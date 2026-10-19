@@ -40,7 +40,7 @@ export default function History() {
       { key: 'pct', label: 'Win %', render: (r) => pct(r.wins, r.losses, r.ties), sort: (r) => winPct(r.wins, r.losses, r.ties) },
       { key: 'ap', label: 'All-Play', render: (r) => record(r.apW, r.apL, r.apT), sort: (r) => r.apW - r.apL / 1000, tip: TIPS.allPlay },
       { key: 'appct', label: 'All-Play %', render: (r) => pct(r.apW, r.apL, r.apT), sort: (r) => winPct(r.apW, r.apL, r.apT) },
-      { key: 'elo', label: 'League Rating', render: (r) => <b>{r.elo}</b>, sort: (r) => r.elo, tip: TIPS.elo },
+      { key: 'elo', label: 'League Rating', render: (r) => <b>{r.elo.toFixed(1)}</b>, sort: (r) => r.elo, tip: TIPS.elo },
       { key: 'troph', label: 'Trophies', render: (r) => <Trophies gold={r.titles} silver={r.seconds} bronze={r.thirds} />, sort: (r) => r.titles * 100 + r.seconds * 10 + r.thirds },
     ],
     Playoffs: [

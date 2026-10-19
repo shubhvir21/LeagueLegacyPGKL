@@ -149,7 +149,7 @@ export const TIPS = {
   luck: 'Actual head-to-head wins minus expected wins from all-play. Positive = lucky.',
   sos: 'Strength of schedule: average points scored by your opponents per game.',
   share: "Your share of all regular-season points scored in the league.",
-  elo: 'Elo rating from completed seasons only (start 1500). The latest season counts at full weight (K=32), each earlier season 20% less.',
+  elo: 'League Rating (0–100) from completed seasons. Each season = 40% all-play win % + 35% points per game vs league average + 25% final finish. Seasons are averaged with recency weights: most recent ×5, then ×3, ×2, then ×1.',
   score: 'Season score (0–100): 30% win %, 30% all-play %, 20% points share, 20% final finish.',
   coach: 'Points scored ÷ max possible points from your roster (optimal lineups).',
   median: 'This league plays the median every week: beating the median is a win.',

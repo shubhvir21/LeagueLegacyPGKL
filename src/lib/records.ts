@@ -65,7 +65,7 @@ export function buildRecords(lg: League): RecordDef[] {
   career('titles', 'Most Championships', 'League titles won.', true, (r) => r.titles, (r) => String(r.titles))
   career('playoffs', 'Most Playoff Appearances', 'Seasons reaching the winners bracket.', true, (r) => r.playoffs, (r) => String(r.playoffs))
   career('pwins', 'Most Playoff Wins', 'Winners-bracket games won.', true, (r) => r.playoffW, (r) => String(r.playoffW))
-  career('elo', 'Highest League Rating', 'Current Elo rating.', true, (r) => r.elo, (r) => String(r.elo))
+  career('elo', 'Highest League Rating', 'Current 0–100 power rating.', true, (r) => r.elo, (r) => r.elo.toFixed(1))
   career('luck', 'Luckiest All-Time', 'Total luck (actual minus expected H2H wins).', true, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)))
   career('unluck', 'Unluckiest All-Time', 'Lowest total luck.', false, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)), true)
   career('highs', 'Most Weekly High Scores', 'Weeks finishing as the top scorer.', true, (r) => careerSum(tsAll, r.member.id, (t) => t.highScores), (r) => String(careerSum(tsAll, r.member.id, (t) => t.highScores)))

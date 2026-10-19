@@ -86,11 +86,7 @@ export interface League {
   eloHistory: { label: string; season: number; week: number; ratings: Record<string, number> }[]
 }
 
-const ELO_START = 1500
-const ELO_K = 32
-// Recency weighting: the latest completed season moves ratings at full K, each season
-// before it a bit less, so recent form counts slightly more than ancient history.
-const ELO_DECAY = 0.8
+const ELO_START = 50 // league rating before a member has a completed season
 const round2 = (n: number) => Math.round(n * 100) / 100
 const nameOverrides = (overrides as { names?: Record<string, string> }).names ?? {}
 // Franchise takeovers: the old owner's seasons count toward the new owner.
@@ -276,25 +272,40 @@ export function buildLeague(raw: RawData): League {
     }
   }
 
-  // Elo over every game of completed seasons, in order. In-progress seasons don't count.
+  // League Rating (power rating, 0–100). Per completed season:
+  //   season power = 40% all-play win % + 35% PPG vs league average + 25% final finish
+  // The rating is a recency-weighted average of a member's completed seasons
+  // (most recent 5, then 3, 2, 1, 1, …), recomputed after each season for the trend line.
+  const power: Record<number, Record<string, number>> = {}
+  for (const s of seasons.filter((x) => x.complete)) {
+    const ts = s.teamSeasons
+    const leaguePpg = ts.reduce((a, t) => a + t.pf / (t.games || 1), 0) / ts.length
+    power[s.year] = {}
+    for (const t of ts) {
+      const ap = (t.apW + t.apT / 2) / (t.apW + t.apL + t.apT || 1)
+      const ppg = Math.max(0, Math.min(100, 50 + 250 * ((t.pf / (t.games || 1)) / leaguePpg - 1)))
+      const finish = (s.teams - (t.finalRank ?? t.regRank)) / (s.teams - 1)
+      power[s.year][t.memberId] = 0.4 * ap * 100 + 0.35 * ppg + 0.25 * finish * 100
+    }
+  }
+  const RECENCY = [5, 3, 2]
+  const ratingAsOf = (id: string, year: number) => {
+    const played = Object.keys(power).map(Number).filter((y) => y <= year && power[y][id] != null).sort((a, b) => b - a)
+    if (!played.length) return null
+    let num = 0, den = 0
+    played.forEach((y, i) => { const w = RECENCY[i] ?? 1; num += w * power[y][id]; den += w })
+    return Math.round((num / den) * 10) / 10
+  }
   const elo: Record<string, number> = {}
   const eloHistory: League['eloHistory'] = []
-  const get = (id: string) => (elo[id] ??= ELO_START)
   games.sort((x, y) => x.season - y.season || x.week - y.week)
-  const lastComplete = Math.max(0, ...seasons.filter((s) => s.complete).map((s) => s.year))
   for (const s of seasons) {
-    for (const t of s.teamSeasons) get(t.memberId)
-    const k = ELO_K * ELO_DECAY ** (lastComplete - s.year)
-    const seasonGames = s.complete ? games.filter((g) => g.season === s.year) : []
-    for (const g of seasonGames) {
-      const ra = get(g.a), rb = get(g.b)
-      const ea = 1 / (1 + 10 ** ((rb - ra) / 400))
-      const sa = g.aPts > g.bPts ? 1 : g.aPts < g.bPts ? 0 : 0.5
-      elo[g.a] = ra + k * (sa - ea)
-      elo[g.b] = rb + k * (ea - sa)
+    for (const t of s.teamSeasons) {
+      const r = ratingAsOf(t.memberId, s.year)
+      if (r != null) elo[t.memberId] = r
+      t.eloEnd = elo[t.memberId] ?? 50
     }
-    for (const t of s.teamSeasons) t.eloEnd = Math.round(elo[t.memberId])
-    eloHistory.push({ label: String(s.year), season: s.year, week: 0, ratings: Object.fromEntries(Object.entries(elo).map(([k, v]) => [k, Math.round(v)])) })
+    eloHistory.push({ label: String(s.year), season: s.year, week: 0, ratings: { ...elo } })
   }
 
   const rosterOwner: League['rosterOwner'] = {}
@@ -309,7 +320,7 @@ export function buildLeague(raw: RawData): League {
     games,
     schedule,
     nflWeek: raw.nflState.week,
-    elo: Object.fromEntries(Object.entries(elo).map(([k, v]) => [k, Math.round(v)])),
+    elo,
     eloHistory,
   }
 }
