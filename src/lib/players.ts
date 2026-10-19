@@ -63,7 +63,7 @@ export interface PlayerModel {
   seasons: PlayerSeason[]
   picks: Pick[]
   moves: Move[]
-  drops: { season: number; week: number; memberId: string; playerId: string; after: number; created: number; standalone: boolean }[]
+  drops: { season: number; week: number; memberId: string; playerId: string; after: number /* value over replacement after the drop, for whoever started him */; created: number; standalone: boolean }[]
   trades: Trade[]
   replacement: Record<number, Record<string, number>>
 }
@@ -210,13 +210,21 @@ export function buildPlayers(lg: League): PlayerModel {
     })
     return round2(total)
   }
-  const ptsAfter = (pid: string, year: number, from: number) => {
+  // Value over replacement a dropped player produced afterwards for *other* teams that
+  // started him (if the dropper picks him back up, those weeks don't count against them).
+  const ptsAfter = (pid: string, year: number, from: number, dropper: string) => {
     let total = 0
     const s = raw.seasons.find((x) => Number(x.league.season) === year)!
+    const owner = lg.rosterOwner[year]
+    const repl = replWeekly(year, pid)
     s.matchups.forEach((wk, i) => {
       const week = i + 1
       if (week < from || week > s.lastScored) return
-      for (const m of wk) total += m.players_points?.[pid] ?? 0
+      for (const m of wk) {
+        if (owner[m.roster_id] === dropper) continue
+        const idx = m.starters.indexOf(pid)
+        if (idx >= 0) total += (m.starters_points[idx] ?? 0) - repl
+      }
     })
     return round2(total)
   }
@@ -233,7 +241,7 @@ export function buildPlayers(lg: League): PlayerModel {
         for (const [pid, rid] of Object.entries(t.adds ?? {})) {
           moves.push({ season: year, week, type: t.type, memberId: owner[rid], playerId: pid, dropId: dropIds[0] ?? null, bid: t.waiver_bid, created: t.created, value: startedFor(pid, year, owner[rid], week) })
         }
-        for (const [pid, rid] of Object.entries(t.drops ?? {})) drops.push({ season: year, week, memberId: owner[rid], playerId: pid, after: ptsAfter(pid, year, week), created: t.created, standalone: !t.adds })
+        for (const [pid, rid] of Object.entries(t.drops ?? {})) drops.push({ season: year, week, memberId: owner[rid], playerId: pid, after: ptsAfter(pid, year, week, owner[rid]), created: t.created, standalone: !t.adds })
       } else if (t.type === 'trade') {
         const sides: TradeSide[] = t.roster_ids.map((rid) => ({ memberId: owner[rid], gets: [], gives: [], picksIn: [], picksOut: [], value: 0 }))
         const side = (rid: number) => sides[t.roster_ids.indexOf(rid)]

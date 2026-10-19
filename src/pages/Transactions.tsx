@@ -49,7 +49,8 @@ export default function Transactions() {
     { key: 'm', label: 'Team', render: (d) => <MemberLink id={d.memberId} /> },
     { key: 'p', label: 'Dropped', render: (d) => <PlayerLink id={d.playerId} /> },
     { key: 'w', label: 'When', render: (d) => `${d.season} W${d.week}` },
-    { key: 'v', label: 'Pts After', render: (d) => <b className="neg">{fmt(d.after)}</b>, sort: (d) => d.after, align: 'right', tip: 'Points the player scored on any roster after being dropped that season.' },
+    { key: 'by', label: 'Started By', render: (d) => <StartedBy d={d} />, },
+    { key: 'v', label: 'Value Lost', render: (d) => <b className={d.after > 0 ? 'neg' : ''}>{signed(d.after)}</b>, sort: (d) => d.after, align: 'right', tip: 'Value over replacement the player produced after being dropped (weeks he started, for any team), that season.' },
   ]
   const tradeValue = (t: Trade) => Math.max(...t.sides.map((s) => Math.abs(s.value)))
   const playerCount: Record<string, number> = {}
@@ -83,11 +84,16 @@ export default function Transactions() {
         <Table rows={rankRows} cols={rankCols} initialSort="total" rowKey={(r) => r.id} />
       </Card>
       <div className="two-col">
-        <Card title="Top Waiver Moves" sub="Pickups that paid off most.">
-          <Table rows={[...moves].sort((a, b) => b.value - a.value).slice(0, 10)} cols={moveCols} rowKey={(m) => `${m.season}-${m.week}-${m.playerId}-${m.memberId}`} />
+        <Card title="Top Waiver Moves" sub="Pickups that paid off most, over replacement.">
+          <Table rows={[...moves].sort((a, b) => b.value - a.value).slice(0, 10)} cols={moveCols} initialSort="v" rowKey={(m) => `${m.season}-${m.week}-${m.playerId}-${m.memberId}`} />
         </Card>
-        <Card title="Worst Drops" sub="Players who produced most after being cut.">
-          <Table rows={[...drops].sort((a, b) => b.after - a.after).slice(0, 10)} cols={dropCols} rowKey={(d) => `${d.season}-${d.week}-${d.playerId}-${d.memberId}`} />
+        <Card title="Worst Waiver Moves" sub="Pickups that hurt most: started below replacement level.">
+          <Table rows={[...moves].sort((a, b) => a.value - b.value).slice(0, 10)} cols={moveCols} initialSort="v" initialAsc rowKey={(m) => `${m.season}-${m.week}-${m.playerId}-${m.memberId}`} />
+        </Card>
+      </div>
+      <div>
+        <Card title="Worst Drops" sub="Cuts that came back to bite: value over replacement after the drop.">
+          <Table rows={[...drops].sort((a, b) => b.after - a.after).slice(0, 10)} cols={dropCols} initialSort="v" rowKey={(d) => `${d.season}-${d.week}-${d.playerId}-${d.memberId}`} />
         </Card>
       </div>
       <Card title="Trades" sub="Most impactful trades first. Values are rest-of-season starting-lineup points." right={<span className="tip" title={TRADE_TIP}>ⓘ</span>}>
@@ -113,4 +119,13 @@ export default function Transactions() {
       </Card>
     </div>
   )
+}
+
+/** Who started a dropped player afterwards (the team that benefited). */
+function StartedBy({ d }: { d: { season: number; week: number; playerId: string; memberId: string } }) {
+  const lg = useLeague()
+  const pm = playersOf(lg)
+  const ids = [...new Set(pm.weeks.filter((w) => w.season === d.season && w.week >= d.week && w.playerId === d.playerId && w.started && w.memberId !== d.memberId).map((w) => w.memberId))]
+  if (!ids.length) return <span className="muted">—</span>
+  return <span className="row">{ids.map((id) => <MemberLink key={id} id={id} avatar={false} />)}</span>
 }
