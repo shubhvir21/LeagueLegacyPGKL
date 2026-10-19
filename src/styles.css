@@ -501,3 +501,54 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
   .tip:hover::after, .tip:focus::after { left: auto; right: -8px; transform: none; max-width: 220px; }
   td .member-link span, td .player-link span:last-child { max-width: 150px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
 }
+
+/* ---------- Franchise valuation ---------- */
+.member-card { position: relative; }
+.member-card.top { border-color: rgba(242,195,91,.45); background: linear-gradient(180deg, rgba(242,195,91,.10), transparent 60%), var(--panel); }
+.member-rank { position: absolute; top: 12px; left: 14px; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.member-card.top .member-rank { color: var(--gold); }
+.valuation { font-family: var(--display); font-size: 22px; font-weight: 750; letter-spacing: -0.02em; color: var(--text); margin-top: 2px; }
+.member-card.top .valuation { color: var(--gold); }
+.yoy { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 650; padding: 2px 8px; border-radius: 99px; width: fit-content; }
+.yoy.up { color: var(--pos); background: rgba(61,220,151,.1); }
+.yoy.down { color: var(--neg); background: rgba(255,107,122,.1); }
+
+.forbes {
+  border-radius: 18px; border: 1px solid var(--border-strong); padding: 26px; display: flex; flex-direction: column; gap: 22px;
+  background: radial-gradient(700px 260px at 100% 0%, rgba(242,195,91,.09), transparent 60%), var(--panel); box-shadow: var(--shadow);
+}
+.forbes-kicker { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); margin-bottom: 12px; }
+.forbes-title { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.forbes-name { font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 32px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; overflow-wrap: anywhere; }
+.forbes-grid { display: grid; grid-template-columns: minmax(240px, 0.9fr) 1.6fr; gap: 24px; align-items: stretch; }
+.forbes-value { display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--border); }
+.forbes-label { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.forbes-value .forbes-label { margin-bottom: 0; }
+.forbes-big { font-family: 'Playfair Display', Georgia, serif; font-size: 46px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; color: var(--text); }
+.forbes-spark { margin-top: auto; }
+.forbes-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--border); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.fact { background: var(--panel-2); padding: 14px 16px; }
+.fact dt { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.fact dd { margin: 4px 0 0; font-family: var(--display); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.forbes-take { border-left: 3px solid var(--gold); padding: 4px 0 4px 18px; }
+.forbes-take p { font-family: 'Playfair Display', Georgia, serif; font-size: 17px; line-height: 1.65; color: var(--text-2); max-width: 900px; }
+.forbes-split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.split-row { display: grid; grid-template-columns: 150px 1fr auto; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--grid); font-size: 13px; color: var(--text-2); }
+.forbes-split > div:last-child .split-row { grid-template-columns: 1fr auto; }
+.split-row.total { border-bottom: 0; border-top: 1px solid var(--border-strong); margin-top: 4px; color: var(--text); font-weight: 600; }
+.split-bar { height: 6px; border-radius: 3px; background: var(--panel-3); overflow: hidden; }
+.split-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), #d9a53a); border-radius: 3px; }
+.forbes-foot { margin-top: -6px; }
+
+@media (max-width: 900px) {
+  .forbes-grid, .forbes-split { grid-template-columns: minmax(0, 1fr); }
+  .forbes-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .forbes { padding: 18px; gap: 18px; border-radius: 16px; }
+  .forbes-name { font-size: 24px; }
+  .forbes-big { font-size: 38px; }
+  .forbes-take p { font-size: 15.5px; }
+  .split-row { grid-template-columns: 110px 1fr auto; }
+  .fact dd { font-size: 17px; }
+}

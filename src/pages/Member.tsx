@@ -4,21 +4,46 @@ import { useLeague } from '../lib/data'
 import { careers, fmt, headToHead, ordinal, pct, record, type TeamSeason } from '../lib/stats'
 import { Avatar, Card, MemberLink, RankBadge, Stat, Table, Trophies, TIPS, type Col } from '../components/ui'
 import { seasonRange, signed } from './History'
+import { valuationTable } from '../lib/valuation'
+import { money } from '../lib/valuation'
+import { FranchiseProfile } from '../components/FranchiseProfile'
 
 export function Members() {
   const lg = useLeague()
   const rows = careers(lg)
-  const current = lg.seasons[0].year
+  const table = valuationTable(lg)
+  const byId = Object.fromEntries(rows.map((r) => [r.member.id, r]))
+  const valued = new Set(table.map((v) => v.memberId))
+  const year = table[0]?.year
   return (
     <div className="page">
-      <h1>Members</h1>
+      <div className="page-head">
+        <div>
+          <h1>Members</h1>
+          <p className="muted">Ranked by franchise valuation{year ? ` · as of the end of ${year}` : ''}.</p>
+        </div>
+      </div>
       <div className="member-grid">
-        {rows.map((r) => (
-          <Link key={r.member.id} to={`/member/${r.member.id}`} className={`member-card ${r.seasons.includes(current) ? '' : 'inactive'}`}>
+        {table.map((v, i) => {
+          const r = byId[v.memberId]
+          if (!r) return null
+          return (
+            <Link key={v.memberId} to={`/member/${v.memberId}`} className={`member-card ${i === 0 ? 'top' : ''}`}>
+              <span className="member-rank">#{i + 1}</span>
+              <Avatar id={v.memberId} size={56} />
+              <div className="member-card-name">{r.member.name}</div>
+              <div className="valuation">{money(v.value)}</div>
+              {v.change != null && <span className={`yoy ${v.change >= 0 ? 'up' : 'down'}`}>{v.change >= 0 ? '▲' : '▼'} {Math.abs(v.change).toFixed(1)}%</span>}
+              <div className="muted small">{seasonRange(r.seasons)} · {record(r.wins, r.losses, r.ties)}</div>
+              <Trophies gold={r.titles} silver={r.seconds} bronze={r.thirds} />
+            </Link>
+          )
+        })}
+        {rows.filter((r) => !valued.has(r.member.id)).map((r) => (
+          <Link key={r.member.id} to={`/member/${r.member.id}`} className="member-card inactive">
             <Avatar id={r.member.id} size={56} />
             <div className="member-card-name">{r.member.name}</div>
-            <div className="muted small">{seasonRange(r.seasons)} · {record(r.wins, r.losses, r.ties)}</div>
-            <Trophies gold={r.titles} silver={r.seconds} bronze={r.thirds} />
+            <div className="muted small">Not yet valued — needs a completed season</div>
           </Link>
         ))}
       </div>
@@ -69,6 +94,8 @@ export default function Member() {
           <p className="muted">{row.seasons.length} seasons · {record(row.wins, row.losses, row.ties)} league record</p>
         </div>
       </div>
+      <FranchiseProfile id={id} />
+
       <Card title="Overview">
         <p className="blurb">{blurb}</p>
         <div className="stat-grid">
