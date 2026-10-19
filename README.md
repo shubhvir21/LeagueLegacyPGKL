@@ -18,3 +18,9 @@ npm run sync   # refresh the committed snapshot in public/data/league.json
 - Stat definitions live in `src/lib/stats.ts` and in the ⓘ tooltips.
 
 See `PROMPT.md` for the full build plan.
+
+## Deploy
+
+GitHub Actions (`.github/workflows/deploy.yml`) builds and publishes to GitHub Pages on every
+push to `main`. It also runs nightly and Tuesday mornings to re-sync from Sleeper, commit the new
+snapshot, and redeploy. Trigger it manually from the repo's **Actions → Sync & Deploy → Run workflow**.

@@ -1,0 +1,61 @@
+name: Sync & Deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 9 * * *'   # nightly, ~5am ET
+    - cron: '0 12 * * 2'  # Tuesday ~8am ET, after Monday Night Football
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Scheduled / manual runs pull fresh data from Sleeper and commit the snapshot.
+      - name: Sync from Sleeper
+        if: github.event_name != 'push'
+        run: npm run sync
+      - name: Commit snapshot
+        if: github.event_name != 'push'
+        run: |
+          if git diff --quiet public/data; then
+            echo "No data changes."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add public/data
+            git commit -m "Sync league data from Sleeper"
+            git push
+          fi
+
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
