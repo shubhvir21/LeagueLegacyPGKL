@@ -1,16 +1,16 @@
 // Legacy Score: ranks every completed team-season against all others.
 //
-// Each component is a z-score *within its own season* (so a high-scoring year doesn't
-// inflate everyone), then blended and mapped onto a 0–100 scale (50 = an average team).
+// Every part is a 0–100 sub-score, then blended:
 //
-//   Results     30%  final finish (title-weighted) + regular-season seed
-//   Dominance   30%  points-per-game, all-play win %, and average margin of victory
-//   Talent      25%  roster value: starting-lineup points over replacement level
-//   Consistency 15%  weekly floor (mean − 1 SD of weekly scores) and median-beat rate
+//   Finish        20%  exact final finish: champion 100, last 0, evenly spaced between
+//   Reg. Season   10%  regular-season seed and win % (incl. median games)
+//   Dominance     30%  points-per-game, all-play win %, and average margin
+//   Talent        25%  roster value: starting-lineup points over replacement level
+//   Consistency   15%  weekly floor (mean − 1 SD of weekly scores) and median-beat rate
 //
-// On top of the blend: +4 for a championship, −2 for a toilet-bowl loss. Ties in the
-// title race are rare, so this bonus mostly separates champions from equally strong
-// teams that flamed out in the playoffs.
+// Finish is absolute. The other parts are z-scores *within their own season* (so a
+// high-scoring year doesn't inflate everyone), mapped as 50 + 20·z and clamped to 0–100,
+// so 50 is an average team and roughly ±2 SD spans 10–90.
 import { playersOf } from './players'
 import { teamWeeks } from './records'
 import type { League, TeamSeason } from './stats'
@@ -18,7 +18,9 @@ import type { League, TeamSeason } from './stats'
 export interface TeamRank {
   t: TeamSeason
   score: number
-  results: number
+  // 0–100 sub-scores
+  finish: number
+  regular: number
   dominance: number
   talent: number
   consistency: number
@@ -28,7 +30,7 @@ export interface TeamRank {
   floor: number
 }
 
-const W = { results: 0.3, dominance: 0.3, talent: 0.25, consistency: 0.15 }
+export const WEIGHTS = { finish: 0.2, regular: 0.1, dominance: 0.3, talent: 0.25, consistency: 0.15 }
 
 function z(values: number[]) {
   const mean = values.reduce((a, b) => a + b, 0) / values.length
@@ -36,13 +38,7 @@ function z(values: number[]) {
   return values.map((v) => (v - mean) / sd)
 }
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0)
-
-/** Finish → 0..1 with extra weight at the top (title ≫ runner-up ≫ 3rd). */
-function finishValue(rank: number, n: number, playoffs: boolean) {
-  const base = (n - rank) / (n - 1)
-  const bonus = rank === 1 ? 0.35 : rank === 2 ? 0.18 : rank === 3 ? 0.1 : playoffs ? 0.04 : 0
-  return base + bonus
-}
+const toScore = (zv: number) => Math.max(0, Math.min(100, 50 + 20 * zv))
 
 export function teamRankings(lg: League): TeamRank[] {
   const pm = playersOf(lg)
@@ -71,27 +67,27 @@ export function teamRankings(lg: League): TeamRank[] {
         rosterValue,
         floor: mean - sd,
         medRate: t.medW / (t.medW + t.medL || 1),
-        finish: finishValue(t.finalRank ?? t.regRank, s.teams, t.madePlayoffs),
         seed: (s.teams - t.regRank) / (s.teams - 1),
+        winPct: (t.wins + t.ties / 2) / (t.wins + t.losses + t.ties || 1),
       }
     })
 
-    const zFinish = z(rows.map((r) => r.finish)), zSeed = z(rows.map((r) => r.seed))
+    const zSeed = z(rows.map((r) => r.seed)), zWin = z(rows.map((r) => r.winPct))
     const zPpg = z(rows.map((r) => r.ppg)), zAp = z(rows.map((r) => r.ap)), zMargin = z(rows.map((r) => r.margin))
     const zTalent = z(rows.map((r) => r.rosterValue))
     const zFloor = z(rows.map((r) => r.floor)), zMed = z(rows.map((r) => r.medRate))
 
     rows.forEach((r, i) => {
-      const results = 0.7 * zFinish[i] + 0.3 * zSeed[i]
-      const dominance = 0.4 * zPpg[i] + 0.35 * zAp[i] + 0.25 * zMargin[i]
-      const talent = zTalent[i]
-      const consistency = 0.6 * zFloor[i] + 0.4 * zMed[i]
-      const blend = W.results * results + W.dominance * dominance + W.talent * talent + W.consistency * consistency
-      const bonus = (r.t.finalRank === 1 ? 4 : 0) - (s.toiletBowlLoser === r.t.memberId ? 2 : 0)
-      // ~±2 SD maps to ~10–90; clamp to 0–100.
-      const score = Math.max(0, Math.min(100, 50 + 20 * blend + bonus))
+      const finish = (100 * (s.teams - (r.t.finalRank ?? s.teams))) / (s.teams - 1)
+      const regular = toScore(0.5 * zSeed[i] + 0.5 * zWin[i])
+      const dominance = toScore(0.4 * zPpg[i] + 0.35 * zAp[i] + 0.25 * zMargin[i])
+      const talent = toScore(zTalent[i])
+      const consistency = toScore(0.6 * zFloor[i] + 0.4 * zMed[i])
+      const score =
+        WEIGHTS.finish * finish + WEIGHTS.regular * regular + WEIGHTS.dominance * dominance +
+        WEIGHTS.talent * talent + WEIGHTS.consistency * consistency
       out.push({
-        t: r.t, score, results, dominance, talent, consistency,
+        t: r.t, score, finish, regular, dominance, talent, consistency,
         ppg: r.ppg, margin: r.margin, rosterValue: r.rosterValue, floor: r.floor,
       })
     })

@@ -184,8 +184,7 @@ export function seasonRange(years: number[]) {
 
 export const signed = (n: number) => (n > 0 ? '+' : '') + fmt(n)
 
-const RANK_TIP = 'Legacy Score (0–100, 50 = average). Each part is compared only against teams from the same season: Results 30% (finish, title-weighted, plus seed), Dominance 30% (PPG, all-play %, avg margin), Talent 25% (starting-lineup points over replacement), Consistency 15% (weekly floor, median-beat rate). +4 for a title, −2 for losing the toilet bowl.'
-const sub = (z: number) => Math.round(Math.max(0, Math.min(100, 50 + 20 * z)))
+const RANK_TIP = 'Legacy Score (0–100). Finish 20% (champion 100, last 0) · Regular Season 10% (seed and win %) · Dominance 30% (PPG, all-play %, avg margin) · Talent 25% (starting-lineup points over replacement) · Consistency 15% (weekly floor, median-beat rate). Everything except Finish is compared against teams from the same season, where 50 = average.'
 
 function Meter({ v }: { v: number }) {
   return (
@@ -213,13 +212,14 @@ function TeamRankings({ lg }: { lg: League }) {
       ),
     },
     { key: 'yr', label: 'Season', render: (r) => r.t.season, sort: (r) => r.t.season },
-    { key: 'fin', label: 'Finish', render: (r) => <RankFinish r={r} lg={lg} />, sort: (r) => -(r.t.finalRank ?? 99) },
+    { key: 'fin', label: 'Place', render: (r) => <RankFinish r={r} lg={lg} />, sort: (r) => -(r.t.finalRank ?? 99) },
     { key: 'rec', label: 'Record', render: (r) => record(r.t.wins, r.t.losses, r.t.ties), sort: (r) => r.t.wins - r.t.losses / 1000 },
     { key: 'ppg', label: 'PPG', render: (r) => fmt(r.ppg), sort: (r) => r.ppg, align: 'right' },
-    { key: 'res', label: 'Results', render: (r) => <Meter v={sub(r.results)} />, sort: (r) => r.results },
-    { key: 'dom', label: 'Dominance', render: (r) => <Meter v={sub(r.dominance)} />, sort: (r) => r.dominance },
-    { key: 'tal', label: 'Talent', render: (r) => <Meter v={sub(r.talent)} />, sort: (r) => r.talent, tip: 'Starting-lineup points over replacement level.' },
-    { key: 'con', label: 'Consistency', render: (r) => <Meter v={sub(r.consistency)} />, sort: (r) => r.consistency },
+    { key: 'fin2', label: 'Finish', render: (r) => <Meter v={Math.round(r.finish)} />, sort: (r) => r.finish, tip: '20% · Exact final finish: champion 100, last 0.' },
+    { key: 'reg', label: 'Reg. Season', render: (r) => <Meter v={Math.round(r.regular)} />, sort: (r) => r.regular, tip: '10% · Regular-season seed and win %.' },
+    { key: 'dom', label: 'Dominance', render: (r) => <Meter v={Math.round(r.dominance)} />, sort: (r) => r.dominance, tip: '30% · Points per game, all-play win %, average margin.' },
+    { key: 'tal', label: 'Talent', render: (r) => <Meter v={Math.round(r.talent)} />, sort: (r) => r.talent, tip: '25% · Starting-lineup points over replacement level.' },
+    { key: 'con', label: 'Consistency', render: (r) => <Meter v={Math.round(r.consistency)} />, sort: (r) => r.consistency, tip: '15% · Weekly scoring floor and median-beat rate.' },
     { key: 'score', label: 'Legacy Score', render: (r) => <span className="legacy-score">{r.score.toFixed(1)}</span>, sort: (r) => r.score, align: 'right', tip: RANK_TIP },
   ]
   return (
