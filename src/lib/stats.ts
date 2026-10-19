@@ -60,6 +60,7 @@ export interface Season {
   champion: string | null
   runnerUp: string | null
   third: string | null
+  toiletBowlLoser: string | null // lost the losers-bracket final (lower score advances)
 }
 
 export interface ScheduledGame {
@@ -87,6 +88,9 @@ export interface League {
 
 const ELO_START = 1500
 const ELO_K = 32
+// Recency weighting: the latest completed season moves ratings at full K, each season
+// before it a bit less, so recent form counts slightly more than ancient history.
+const ELO_DECAY = 0.8
 const round2 = (n: number) => Math.round(n * 100) / 100
 const nameOverrides = (overrides as { names?: Record<string, string> }).names ?? {}
 // Franchise takeovers: the old owner's seasons count toward the new owner.
@@ -240,6 +244,11 @@ function buildSeason(raw: RawSeason, games: Game[], schedule: ScheduledGame[]) {
     year, leagueId: league.league_id, name: league.name, status: league.status, complete,
     teams: n, playoffTeams, playoffStart, weeksPlayed, teamSeasons: list,
     champion: byRank(1), runnerUp: byRank(2), third: byRank(3),
+    // Toilet bowl: the lower score advances, so the final's "winner" is the real loser.
+    toiletBowlLoser: (() => {
+      const f = raw.losersBracket.find((b) => b.p === 1)
+      return complete && f?.w != null ? owner[f.w] : null
+    })(),
   }
   return season
 }
@@ -267,20 +276,22 @@ export function buildLeague(raw: RawData): League {
     }
   }
 
-  // Elo over every game, in order.
+  // Elo over every game of completed seasons, in order. In-progress seasons don't count.
   const elo: Record<string, number> = {}
   const eloHistory: League['eloHistory'] = []
   const get = (id: string) => (elo[id] ??= ELO_START)
   games.sort((x, y) => x.season - y.season || x.week - y.week)
+  const lastComplete = Math.max(0, ...seasons.filter((s) => s.complete).map((s) => s.year))
   for (const s of seasons) {
     for (const t of s.teamSeasons) get(t.memberId)
-    const seasonGames = games.filter((g) => g.season === s.year)
+    const k = ELO_K * ELO_DECAY ** (lastComplete - s.year)
+    const seasonGames = s.complete ? games.filter((g) => g.season === s.year) : []
     for (const g of seasonGames) {
       const ra = get(g.a), rb = get(g.b)
       const ea = 1 / (1 + 10 ** ((rb - ra) / 400))
       const sa = g.aPts > g.bPts ? 1 : g.aPts < g.bPts ? 0 : 0.5
-      elo[g.a] = ra + ELO_K * (sa - ea)
-      elo[g.b] = rb + ELO_K * (1 - sa - (1 - ea))
+      elo[g.a] = ra + k * (sa - ea)
+      elo[g.b] = rb + k * (ea - sa)
     }
     for (const t of s.teamSeasons) t.eloEnd = Math.round(elo[t.memberId])
     eloHistory.push({ label: String(s.year), season: s.year, week: 0, ratings: Object.fromEntries(Object.entries(elo).map(([k, v]) => [k, Math.round(v)])) })
@@ -340,7 +351,8 @@ export function careers(lg: League): CareerRow[] {
       r.avgScore += t.seasonScore
     }
   }
-  for (const g of lg.games.filter((g) => g.bracket === 'winners')) {
+  // Playoff record excludes the 5th-place game.
+  for (const g of lg.games.filter((g) => g.bracket === 'winners' && g.place !== 5)) {
     const aw = g.aPts > g.bPts
     if (rows[g.a]) aw ? rows[g.a].playoffW++ : rows[g.a].playoffL++
     if (rows[g.b]) aw ? rows[g.b].playoffL++ : rows[g.b].playoffW++

@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
-import { careers, fmt, pct, record, type CareerRow, type League, type TeamSeason } from '../lib/stats'
-import { Card, MemberLink, Table, Tabs, Trophies, TIPS, type Col } from '../components/ui'
+import { careers, fmt, pct, record, type CareerRow, type League, type Season, type TeamSeason } from '../lib/stats'
+import { Avatar, Card, MemberLink, Table, Tabs, Trophies, TIPS, type Col } from '../components/ui'
+import { teamRankings, type TeamRank } from '../lib/teamRank'
 
 export const PALETTE = ['#7c8cff', '#3ddc97', '#f2c35b', '#ff7a8a', '#a78bfa', '#5ec8f2', '#ff9f5a', '#c6e66b', '#f0abfc', '#8a93a6', '#4fd1c5', '#e8b4b8']
 
@@ -26,36 +27,34 @@ export default function History() {
   const [tab, setTab] = useState<(typeof STANDINGS_TABS)[number]>('All-Time')
   const [seasonTab, setSeasonTab] = useState<(typeof SEASON_TABS)[number]>('Champions')
   const [metric, setMetric] = useState<Metric>('League Rating')
-  const [showInactive, setShowInactive] = useState(false)
-  const current = lg.seasons[0].year
-  const visible = showInactive ? rows : rows.filter((r) => r.seasons.includes(current))
-
+  const winPct = (w: number, l: number, t = 0) => (w + t / 2) / (w + l + t || 1)
   const base: Col<CareerRow>[] = [
     { key: 'rank', label: '#', render: (_r, i) => i + 1 },
-    { key: 'team', label: 'Member', render: (r) => <MemberLink id={r.member.id} /> },
-    { key: 'seasons', label: 'Seasons', render: (r) => `${seasonRange(r.seasons)} (${r.seasons.length})`, sort: (r) => r.seasons.length },
+    { key: 'team', label: 'Member', render: (r) => <MemberLink id={r.member.id} />, sort: (r) => r.member.name.toLowerCase() },
   ]
+  const seasonsCol: Col<CareerRow> = { key: 'seasons', label: 'Seasons', render: (r) => `${seasonRange(r.seasons)} (${r.seasons.length})`, sort: (r) => r.seasons.length }
   const cols: Record<typeof tab, Col<CareerRow>[]> = {
     'All-Time': [
       ...base,
-      { key: 'rec', label: 'Record', render: (r) => record(r.wins, r.losses, r.ties), sort: (r) => r.wins, tip: TIPS.median },
-      { key: 'pct', label: 'Win %', render: (r) => pct(r.wins, r.losses, r.ties), sort: (r) => r.wins / (r.wins + r.losses + r.ties || 1) },
-      { key: 'ap', label: 'All-Play', render: (r) => record(r.apW, r.apL, r.apT), sort: (r) => r.apW, tip: TIPS.allPlay },
-      { key: 'appct', label: 'All-Play %', render: (r) => pct(r.apW, r.apL, r.apT), sort: (r) => r.apW / (r.apW + r.apL + r.apT || 1) },
+      { key: 'rec', label: 'Record', render: (r) => record(r.wins, r.losses, r.ties), sort: (r) => r.wins - r.losses / 1000, tip: TIPS.median },
+      { key: 'pct', label: 'Win %', render: (r) => pct(r.wins, r.losses, r.ties), sort: (r) => winPct(r.wins, r.losses, r.ties) },
+      { key: 'ap', label: 'All-Play', render: (r) => record(r.apW, r.apL, r.apT), sort: (r) => r.apW - r.apL / 1000, tip: TIPS.allPlay },
+      { key: 'appct', label: 'All-Play %', render: (r) => pct(r.apW, r.apL, r.apT), sort: (r) => winPct(r.apW, r.apL, r.apT) },
       { key: 'elo', label: 'League Rating', render: (r) => <b>{r.elo}</b>, sort: (r) => r.elo, tip: TIPS.elo },
       { key: 'troph', label: 'Trophies', render: (r) => <Trophies gold={r.titles} silver={r.seconds} bronze={r.thirds} />, sort: (r) => r.titles * 100 + r.seconds * 10 + r.thirds },
     ],
     Playoffs: [
       ...base,
       { key: 'apps', label: 'Appearances', render: (r) => r.playoffs, sort: (r) => r.playoffs },
-      { key: 'prec', label: 'Playoff Record', render: (r) => record(r.playoffW, r.playoffL), sort: (r) => r.playoffW },
-      { key: 'ppct', label: 'Playoff Win %', render: (r) => pct(r.playoffW, r.playoffL), sort: (r) => r.playoffW / (r.playoffW + r.playoffL || 1) },
+      { key: 'prec', label: 'Playoff Record', render: (r) => record(r.playoffW, r.playoffL), sort: (r) => r.playoffW - r.playoffL / 1000, tip: 'Winners-bracket games, excluding the 5th-place game.' },
+      { key: 'ppct', label: 'Playoff Win %', render: (r) => pct(r.playoffW, r.playoffL), sort: (r) => winPct(r.playoffW, r.playoffL) },
       { key: 'titles', label: 'Titles', render: (r) => r.titles, sort: (r) => r.titles },
       { key: 'finals', label: 'Finals', render: (r) => r.titles + r.seconds, sort: (r) => r.titles + r.seconds },
-      { key: 'avgf', label: 'Avg Finish', render: (r) => (r.avgFinish != null ? r.avgFinish.toFixed(1) : '—'), sort: (r) => -(r.avgFinish ?? 99) },
+      { key: 'avgf', label: 'Avg Finish', render: (r) => (r.avgFinish != null ? r.avgFinish.toFixed(1) : '—'), sort: (r) => r.avgFinish ?? 99, tip: 'Lower is better.' },
     ],
     Advanced: [
       ...base,
+      seasonsCol,
       { key: 'pf', label: 'Points For', render: (r) => fmt(r.pf), sort: (r) => r.pf, align: 'right' },
       { key: 'ppg', label: 'PPG', render: (r) => fmt(r.pf / (r.games || 1)), sort: (r) => r.pf / (r.games || 1), align: 'right' },
       { key: 'pa', label: 'Points Against', render: (r) => fmt(r.pa), sort: (r) => r.pa, align: 'right' },
@@ -70,16 +69,13 @@ export default function History() {
       <h1>League History</h1>
       <Card
         title="Standings"
-        sub="Every manager's all-time numbers. Click a column to sort."
-        right={
-          <label className="check">
-            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> Show inactive members
-          </label>
-        }
+        sub="Every manager's all-time numbers. Click a column header to sort; click again to flip high/low."
       >
         <Tabs tabs={STANDINGS_TABS} value={tab} onChange={setTab} />
-        <Table key={tab} rows={visible} cols={cols[tab]} rowKey={(r) => r.member.id} />
+        <Table key={tab} rows={rows} cols={cols[tab]} initialSort={{ 'All-Time': 'elo', Playoffs: 'apps', Advanced: 'ppg' }[tab]} rowKey={(r) => r.member.id} />
       </Card>
+
+      <TeamRankings lg={lg} />
 
       <Card title="Season by Season" sub="Champions and leaders for every season.">
         <Tabs tabs={SEASON_TABS} value={seasonTab} onChange={setSeasonTab} />
@@ -102,7 +98,7 @@ export default function History() {
 }
 
 function SeasonTable({ lg, mode }: { lg: League; mode: 'Champions' | 'Chumpions' }) {
-  const awards = (pick: (ts: TeamSeason[]) => TeamSeason | undefined) => (ts: TeamSeason[]) => pick(ts)?.memberId ?? null
+  const awards = (pick: (ts: TeamSeason[]) => TeamSeason | undefined) => (s: Season) => pick(s.teamSeasons)?.memberId ?? null
   const maxBy = (f: (t: TeamSeason) => number) => (ts: TeamSeason[]) => [...ts].sort((a, b) => f(b) - f(a))[0]
   const minBy = (f: (t: TeamSeason) => number) => (ts: TeamSeason[]) => [...ts].sort((a, b) => f(a) - f(b))[0]
   const champCols = [
@@ -114,7 +110,8 @@ function SeasonTable({ lg, mode }: { lg: League; mode: 'Champions' | 'Chumpions'
     { label: 'All-Play Leader', get: awards(maxBy((t) => t.apW)) },
   ]
   const chumpCols = [
-    { label: 'Last Place', get: awards((ts) => [...ts].sort((a, b) => (b.finalRank ?? b.regRank) - (a.finalRank ?? a.regRank))[0]) },
+    { label: 'Reg. Season Last', get: awards((ts) => ts.find((t) => t.regRank === ts.length)) },
+    { label: 'Toilet Bowl Loser', get: (s: Season) => s.toiletBowlLoser },
     { label: 'Fewest Points', get: awards(minBy((t) => t.pf)) },
     { label: 'Worst All-Play', get: awards(minBy((t) => t.apW)) },
     { label: 'Most Points Against', get: awards(maxBy((t) => t.pa)) },
@@ -132,8 +129,8 @@ function SeasonTable({ lg, mode }: { lg: League; mode: 'Champions' | 'Chumpions'
             <tr key={s.year}>
               <td><Link to={`/season/${s.year}`}><b>{s.year}</b></Link>{!s.complete && <span className="pill">in progress</span>}</td>
               {cols.map((c) => {
-                const id = c.get(s.teamSeasons)
-                const placement = ['Champion', 'Runner-up', 'Third', 'Last Place'].includes(c.label)
+                const id = c.get(s)
+                const placement = ['Champion', 'Runner-up', 'Third', 'Toilet Bowl Loser'].includes(c.label)
                 return <td key={c.label}>{placement && !s.complete ? <span className="muted">—</span> : <MemberLink id={id} />}</td>
               })}
             </tr>
@@ -160,7 +157,11 @@ function TrendChart({ lg, metric }: { lg: League; metric: Metric }) {
         <CartesianGrid stroke="var(--grid)" />
         <XAxis dataKey="season" stroke="var(--muted)" />
         <YAxis stroke="var(--muted)" reversed={reversed} domain={['auto', 'auto']} allowDecimals={!reversed} />
-        <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }} />
+        <Tooltip
+          contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }}
+          // Best first: highest value on top, except rank where 1st is best.
+          itemSorter={(item) => (reversed ? 1 : -1) * Number(item.value ?? 0)}
+        />
         <Legend />
         {ids.map((id, i) => (
           <Line key={id} dataKey={id} name={lg.memberById[id]?.name} stroke={PALETTE[i % PALETTE.length]} strokeWidth={2} dot={{ r: 3 }} connectNulls />
@@ -182,3 +183,57 @@ export function seasonRange(years: number[]) {
 }
 
 export const signed = (n: number) => (n > 0 ? '+' : '') + fmt(n)
+
+const RANK_TIP = 'Legacy Score (0–100, 50 = average). Each part is compared only against teams from the same season: Results 30% (finish, title-weighted, plus seed), Dominance 30% (PPG, all-play %, avg margin), Talent 25% (starting-lineup points over replacement), Consistency 15% (weekly floor, median-beat rate). +4 for a title, −2 for losing the toilet bowl.'
+const sub = (z: number) => Math.round(Math.max(0, Math.min(100, 50 + 20 * z)))
+
+function Meter({ v }: { v: number }) {
+  return (
+    <span className="meter" title={`${v}/100`}>
+      <span className="meter-track"><span className="meter-bar" style={{ width: `${v}%`, background: v >= 60 ? 'var(--pos)' : v <= 40 ? 'var(--neg)' : 'var(--accent)' }} /></span>
+      <span className="meter-num">{v}</span>
+    </span>
+  )
+}
+
+function TeamRankings({ lg }: { lg: League }) {
+  const all = teamRankings(lg)
+  const [view, setView] = useState<'Best 25' | 'Worst 25'>('Best 25')
+  const rows = view === 'Best 25' ? all.slice(0, 25) : [...all].reverse().slice(0, 25)
+  const place = new Map(all.map((r, i) => [r, i + 1]))
+  const cols: Col<TeamRank>[] = [
+    { key: 'rk', label: '#', render: (r) => <b>{place.get(r)}</b>, sort: (r) => -place.get(r)! },
+    {
+      key: 'team', label: 'Team', sort: (r) => r.t.teamName.toLowerCase(),
+      render: (r) => (
+        <Link to={`/season/${r.t.season}/team/${r.t.memberId}`} className="member-link">
+          <Avatar id={r.t.memberId} />
+          <span>{r.t.teamName}<span className="muted small"> · {lg.memberById[r.t.memberId]?.name}</span></span>
+        </Link>
+      ),
+    },
+    { key: 'yr', label: 'Season', render: (r) => r.t.season, sort: (r) => r.t.season },
+    { key: 'fin', label: 'Finish', render: (r) => <RankFinish r={r} lg={lg} />, sort: (r) => -(r.t.finalRank ?? 99) },
+    { key: 'rec', label: 'Record', render: (r) => record(r.t.wins, r.t.losses, r.t.ties), sort: (r) => r.t.wins - r.t.losses / 1000 },
+    { key: 'ppg', label: 'PPG', render: (r) => fmt(r.ppg), sort: (r) => r.ppg, align: 'right' },
+    { key: 'res', label: 'Results', render: (r) => <Meter v={sub(r.results)} />, sort: (r) => r.results },
+    { key: 'dom', label: 'Dominance', render: (r) => <Meter v={sub(r.dominance)} />, sort: (r) => r.dominance },
+    { key: 'tal', label: 'Talent', render: (r) => <Meter v={sub(r.talent)} />, sort: (r) => r.talent, tip: 'Starting-lineup points over replacement level.' },
+    { key: 'con', label: 'Consistency', render: (r) => <Meter v={sub(r.consistency)} />, sort: (r) => r.consistency },
+    { key: 'score', label: 'Legacy Score', render: (r) => <span className="legacy-score">{r.score.toFixed(1)}</span>, sort: (r) => r.score, align: 'right', tip: RANK_TIP },
+  ]
+  return (
+    <Card title="Team Rankings" sub={`The best and worst single-season teams in league history (${all.length} completed team-seasons). Click a column to sort.`}>
+      <Tabs tabs={['Best 25', 'Worst 25'] as const} value={view} onChange={setView} />
+      <Table key={view} rows={rows} cols={cols} initialSort="score" initialAsc={view === 'Worst 25'} rowKey={(r) => `${r.t.season}-${r.t.memberId}`} />
+      {all.length < 50 && <p className="muted small" style={{ marginTop: 12 }}>With {all.length} completed team-seasons so far, the two lists overlap. They’ll separate as more seasons finish.</p>}
+    </Card>
+  )
+}
+
+function RankFinish({ r, lg }: { r: TeamRank; lg: League }) {
+  const s = lg.seasons.find((x) => x.year === r.t.season)!
+  const f = r.t.finalRank!
+  const cls = f === 1 ? 'gold' : f === 2 ? 'silver' : f === 3 ? 'bronze' : ''
+  return <span className={`rank ${cls}`}>{f === 1 ? 'Champ' : s.toiletBowlLoser === r.t.memberId ? 'Toilet' : f}</span>
+}

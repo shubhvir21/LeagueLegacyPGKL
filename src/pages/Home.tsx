@@ -15,9 +15,7 @@ export default function Home() {
   const lastGames = lg.games.filter((g) => g.season === current.year && g.week === lastWeek)
   const nextWeek = Math.min(...lg.schedule.filter((g) => g.season === current.year).map((g) => g.week))
   const upcoming = lg.schedule.filter((g) => g.season === current.year && g.week === nextWeek)
-  const champs = lg.seasons.filter((s) => s.complete && s.champion).slice(0, 3)
-  // Most recent champion in the middle, the two before it on either side.
-  const podium = [champs[1], champs[0], champs[2]]
+  const champs = lg.seasons.filter((s) => s.complete && s.champion) // newest first
   const pm = playersOf(lg)
   const activity = [
     ...pm.moves.map((m) => ({ created: m.created, kind: m.type === 'free_agent' ? 'Free agent' : 'Waiver', m })),
@@ -35,15 +33,18 @@ export default function Home() {
           <p className="muted">{lg.seasons.length} seasons · {current.teams} teams · {current.year} {current.complete ? 'complete' : `through week ${current.weeksPlayed}`}</p>
         </div>
         {champs.length > 0 && (
-          <div className="hero-podium" aria-label="Recent champions">
-            {podium.map((s, i) => s && (
-              <Link key={s.year} to={`/season/${s.year}`} className={`hero-step ${i === 1 ? 'p1' : ''}`}>
-                <Avatar id={s.champion!} size={i === 1 ? 56 : 44} />
-                <b>{lg.memberById[s.champion!]?.name}</b>
-                <span className={`place ${i === 1 ? 'p1' : 'p2'}`}>{s.year} Champion</span>
-              </Link>
+          <ol className="champ-list" aria-label="Champions">
+            {champs.map((s, i) => (
+              <li key={s.year}>
+                <Link to={`/season/${s.year}`} className={`champ-row ${i === 0 ? 'latest' : ''}`}>
+                  <span className="champ-year">{s.year}</span>
+                  <Avatar id={s.champion!} size={i === 0 ? 34 : 26} />
+                  <span className="champ-name">{lg.memberById[s.champion!]?.name}</span>
+                  {i === 0 && <span className="champ-tag"><Icon name="trophy" size={12} /> Reigning</span>}
+                </Link>
+              </li>
             ))}
-          </div>
+          </ol>
         )}
       </div>
 

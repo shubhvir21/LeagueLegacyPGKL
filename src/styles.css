@@ -377,6 +377,31 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
 .trade-side .row { justify-content: space-between; flex-wrap: nowrap; }
 .trade-side .small.muted { text-transform: uppercase; letter-spacing: .07em; font-size: 10.5px; font-weight: 600; margin-top: 4px; }
 
+/* ---------- Team rankings ---------- */
+.meter { display: inline-flex; align-items: center; gap: 8px; }
+.meter-track { display: block; width: 56px; height: 5px; border-radius: 3px; background: var(--panel-3); overflow: hidden; }
+.meter-bar { display: block; height: 100%; border-radius: 3px; }
+.meter-num { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; width: 20px; }
+.legacy-score { font-family: var(--display); font-size: 16px; font-weight: 750; color: var(--text); letter-spacing: -0.01em; }
+
+/* ---------- Champions list ---------- */
+.champ-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 280px; }
+.champ-row {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 12px; border-radius: 11px;
+  background: rgba(8,9,12,.5); border: 1px solid var(--border); color: var(--text-2); transition: border-color .15s, background .15s;
+}
+.champ-row:hover { border-color: var(--border-strong); color: var(--text); }
+.champ-year { font-variant-numeric: tabular-nums; font-weight: 650; color: var(--muted); font-size: 12.5px; width: 34px; }
+.champ-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.champ-row.latest {
+  padding: 12px 14px 12px 12px; color: var(--text);
+  background: linear-gradient(100deg, rgba(242,195,91,.18), rgba(242,195,91,.04) 70%), rgba(8,9,12,.5);
+  border-color: rgba(242,195,91,.45); box-shadow: 0 10px 30px -14px rgba(242,195,91,.45);
+}
+.champ-row.latest .champ-year { color: var(--gold); }
+.champ-row.latest .champ-name { font-size: 15px; }
+.champ-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #2a1d00; background: linear-gradient(140deg, #f7d47e, #d9a53a); padding: 3px 8px; border-radius: 99px; }
+
 /* ---------- Activity feed ---------- */
 .feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .feed-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0; border-bottom: 1px solid var(--grid); }
@@ -437,6 +462,7 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
   .hero { padding: 22px 18px; border-radius: 16px; }
   .hero h1 { font-size: 26px; }
   .hero-podium { width: 100%; justify-content: center; }
+  .champ-list { width: 100%; min-width: 0; }
   .hero-step { flex: 1; width: auto; min-width: 0; }
   .page { gap: 16px; }
   .card { padding: 16px; border-radius: 13px; }

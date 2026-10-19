@@ -81,9 +81,9 @@ export interface Col<R> {
   align?: 'left' | 'right' | 'center'
 }
 
-export function Table<R>({ rows, cols, initialSort, rowKey }: { rows: R[]; cols: Col<R>[]; initialSort?: string; rowKey: (r: R) => string }) {
+export function Table<R>({ rows, cols, initialSort, initialAsc = false, rowKey }: { rows: R[]; cols: Col<R>[]; initialSort?: string; initialAsc?: boolean; rowKey: (r: R) => string }) {
   const [sortKey, setSortKey] = useState(initialSort)
-  const [desc, setDesc] = useState(true)
+  const [desc, setDesc] = useState(!initialAsc)
   const col = cols.find((c) => c.key === sortKey)
   const sorted = col?.sort
     ? [...rows].sort((a, b) => {
@@ -149,7 +149,7 @@ export const TIPS = {
   luck: 'Actual head-to-head wins minus expected wins from all-play. Positive = lucky.',
   sos: 'Strength of schedule: average points scored by your opponents per game.',
   share: "Your share of all regular-season points scored in the league.",
-  elo: 'Elo rating across every game (start 1500, K=32). Higher = stronger historically.',
+  elo: 'Elo rating from completed seasons only (start 1500). The latest season counts at full weight (K=32), each earlier season 20% less.',
   score: 'Season score (0–100): 30% win %, 30% all-play %, 20% points share, 20% final finish.',
   coach: 'Points scored ÷ max possible points from your roster (optimal lineups).',
   median: 'This league plays the median every week: beating the median is a win.',
