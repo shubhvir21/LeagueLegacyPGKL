@@ -74,7 +74,10 @@ export interface League {
 const ELO_START = 1500
 const ELO_K = 32
 const round2 = (n: number) => Math.round(n * 100) / 100
-const nameOverrides = overrides as Record<string, string>
+const nameOverrides = (overrides as { names?: Record<string, string> }).names ?? {}
+// Franchise takeovers: the old owner's seasons count toward the new owner.
+const merges = (overrides as { merge?: Record<string, string> }).merge ?? {}
+const franchise = (id: string) => merges[id] ?? id
 
 function placementsFromBracket(br: BracketMatch[]): Record<number, number> {
   // Matches with p=N decide places N and N+1 (p=1 championship, p=3 third place, …).
@@ -96,7 +99,7 @@ function buildSeason(raw: RawSeason, games: Game[]) {
   const playoffTeams = Number(league.settings.playoff_teams ?? 6)
   const median = Number(league.settings.league_average_match ?? 0) === 1
   const owner: Record<number, string> = {}
-  for (const r of raw.rosters) owner[r.roster_id] = r.owner_id ?? `roster-${year}-${r.roster_id}`
+  for (const r of raw.rosters) owner[r.roster_id] = franchise(r.owner_id ?? `roster-${year}-${r.roster_id}`)
   const userById = Object.fromEntries(raw.users.map((u) => [u.user_id, u]))
 
   const ts: Record<number, TeamSeason> = {}
@@ -224,6 +227,7 @@ export function buildLeague(raw: RawData): League {
   const members: Record<string, Member> = {}
   for (const s of raw.seasons) {
     for (const u of s.users) {
+      if (merges[u.user_id]) continue
       members[u.user_id] = { id: u.user_id, name: nameOverrides[u.user_id] ?? u.display_name, avatar: u.avatar }
     }
   }

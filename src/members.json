@@ -1,1 +1,9 @@
-{}
+{
+  "names": {},
+  "merge": {
+    "995159740512518144": "1362926939144228864",
+    "roster-2023-3": "1120898664945352704",
+    "roster-2023-9": "1120900070515351552"
+  },
+  "_help": "names: { memberId: display name }. merge: { old owner id: current owner id } combines franchise takeovers into one all-time record. Orphaned rosters use ids like roster-<year>-<roster_id>."
+}
