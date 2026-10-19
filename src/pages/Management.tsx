@@ -13,10 +13,10 @@ const T = {
   bench: 'Points left on the bench: optimal lineup minus actual, per season.',
   perfect: 'Weeks where the lineup you started was the best possible one.',
   ll: 'Head-to-head losses your optimal lineup would have won.',
-  waiver: 'Waiver/FA value over replacement: points above a replacement-level player at the same position, for weeks the pickup started.',
+  waiver: 'Net lineup points from waiver/FA moves: what pickups added to your best possible lineup, minus what the players you cut would have added.',
   faab: 'Share of the season’s FAAB budget spent.',
   vpf: 'Waiver value per 1% of FAAB spent — bang for the buck.',
-  trade: 'Value over replacement gained in trades minus value given up.',
+  trade: 'Lineup points gained from trades vs. keeping the players you gave up.',
   pickup: 'Share of starting-lineup points that came from in-season pickups.',
   top3: 'Share of starting-lineup points from the team’s 3 best starters. High = top-heavy roster.',
 }

@@ -6,8 +6,10 @@ import { Card, MemberLink, Stat, Table, type Col } from '../components/ui'
 import { PlayerLink } from '../components/PlayerLink'
 import { signed } from './History'
 
-const MOVE_TIP = 'Value over replacement: for every week the player started for this team (rest of season), his points minus a replacement-level player at his position. Easy-to-find positions like QB and DEF have a high bar.'
-const TRADE_TIP = 'Trade value = value over replacement from players received (started weeks) minus value over replacement the departed players produced for their new team, rest of season. Draft picks are listed but not valued.'
+const MOVE_TIP = 'Net lineup points: what the pickup added to your best possible lineup each week he was on your roster, minus what the player you dropped would have added had you kept him.'
+const GAIN_TIP = 'Points the pickup added to your best possible lineup (optimal lineup with him minus without him), every week he was on your roster. Bench filler adds ~0.'
+const COST_TIP = 'Points your best possible lineup would have gained by keeping the dropped player (only counts weeks he scored for another roster). Cutting someone who would never have started costs 0.'
+const TRADE_TIP = 'Lineup points gained: each week after the trade, your actual best possible lineup minus the best lineup you would have had keeping the players you gave up. Draft picks are listed but not valued.'
 
 export default function Transactions() {
   const lg = useLeague()
@@ -43,14 +45,16 @@ export default function Transactions() {
     { key: 'p', label: 'Added', render: (m) => <PlayerLink id={m.playerId} /> },
     { key: 'd', label: 'Dropped', render: (m) => (m.dropId ? <PlayerLink id={m.dropId} /> : <span className="muted">—</span>) },
     { key: 'w', label: 'When', render: (m) => `${m.season} W${m.week}${m.type === 'free_agent' ? ' · FA' : m.bid ? ` · $${m.bid}` : ''}` },
-    { key: 'v', label: 'Value', render: (m) => <b>{fmt(m.value)}</b>, sort: (m) => m.value, align: 'right', tip: MOVE_TIP },
+    { key: 'g', label: 'Gain', render: (m) => <span className="pos">{fmt(m.gain, 1)}</span>, sort: (m) => m.gain, align: 'right', tip: GAIN_TIP },
+    { key: 'c', label: 'Drop Cost', render: (m) => <span className={m.dropCost > 0 ? 'neg' : 'muted'}>{m.dropCost > 0 ? `−${fmt(m.dropCost, 1)}` : '0'}</span>, sort: (m) => m.dropCost, align: 'right', tip: COST_TIP },
+    { key: 'v', label: 'Net', render: (m) => <b className={m.value >= 0 ? '' : 'neg'}>{signed(m.value)}</b>, sort: (m) => m.value, align: 'right', tip: MOVE_TIP },
   ]
   const dropCols: Col<(typeof drops)[number]>[] = [
     { key: 'm', label: 'Team', render: (d) => <MemberLink id={d.memberId} /> },
     { key: 'p', label: 'Dropped', render: (d) => <PlayerLink id={d.playerId} /> },
     { key: 'w', label: 'When', render: (d) => `${d.season} W${d.week}` },
     { key: 'by', label: 'Started By', render: (d) => <StartedBy d={d} />, },
-    { key: 'v', label: 'Value Lost', render: (d) => <b className={d.after > 0 ? 'neg' : ''}>{signed(d.after)}</b>, sort: (d) => d.after, align: 'right', tip: 'Value over replacement the player produced after being dropped (weeks he started, for any team), that season.' },
+    { key: 'v', label: 'Lineup Pts Lost', render: (d) => <b className={d.after > 0 ? 'neg' : 'muted'}>{d.after > 0 ? `−${fmt(d.after, 1)}` : '0'}</b>, sort: (d) => d.after, align: 'right', tip: COST_TIP },
   ]
   const tradeValue = (t: Trade) => Math.max(...t.sides.map((s) => Math.abs(s.value)))
   const playerCount: Record<string, number> = {}
@@ -84,19 +88,19 @@ export default function Transactions() {
         <Table rows={rankRows} cols={rankCols} initialSort="total" rowKey={(r) => r.id} />
       </Card>
       <div className="two-col">
-        <Card title="Top Waiver Moves" sub="Pickups that paid off most, over replacement.">
+        <Card title="Top Waiver Moves" sub="Net lineup points added (pickup gain minus drop cost).">
           <Table rows={[...moves].sort((a, b) => b.value - a.value).slice(0, 10)} cols={moveCols} initialSort="v" rowKey={(m) => `${m.season}-${m.week}-${m.playerId}-${m.memberId}`} />
         </Card>
-        <Card title="Worst Waiver Moves" sub="Pickups that hurt most: started below replacement level.">
+        <Card title="Worst Waiver Moves" sub="Moves that cost lineup points, usually by cutting someone who would have started.">
           <Table rows={[...moves].sort((a, b) => a.value - b.value).slice(0, 10)} cols={moveCols} initialSort="v" initialAsc rowKey={(m) => `${m.season}-${m.week}-${m.playerId}-${m.memberId}`} />
         </Card>
       </div>
       <div>
-        <Card title="Worst Drops" sub="Cuts that came back to bite: value over replacement after the drop.">
+        <Card title="Worst Drops" sub="Cuts that came back to bite: points the dropper\u2019s best lineup missed out on.">
           <Table rows={[...drops].sort((a, b) => b.after - a.after).slice(0, 10)} cols={dropCols} initialSort="v" rowKey={(d) => `${d.season}-${d.week}-${d.playerId}-${d.memberId}`} />
         </Card>
       </div>
-      <Card title="Trades" sub="Most impactful trades first. Values are rest-of-season starting-lineup points." right={<span className="tip" title={TRADE_TIP}>ⓘ</span>}>
+      <Card title="Trades" sub="Most impactful trades first. Values are lineup points gained or lost the rest of that season." right={<span className="tip" title={TRADE_TIP}>ⓘ</span>}>
         <div className="trade-list">
           {[...realTrades].sort((a, b) => tradeValue(b) - tradeValue(a)).slice(0, 30).map((t) => (
             <div key={t.created} className="trade">

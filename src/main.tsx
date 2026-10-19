@@ -11,6 +11,7 @@ import Matchups from './pages/Matchups'
 import Playoffs from './pages/Playoffs'
 import RecordBook from './pages/RecordBook'
 import Management from './pages/Management'
+import Rules from './pages/Rules'
 import Transactions from './pages/Transactions'
 import Players, { Player } from './pages/Players'
 import Achievements from './pages/Achievements'
@@ -27,6 +28,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="history" element={<History />} />
             <Route path="schedule" element={<Schedule />} />
             <Route path="management" element={<Management />} />
+            <Route path="rules" element={<Rules />} />
             <Route path="draft" element={<Navigate to="/management" replace />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="players" element={<Players />} />

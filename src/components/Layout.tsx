@@ -13,6 +13,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/seasons', label: 'Seasons', icon: 'calendar', also: '/season/' },
       { to: '/members', label: 'Members', icon: 'users', also: '/member/' },
       { to: '/schedule', label: 'Schedule', icon: 'clock' },
+      { to: '/rules', label: 'Rules', icon: 'scale' },
     ],
   },
   {

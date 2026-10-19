@@ -3,6 +3,7 @@
 import type { RawSeason } from './sleeper'
 import type { League } from './stats'
 import keeperOverrides from '../keepers.json'
+import { lineupSlots, optimalLineup } from './lineup'
 
 export const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const
 
@@ -44,7 +45,9 @@ export interface Move {
   dropId: string | null
   bid?: number
   created: number
-  value: number // starting-lineup points over replacement for this team, rest of season
+  gain: number // lineup points the pickup added
+  dropCost: number // lineup points lost by cutting the dropped player
+  value: number // gain − dropCost
 }
 
 export interface TradeSide {
@@ -63,7 +66,7 @@ export interface PlayerModel {
   seasons: PlayerSeason[]
   picks: Pick[]
   moves: Move[]
-  drops: { season: number; week: number; memberId: string; playerId: string; after: number /* value over replacement after the drop, for whoever started him */; created: number; standalone: boolean }[]
+  drops: { season: number; week: number; memberId: string; playerId: string; after: number /* lineup points the dropper would have gained by keeping him */; created: number; standalone: boolean }[]
   trades: Trade[]
   replacement: Record<number, Record<string, number>>
 }
@@ -185,63 +188,72 @@ export function buildPlayers(lg: League): PlayerModel {
   }
 
   // ---- Transactions ----
-  // Value over replacement a member got from a player in weeks >= from (same season):
-  // for every week he started, his points minus a replacement-level player's weekly
-  // average at his position. Deep positions (QB, DEF) have high replacement levels, so a
-  // waiver QB only scores if he's genuinely better than the guy you could grab anyway.
-  const replWeekly = (year: number, pid: string) => {
-    const s = raw.seasons.find((x) => Number(x.league.season) === year)!
-    const weeks = Math.max(1, s.lastScored)
-    return (replacement[year]?.[posOf(pid)] ?? 0) / weeks
-  }
-  const startedFor = (pid: string, year: number, member: string, from: number) => {
-    let total = 0
-    const s = raw.seasons.find((x) => Number(x.league.season) === year)!
-    const owner = lg.rosterOwner[year]
-    const repl = replWeekly(year, pid)
-    s.matchups.forEach((wk, i) => {
-      const week = i + 1
-      if (week < from || week > s.lastScored) return
-      for (const m of wk) {
-        if (owner[m.roster_id] !== member) continue
-        const idx = m.starters.indexOf(pid)
-        if (idx >= 0) total += (m.starters_points[idx] ?? 0) - repl
-      }
-    })
-    return round2(total)
-  }
-  // Value over replacement a dropped player produced afterwards for *other* teams that
-  // started him (if the dropper picks him back up, those weeks don't count against them).
-  const ptsAfter = (pid: string, year: number, from: number, dropper: string) => {
-    let total = 0
-    const s = raw.seasons.find((x) => Number(x.league.season) === year)!
-    const owner = lg.rosterOwner[year]
-    const repl = replWeekly(year, pid)
-    s.matchups.forEach((wk, i) => {
-      const week = i + 1
-      if (week < from || week > s.lastScored) return
-      for (const m of wk) {
-        if (owner[m.roster_id] === dropper) continue
-        const idx = m.starters.indexOf(pid)
-        if (idx >= 0) total += (m.starters_points[idx] ?? 0) - repl
-      }
-    })
-    return round2(total)
-  }
+  // Every value here is "points added to your best possible lineup": for each week, rebuild the
+  // optimal lineup from the roster's actual points with and without the player(s) in question.
+  // That ignores bench filler (a player who never cracks your best lineup adds ~0) and doesn't
+  // punish moves for lineup mistakes, which Coach Score covers separately.
   const moves: Move[] = []
   const drops: PlayerModel['drops'] = []
   const trades: Trade[] = []
   for (const s of raw.seasons) {
     const year = Number(s.league.season)
     const owner = lg.rosterOwner[year]
+    const slots = lineupSlots(s.league.roster_positions)
+    // week -> member -> (player -> points), and week -> player -> points (any roster)
+    const roster: Record<number, Record<string, Record<string, number>>> = {}
+    const anyPts: Record<number, Record<string, number>> = {}
+    const played = new Set(lg.games.filter((g) => g.season === year).flatMap((g) => [`${g.week}|${g.a}`, `${g.week}|${g.b}`]))
+    s.matchups.forEach((wk, i) => {
+      const week = i + 1
+      if (week > s.lastScored) return
+      for (const m of wk) {
+        const pp = m.players_points ?? {}
+        ;(roster[week] ??= {})[owner[m.roster_id]] = pp
+        Object.assign((anyPts[week] ??= {}), pp)
+      }
+    })
+    const weeks = Object.keys(roster).map(Number).sort((x, y) => x - y)
+    const opt = (pp: Record<string, number>) => optimalLineup(slots, Object.entries(pp).map(([pid, pts]) => ({ pos: posOf(pid), pts })))
+    const without = (pp: Record<string, number>, ids: string[]) => Object.fromEntries(Object.entries(pp).filter(([pid]) => !ids.includes(pid)))
+    const withPlayers = (pp: Record<string, number>, ids: string[], week: number) => {
+      const out = { ...pp }
+      for (const id of ids) if (!(id in out)) out[id] = anyPts[week]?.[id] ?? 0
+      return out
+    }
+    const counts = (week: number, member: string) => played.has(`${week}|${member}`)
+
+    /** Lineup points a player added while he was on this member's roster. */
+    const gainFrom = (pid: string, member: string, from: number) => {
+      let total = 0
+      for (const w of weeks) {
+        const pp = roster[w]?.[member]
+        if (w < from || !pp || !(pid in pp) || !counts(w, member)) continue
+        total += opt(pp) - opt(without(pp, [pid]))
+      }
+      return round2(total)
+    }
+    /** Lineup points a member would have gained by keeping a player they cut. */
+    const dropCost = (pid: string, member: string, from: number) => {
+      let total = 0
+      for (const w of weeks) {
+        const pp = roster[w]?.[member]
+        if (w < from || !pp || pid in pp || !(pid in (anyPts[w] ?? {})) || !counts(w, member)) continue
+        total += opt(withPlayers(pp, [pid], w)) - opt(pp)
+      }
+      return round2(total)
+    }
+
     for (const t of [...s.transactions].sort((a, b) => a.created - b.created)) {
       const week = Math.max(1, t.leg)
       if (t.type === 'waiver' || t.type === 'free_agent') {
         const dropIds = Object.keys(t.drops ?? {})
+        const costs = Object.fromEntries(Object.entries(t.drops ?? {}).map(([pid, rid]) => [pid, dropCost(pid, owner[rid], week)]))
         for (const [pid, rid] of Object.entries(t.adds ?? {})) {
-          moves.push({ season: year, week, type: t.type, memberId: owner[rid], playerId: pid, dropId: dropIds[0] ?? null, bid: t.waiver_bid, created: t.created, value: startedFor(pid, year, owner[rid], week) })
+          const gain = gainFrom(pid, owner[rid], week)
+          const cost = dropIds.reduce((a, d) => a + (costs[d] ?? 0), 0)
+          moves.push({ season: year, week, type: t.type, memberId: owner[rid], playerId: pid, dropId: dropIds[0] ?? null, bid: t.waiver_bid, created: t.created, gain, dropCost: cost, value: round2(gain - cost) })
         }
-        for (const [pid, rid] of Object.entries(t.drops ?? {})) drops.push({ season: year, week, memberId: owner[rid], playerId: pid, after: ptsAfter(pid, year, week, owner[rid]), created: t.created, standalone: !t.adds })
+        for (const [pid, rid] of Object.entries(t.drops ?? {})) drops.push({ season: year, week, memberId: owner[rid], playerId: pid, after: costs[pid] ?? 0, created: t.created, standalone: !t.adds })
       } else if (t.type === 'trade') {
         const sides: TradeSide[] = t.roster_ids.map((rid) => ({ memberId: owner[rid], gets: [], gives: [], picksIn: [], picksOut: [], value: 0 }))
         const side = (rid: number) => sides[t.roster_ids.indexOf(rid)]
@@ -253,12 +265,15 @@ export function buildPlayers(lg: League): PlayerModel {
           side(dp.previous_owner_id)?.picksOut.push(label)
         }
         for (const sd of sides) {
-          const gained = sd.gets.reduce((a, pid) => a + startedFor(pid, year, sd.memberId, week), 0)
-          const lost = sd.gives.reduce((a, pid) => {
-            const to = Object.entries(t.adds ?? {}).find(([p]) => p === pid)?.[1]
-            return a + (to != null ? startedFor(pid, year, owner[to], week) : 0)
-          }, 0)
-          sd.value = round2(gained - lost)
+          // Actual best lineup vs. the best lineup had the trade never happened.
+          let total = 0
+          for (const w of weeks) {
+            const pp = roster[w]?.[sd.memberId]
+            if (w < week || !pp || !counts(w, sd.memberId)) continue
+            const counterfactual = withPlayers(without(pp, sd.gets), sd.gives, w)
+            total += opt(pp) - opt(counterfactual)
+          }
+          sd.value = round2(total)
         }
         trades.push({ season: year, week, created: t.created, sides })
       }
