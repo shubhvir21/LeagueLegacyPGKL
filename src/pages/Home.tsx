@@ -3,7 +3,9 @@ import { useLeague } from '../lib/data'
 import { fmt, headToHead, record, type ScheduledGame } from '../lib/stats'
 import { Avatar, Card, MemberLink, RankBadge } from '../components/ui'
 import { GameCard } from './Season'
-import { badgesOf } from './Achievements'
+import { playersOf } from '../lib/players'
+import { PlayerLink } from '../components/PlayerLink'
+import { Icon } from '../components/Icon'
 
 export default function Home() {
   const lg = useLeague()
@@ -13,8 +15,16 @@ export default function Home() {
   const lastGames = lg.games.filter((g) => g.season === current.year && g.week === lastWeek)
   const nextWeek = Math.min(...lg.schedule.filter((g) => g.season === current.year).map((g) => g.week))
   const upcoming = lg.schedule.filter((g) => g.season === current.year && g.week === nextWeek)
-  const badges = badgesOf(lg).filter((e) => e.week != null).slice(0, 10)
-  const podium = lastDone ? [2, 1, 3].map((r) => lastDone.teamSeasons.find((t) => t.finalRank === r)!) : []
+  const champs = lg.seasons.filter((s) => s.complete && s.champion).slice(0, 3)
+  // Most recent champion in the middle, the two before it on either side.
+  const podium = [champs[1], champs[0], champs[2]]
+  const pm = playersOf(lg)
+  const activity = [
+    ...pm.moves.map((m) => ({ created: m.created, kind: m.type === 'free_agent' ? 'Free agent' : 'Waiver', m })),
+    ...pm.drops.filter((d) => d.standalone).map((d) => ({ created: d.created, kind: 'Drop', d })),
+    ...pm.trades.filter((t) => t.sides.some((x) => x.gets.length || x.picksIn.length)).map((t) => ({ created: t.created, kind: 'Trade', t })),
+  ].sort((a, b) => b.created - a.created).slice(0, 10)
+  const when = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
   return (
     <div className="page">
@@ -24,13 +34,13 @@ export default function Home() {
           <h1>{current.name}</h1>
           <p className="muted">{lg.seasons.length} seasons · {current.teams} teams · {current.year} {current.complete ? 'complete' : `through week ${current.weeksPlayed}`}</p>
         </div>
-        {lastDone && (
-          <div className="hero-podium">
-            {podium.map((t, i) => t && (
-              <Link key={t.memberId} to={`/member/${t.memberId}`} className={`hero-step p${[2, 1, 3][i]}`}>
-                <Avatar id={t.memberId} size={i === 1 ? 56 : 44} />
-                <b>{lg.memberById[t.memberId]?.name}</b>
-                <span className={`place p${[2, 1, 3][i]}`}>{['Runner-up', `${lastDone.year} Champion`, 'Third'][i]}</span>
+        {champs.length > 0 && (
+          <div className="hero-podium" aria-label="Recent champions">
+            {podium.map((s, i) => s && (
+              <Link key={s.year} to={`/season/${s.year}`} className={`hero-step ${i === 1 ? 'p1' : ''}`}>
+                <Avatar id={s.champion!} size={i === 1 ? 56 : 44} />
+                <b>{lg.memberById[s.champion!]?.name}</b>
+                <span className={`place ${i === 1 ? 'p1' : 'p2'}`}>{s.year} Champion</span>
               </Link>
             ))}
           </div>
@@ -48,14 +58,40 @@ export default function Home() {
             </tr>
           ))}</tbody></table></div>
         </Card>
-        <Card title="League Activity" sub="Latest badges earned." right={<Link to="/achievements">All →</Link>}>
-          <div className="table-wrap"><table><tbody>{badges.map((e, i) => (
-            <tr key={i}>
-              <td><MemberLink id={e.memberId} /></td>
-              <td><span className={`badge ${e.badge.kind}`} title={e.badge.desc}>{e.badge.icon} {e.badge.name}</span></td>
-              <td className="muted small">{e.season} W{e.week}</td>
-            </tr>
-          ))}</tbody></table></div>
+        <Card title="League Activity" sub="Latest transactions." right={<Link to="/transactions">All →</Link>}>
+          <ul className="feed">
+            {activity.map((a, i) => (
+              <li key={i} className="feed-item">
+                <span className={`feed-icon ${a.kind === 'Trade' ? 'trade' : a.kind === 'Drop' ? 'drop' : 'add'}`}>
+                  <Icon name={a.kind === 'Trade' ? 'swap' : a.kind === 'Drop' ? 'minus' : 'plus'} size={14} />
+                </span>
+                <div className="feed-body">
+                  {'m' in a && a.m && (
+                    <>
+                      <div className="feed-line"><MemberLink id={a.m.memberId} avatar={false} /> <span className="muted">added</span> <PlayerLink id={a.m.playerId} /></div>
+                      {a.m.dropId && <div className="feed-line small"><span className="muted">dropped</span> <PlayerLink id={a.m.dropId} /></div>}
+                    </>
+                  )}
+                  {'d' in a && a.d && (
+                    <div className="feed-line"><MemberLink id={a.d.memberId} avatar={false} /> <span className="muted">dropped</span> <PlayerLink id={a.d.playerId} /></div>
+                  )}
+                  {'t' in a && a.t && a.t.sides.map((x) => (
+                    <div key={x.memberId} className="feed-line">
+                      <MemberLink id={x.memberId} avatar={false} /> <span className="muted">gets</span>{' '}
+                      {[...x.gets.map((p) => <PlayerLink key={p} id={p} />), ...x.picksIn.map((p) => <span key={p} className="pill" style={{ marginLeft: 0 }}>{p} pick</span>)]
+                        .flatMap((el, j) => (j ? [<span key={`c${j}`} className="muted">, </span>, el] : [el]))}
+                      {!x.gets.length && !x.picksIn.length && <span className="muted">nothing</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="feed-meta">
+                  <span className="feed-kind">{a.kind}{'m' in a && a.m?.bid ? ` · $${a.m.bid}` : ''}</span>
+                  <span className="muted small">{when(a.created)}</span>
+                </div>
+              </li>
+            ))}
+            {!activity.length && <li className="muted">No transactions yet.</li>}
+          </ul>
         </Card>
       </div>
 

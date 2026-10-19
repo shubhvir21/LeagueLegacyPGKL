@@ -377,6 +377,19 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
 .trade-side .row { justify-content: space-between; flex-wrap: nowrap; }
 .trade-side .small.muted { text-transform: uppercase; letter-spacing: .07em; font-size: 10.5px; font-weight: 600; margin-top: 4px; }
 
+/* ---------- Activity feed ---------- */
+.feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.feed-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0; border-bottom: 1px solid var(--grid); }
+.feed-item:last-child { border-bottom: 0; }
+.feed-icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; margin-top: 1px; }
+.feed-icon.add { background: rgba(61,220,151,.12); color: var(--pos); }
+.feed-icon.drop { background: rgba(255,107,122,.12); color: var(--neg); }
+.feed-icon.trade { background: var(--accent-soft); color: var(--accent); }
+.feed-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.feed-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; line-height: 1.5; }
+.feed-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
+.feed-kind { font-size: 11px; font-weight: 600; color: var(--text-2); }
+
 /* ---------- Badges ---------- */
 .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .badge.achievement { background: rgba(61,220,151,.1); color: #74e6b4; box-shadow: 0 0 0 1px rgba(61,220,151,.18) inset; }

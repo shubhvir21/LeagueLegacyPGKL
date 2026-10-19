@@ -43,6 +43,7 @@ export interface Move {
   playerId: string
   dropId: string | null
   bid?: number
+  created: number
   value: number // started points for this team the rest of the season
 }
 
@@ -62,7 +63,7 @@ export interface PlayerModel {
   seasons: PlayerSeason[]
   picks: Pick[]
   moves: Move[]
-  drops: { season: number; week: number; memberId: string; playerId: string; after: number }[]
+  drops: { season: number; week: number; memberId: string; playerId: string; after: number; created: number; standalone: boolean }[]
   trades: Trade[]
   replacement: Record<number, Record<string, number>>
 }
@@ -218,9 +219,9 @@ export function buildPlayers(lg: League): PlayerModel {
       if (t.type === 'waiver' || t.type === 'free_agent') {
         const dropIds = Object.keys(t.drops ?? {})
         for (const [pid, rid] of Object.entries(t.adds ?? {})) {
-          moves.push({ season: year, week, type: t.type, memberId: owner[rid], playerId: pid, dropId: dropIds[0] ?? null, bid: t.waiver_bid, value: startedFor(pid, year, owner[rid], week) })
+          moves.push({ season: year, week, type: t.type, memberId: owner[rid], playerId: pid, dropId: dropIds[0] ?? null, bid: t.waiver_bid, created: t.created, value: startedFor(pid, year, owner[rid], week) })
         }
-        for (const [pid, rid] of Object.entries(t.drops ?? {})) drops.push({ season: year, week, memberId: owner[rid], playerId: pid, after: ptsAfter(pid, year, week) })
+        for (const [pid, rid] of Object.entries(t.drops ?? {})) drops.push({ season: year, week, memberId: owner[rid], playerId: pid, after: ptsAfter(pid, year, week), created: t.created, standalone: !t.adds })
       } else if (t.type === 'trade') {
         const sides: TradeSide[] = t.roster_ids.map((rid) => ({ memberId: owner[rid], gets: [], gives: [], picksIn: [], picksOut: [], value: 0 }))
         const side = (rid: number) => sides[t.roster_ids.indexOf(rid)]
