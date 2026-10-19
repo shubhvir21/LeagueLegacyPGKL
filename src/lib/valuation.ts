@@ -17,13 +17,13 @@
 //   Trophy case    +1.2 per title, +0.4 per runner-up
 //   Pedigree       +2.0 × (playoff rate − 50%)
 //   Momentum       +0.06 per point of League Rating above 50
-//   Front office   +0.03 per point of avg draft surplus, +0.004 per point of trade value / season
+//   Front office   +0.04 per point of avg Manager Score above 50
 //   Stigma         −0.5 per last place, −0.3 per toilet-bowl loss
 //
 // VALUE = trailing revenue × multiple, smoothed: 65% this year's model + 35% last year's
 // value grown 5% (franchise values don't halve overnight). Debt/value is a joke stat.
-import { playersOf } from './players'
 import { teamRankings } from './teamRank'
+import { managementCached } from './management'
 import type { League } from './stats'
 
 export interface RevenueLine { label: string; amount: number }
@@ -46,7 +46,6 @@ export interface Valuation {
 const RECENCY = [5, 3, 2]
 
 export function valuations(lg: League): Record<string, Valuation[]> {
-  const pm = playersOf(lg)
   const ranks = teamRankings(lg)
   const done = [...lg.seasons].filter((s) => s.complete).sort((a, b) => a.year - b.year)
   const rawRoster = (year: number, rosterId: number) =>
@@ -98,16 +97,15 @@ export function valuations(lg: League): Record<string, Valuation[]> {
       const lasts = mine.filter((x) => x.t!.finalRank === x.s.teams).length
       const toilets = mine.filter((x) => x.s.toiletBowlLoser === m.id).length
       const rating = lg.eloHistory.find((h) => h.season === s.year)?.ratings[m.id] ?? 50
-      const picks = pm.picks.filter((p) => p.memberId === m.id && !p.pending && p.season <= s.year)
-      const draft = picks.length ? picks.reduce((a, p) => a + p.surplus, 0) / picks.length : 0
-      const trade = pm.trades.filter((t) => t.season <= s.year).flatMap((t) => t.sides.filter((x) => x.memberId === m.id)).reduce((a, x) => a + x.value, 0) / (mine.length || 1)
+      const mgr = managementCached(lg).filter((r) => r.memberId === m.id && !r.inProgress && r.season <= s.year)
+      const mgrScore = mgr.length ? mgr.reduce((a, r) => a + r.managerScore, 0) / mgr.length : 50
 
       const multipleLines: RevenueLine[] = [
         { label: 'League base', amount: 7 },
         { label: 'Trophy case', amount: 1.2 * titles + 0.4 * seconds },
         { label: 'Playoff pedigree', amount: 2 * (playoffRate - 0.5) },
         { label: 'Momentum', amount: 0.06 * (rating - 50) },
-        { label: 'Front office', amount: 0.03 * draft + 0.004 * trade },
+        { label: 'Front office', amount: 0.04 * (mgrScore - 50) },
         { label: 'Stigma', amount: -0.5 * lasts - 0.3 * toilets },
       ]
       const multiple = Math.max(4, Math.min(14, multipleLines.reduce((a, l) => a + l.amount, 0)))

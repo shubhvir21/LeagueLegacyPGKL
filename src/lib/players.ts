@@ -44,7 +44,7 @@ export interface Move {
   dropId: string | null
   bid?: number
   created: number
-  value: number // started points for this team the rest of the season
+  value: number // starting-lineup points over replacement for this team, rest of season
 }
 
 export interface TradeSide {
@@ -137,7 +137,10 @@ export function buildPlayers(lg: League): PlayerModel {
     replacement[year] = {}
     for (const pos of POSITIONS) {
       const pool = seasons.filter((p) => p.season === year && posOf(p.playerId) === pos).map((p) => p.pts).sort((a, b) => b - a)
-      const idx = Math.round(sl[pos] * n)
+      // Streamable positions (QB, DEF, K) always have a decent option on waivers, so their
+      // replacement bar sits higher: ~the 8th-best instead of the first non-starter.
+      const depth = pos === 'QB' ? 0.75 : pos === 'DEF' || pos === 'K' ? 0.7 : 1
+      const idx = depth < 1 ? Math.max(0, Math.round(sl[pos] * n * depth) - 1) : Math.round(sl[pos] * n)
       replacement[year][pos] = pool.length ? pool[Math.min(idx, pool.length - 1)] ?? 0 : 0
     }
   }
@@ -182,18 +185,27 @@ export function buildPlayers(lg: League): PlayerModel {
   }
 
   // ---- Transactions ----
-  // Started points a member got from a player in weeks >= from (same season).
+  // Value over replacement a member got from a player in weeks >= from (same season):
+  // for every week he started, his points minus a replacement-level player's weekly
+  // average at his position. Deep positions (QB, DEF) have high replacement levels, so a
+  // waiver QB only scores if he's genuinely better than the guy you could grab anyway.
+  const replWeekly = (year: number, pid: string) => {
+    const s = raw.seasons.find((x) => Number(x.league.season) === year)!
+    const weeks = Math.max(1, s.lastScored)
+    return (replacement[year]?.[posOf(pid)] ?? 0) / weeks
+  }
   const startedFor = (pid: string, year: number, member: string, from: number) => {
     let total = 0
     const s = raw.seasons.find((x) => Number(x.league.season) === year)!
     const owner = lg.rosterOwner[year]
+    const repl = replWeekly(year, pid)
     s.matchups.forEach((wk, i) => {
       const week = i + 1
       if (week < from || week > s.lastScored) return
       for (const m of wk) {
         if (owner[m.roster_id] !== member) continue
         const idx = m.starters.indexOf(pid)
-        if (idx >= 0) total += m.starters_points[idx] ?? 0
+        if (idx >= 0) total += (m.starters_points[idx] ?? 0) - repl
       }
     })
     return round2(total)

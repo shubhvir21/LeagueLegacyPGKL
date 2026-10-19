@@ -552,3 +552,10 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
   .split-row { grid-template-columns: 110px 1fr auto; }
   .fact dd { font-size: 17px; }
 }
+
+/* ---------- Management ---------- */
+.score-pill { display: inline-grid; place-items: center; min-width: 34px; padding: 3px 8px; border-radius: 7px; font-weight: 750; font-size: 12.5px; background: var(--accent-soft); color: #aab4ff; font-variant-numeric: tabular-nums; }
+.score-pill.good { background: rgba(61,220,151,.13); color: var(--pos); }
+.score-pill.bad { background: rgba(255,107,122,.13); color: var(--neg); }
+.chart-tip { background: #22262f; border: 1px solid var(--border-strong); border-radius: 10px; padding: 8px 10px; font-size: 12px; color: var(--text-2); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.chart-tip b { color: var(--text); }

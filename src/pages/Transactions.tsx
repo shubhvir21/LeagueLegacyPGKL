@@ -6,8 +6,8 @@ import { Card, MemberLink, Stat, Table, type Col } from '../components/ui'
 import { PlayerLink } from '../components/PlayerLink'
 import { signed } from './History'
 
-const MOVE_TIP = 'Value = points the player scored in this team’s starting lineup for the rest of that season.'
-const TRADE_TIP = 'Trade value = starting-lineup points from players received minus starting-lineup points the departed players scored for their new team, rest of season. Draft picks are listed but not valued.'
+const MOVE_TIP = 'Value over replacement: for every week the player started for this team (rest of season), his points minus a replacement-level player at his position. Easy-to-find positions like QB and DEF have a high bar.'
+const TRADE_TIP = 'Trade value = value over replacement from players received (started weeks) minus value over replacement the departed players produced for their new team, rest of season. Draft picks are listed but not valued.'
 
 export default function Transactions() {
   const lg = useLeague()

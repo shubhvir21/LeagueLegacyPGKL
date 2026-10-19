@@ -26,7 +26,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Roster',
     items: [
-      { to: '/draft', label: 'Draft', icon: 'list' },
+      { to: '/management', label: 'Management', icon: 'list' },
       { to: '/transactions', label: 'Transactions', icon: 'swap' },
       { to: '/players', label: 'Players', icon: 'user', also: '/player/' },
     ],

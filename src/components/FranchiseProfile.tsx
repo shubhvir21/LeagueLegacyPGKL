@@ -3,6 +3,7 @@ import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from 'rechar
 import { useLeague } from '../lib/data'
 import { playersOf } from '../lib/players'
 import { money, valuationTable, valuationsOf, type Valuation } from '../lib/valuation'
+import { managementCached } from '../lib/management'
 import type { League } from '../lib/stats'
 import { Avatar } from './ui'
 
@@ -112,8 +113,10 @@ function take(lg: League, id: string, v: Valuation, hist: Valuation[], rank: num
   const latest = mine.sort((a, b) => b.s.year - a.s.year)[0]
   const trades = pm.trades.filter((t) => t.sides.some((x) => x.memberId === id && (x.gets.length || x.gives.length))).length
   const adds = pm.moves.filter((m) => m.memberId === id).length
-  const picks = pm.picks.filter((p) => p.memberId === id && !p.pending)
-  const draft = picks.length ? picks.reduce((a, p) => a + p.surplus, 0) / picks.length : 0
+  const mgmt = managementCached(lg).filter((r) => r.memberId === id && !r.inProgress)
+  const eff = mgmt.length ? mgmt.reduce((a, r) => a + r.actual, 0) / (mgmt.reduce((a, r) => a + r.optimal, 0) || 1) * 100 : 0
+  const lineupLosses = mgmt.reduce((a, r) => a + r.lineupLosses, 0)
+  const coach = mgmt.length ? mgmt.reduce((a, r) => a + r.coachScore, 0) / mgmt.length : 50
   const faab = lg.raw.seasons.filter((s) => s.league.status === 'complete').map((s) => {
     const r = s.rosters.find((x) => lg.rosterOwner[Number(s.league.season)][x.roster_id] === id)
     return (r?.settings.waiver_budget_used ?? 0) / (Number(s.league.settings.waiver_budget) || 100)
@@ -137,8 +140,8 @@ function take(lg: League, id: string, v: Valuation, hist: Valuation[], rank: num
   if (spend >= 0.9) parts.push(`Ownership spends like a hedge fund on the waiver wire (${Math.round(spend * 100)}% of FAAB on average, ${adds} adds).`)
   else if (spend <= 0.45) parts.push(`Famously frugal: just ${Math.round(spend * 100)}% of FAAB spent per season. The accountants are thrilled; the fans are less sure.`)
 
-  if (draft > 4) parts.push(`The scouting department is the envy of the league, beating draft-slot expectations by ${draft.toFixed(1)} points per pick.`)
-  else if (draft < -4) parts.push(`Draft-day decisions have been described as "bold" (${draft.toFixed(1)} points per pick below slot value).`)
+  if (coach >= 58) parts.push(`The coaching staff is the envy of the league: lineups hit ${eff.toFixed(1)}% of their ceiling.`)
+  else if (coach <= 42) parts.push(`Sunday lineup decisions have been described as "bold": ${lineupLosses} losses that the bench would have won.`)
 
   if (trades >= 20) parts.push(`A notorious dealmaker with ${trades} trades on record; the front office phone reportedly never stops ringing.`)
   if (toilets.length) parts.push(`Brand consultants are still scrubbing the ${toilets.join(' and ')} toilet-bowl ${toilets.length > 1 ? 'losses' : 'loss'} from the archives.`)

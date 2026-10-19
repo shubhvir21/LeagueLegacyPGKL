@@ -4,7 +4,7 @@ import { useLeague } from '../lib/data'
 import { playersOf, type PlayerModel } from '../lib/players'
 import { fmt, type League } from '../lib/stats'
 import { Card, MemberLink, Stat, Table, type Col } from '../components/ui'
-import { KeeperTag, PlayerLink, PosFilter } from '../components/PlayerLink'
+import { PlayerLink, PosFilter } from '../components/PlayerLink'
 import { signed } from './History'
 
 interface Career {
@@ -90,7 +90,6 @@ export default function Players() {
         <Stat icon="list" label={`Most drafted · ${top('drafted')?.drafted ?? 0}×`} value={name(top('drafted')?.id)} />
         <Stat icon="plus" label={`Most added · ${top('added')?.added ?? 0}×`} value={name(top('added')?.id)} />
         <Stat icon="minus" label={`Most dropped · ${top('dropped')?.dropped ?? 0}×`} value={name(top('dropped')?.id)} />
-        <Stat icon="target" label={`Best draft value · ${signed(top('bestPick')?.bestPick ?? 0)}`} value={name(top('bestPick')?.id)} />
         <Stat icon="trophy" label={`Most rings · ${top('rings')?.rings ?? 0}`} value={name(top('rings')?.id)} />
       </div>
 
@@ -150,7 +149,7 @@ export function Player() {
                 <td><span className="row">{s.members.map((m) => <MemberLink key={m} id={m} />)}</span></td>
                 <td className="right">{fmt(s.pts)}</td><td className="right">{fmt(s.startedPts)}</td><td className="right">{s.starts}</td>
                 <td className="right">{signed(s.vor)}</td>
-                <td>{pk ? <>R{pk.round} by <MemberLink id={pk.memberId} avatar={false} />{pk.keeper && <KeeperTag />}</> : <span className="muted">Undrafted</span>}</td>
+                <td>{pk ? <>R{pk.round} by <MemberLink id={pk.memberId} avatar={false} /></> : <span className="muted">Undrafted</span>}</td>
               </tr>
             )
           })}</tbody>
