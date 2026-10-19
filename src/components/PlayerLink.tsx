@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useLeague } from '../lib/data'
 import { playersOf } from '../lib/players'
+import { Icon } from './Icon'
 
 export function PlayerLink({ id, showPos = true }: { id: string; showPos?: boolean }) {
   const m = playersOf(useLeague())
@@ -21,4 +22,8 @@ export function PosFilter({ value, onChange }: { value: string; onChange: (p: st
       ))}
     </div>
   )
+}
+
+export function KeeperTag() {
+  return <span className="keeper" title="Keeper"><Icon name="lock" size={10} />K</span>
 }

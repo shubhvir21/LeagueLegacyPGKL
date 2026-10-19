@@ -4,7 +4,7 @@ import { useLeague } from '../lib/data'
 import { playersOf, type Pick } from '../lib/players'
 import { careers, fmt } from '../lib/stats'
 import { Card, MemberLink, Stat, Table, type Col } from '../components/ui'
-import { PlayerLink, PosFilter } from '../components/PlayerLink'
+import { KeeperTag, PlayerLink, PosFilter } from '../components/PlayerLink'
 import { signed } from './History'
 
 const VALUE_TIP = 'Value = player points that season minus a replacement-level player at his position (floored at 0). Surplus = value minus the average value of non-keeper picks in that round.'
@@ -24,7 +24,7 @@ export default function Draft() {
 
   const pickCols: Col<Pick>[] = [
     { key: 'pl', label: 'Player', render: (p) => <PlayerLink id={p.playerId} /> },
-    { key: 'pick', label: 'Pick', render: (p) => `${p.season} · R${p.round} (#${p.pickNo})${p.keeper ? ' 🔒' : ''}` },
+    { key: 'pick', label: 'Pick', render: (p) => <>{p.season} · R{p.round} <span className="muted">#{p.pickNo}</span>{p.keeper && <KeeperTag />}</> },
     { key: 'by', label: 'Drafted By', render: (p) => <MemberLink id={p.memberId} /> },
     { key: 'v', label: 'Value', render: (p) => fmt(p.value), sort: (p) => p.value, align: 'right', tip: VALUE_TIP },
     { key: 's', label: 'Surplus', render: (p) => <b className={p.surplus >= 0 ? 'pos' : 'neg'}>{signed(p.surplus)}</b>, sort: (p) => p.surplus, align: 'right' },
@@ -76,7 +76,7 @@ export default function Draft() {
       {season !== 'Overview' && scoped.some((p) => p.pending) && <div className="banner">The {season} season is in progress — pick values appear once it's complete.</div>}
       <div className="stat-grid">
         <Stat label="Picks" value={scoped.length} />
-        <Stat label="Keepers" value={keepers.length} icon="🔒" />
+        <Stat label="Keepers" value={keepers.length} icon="lock" />
         <Stat label="Avg pick value" value={fmt(avg(valued.map((p) => p.value)))} tip={VALUE_TIP} />
         <Stat label="Avg keeper surplus" value={signed(avg(valued.filter((p) => p.keeper).map((p) => p.surplus)))} />
         <Stat label="Avg keeper round" value={keepers.length ? avg(keepers.map((p) => p.round)).toFixed(1) : '—'} />
@@ -98,7 +98,7 @@ export default function Draft() {
         </Card>
       </div>
 
-      <Card title="Keepers" sub="Players kept at the round they were drafted (🔒). Undrafted keepers come in at their assigned round. Detected automatically — fix any misses in src/keepers.json.">
+      <Card title="Keepers" sub="Players kept at the round they were drafted. Undrafted keepers come in at their assigned round. Detected automatically — fix any misses in src/keepers.json.">
         <Table rows={[...keepers].sort((a, b) => b.season - a.season || a.round - b.round)} cols={pickCols} rowKey={(p) => `${p.season}-${p.pickNo}`} />
       </Card>
 
@@ -115,7 +115,7 @@ export default function Draft() {
             <XAxis type="number" dataKey="x" name="Avg surplus" stroke="var(--muted)" />
             <YAxis type="number" dataKey="y" name="Final rank" reversed stroke="var(--muted)" domain={[1, 'dataMax']} allowDecimals={false} />
             <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }} formatter={(v) => String(v)} labelFormatter={() => ''} />
-            <Scatter data={scatter} fill="#4f8cff" />
+            <Scatter data={scatter} fill="#7c8cff" />
           </ScatterChart>
         </ResponsiveContainer>
         <p className="muted small">Better drafts trend toward the top-right.</p>
@@ -144,7 +144,7 @@ function DraftBoard({ picks }: { picks: Pick[] }) {
                 return (
                   <td key={t} className={`board-cell ${pos}`}>
                     <PlayerLink id={p.playerId} showPos={false} />
-                    <div className="muted small">{pos} · #{p.pickNo}{p.keeper && ' · 🔒'}{!p.pending && ` · ${signed(p.surplus)}`}</div>
+                    <div className="muted small">{pos} · #{p.pickNo}{p.keeper && <KeeperTag />}{!p.pending && ` · ${signed(p.surplus)}`}</div>
                   </td>
                 )
               })}

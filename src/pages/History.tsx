@@ -5,7 +5,7 @@ import { useLeague } from '../lib/data'
 import { careers, fmt, pct, record, type CareerRow, type League, type TeamSeason } from '../lib/stats'
 import { Card, MemberLink, Table, Tabs, Trophies, TIPS, type Col } from '../components/ui'
 
-export const PALETTE = ['#4f8cff', '#ff7a59', '#2ecc8f', '#f5c542', '#b07cff', '#ff5c8a', '#3fd0d4', '#a3d65c', '#ff9f43', '#8892b0', '#e86fd8', '#6be0a5']
+export const PALETTE = ['#7c8cff', '#3ddc97', '#f2c35b', '#ff7a8a', '#a78bfa', '#5ec8f2', '#ff9f5a', '#c6e66b', '#f0abfc', '#8a93a6', '#4fd1c5', '#e8b4b8']
 
 const STANDINGS_TABS = ['All-Time', 'Playoffs', 'Advanced'] as const
 const SEASON_TABS = ['Champions', 'Chumpions'] as const
@@ -106,19 +106,19 @@ function SeasonTable({ lg, mode }: { lg: League; mode: 'Champions' | 'Chumpions'
   const maxBy = (f: (t: TeamSeason) => number) => (ts: TeamSeason[]) => [...ts].sort((a, b) => f(b) - f(a))[0]
   const minBy = (f: (t: TeamSeason) => number) => (ts: TeamSeason[]) => [...ts].sort((a, b) => f(a) - f(b))[0]
   const champCols = [
-    { label: '🏆 Champion', get: awards((ts) => ts.find((t) => t.finalRank === 1)) },
-    { label: '🥈 2nd', get: awards((ts) => ts.find((t) => t.finalRank === 2)) },
-    { label: '🥉 3rd', get: awards((ts) => ts.find((t) => t.finalRank === 3)) },
-    { label: '🥇 Reg. Season', get: awards((ts) => ts.find((t) => t.regRank === 1)) },
-    { label: '⭐ Points', get: awards(maxBy((t) => t.pf)) },
-    { label: '👑 All-Play', get: awards(maxBy((t) => t.apW)) },
+    { label: 'Champion', get: awards((ts) => ts.find((t) => t.finalRank === 1)) },
+    { label: 'Runner-up', get: awards((ts) => ts.find((t) => t.finalRank === 2)) },
+    { label: 'Third', get: awards((ts) => ts.find((t) => t.finalRank === 3)) },
+    { label: 'Reg. Season', get: awards((ts) => ts.find((t) => t.regRank === 1)) },
+    { label: 'Points Leader', get: awards(maxBy((t) => t.pf)) },
+    { label: 'All-Play Leader', get: awards(maxBy((t) => t.apW)) },
   ]
   const chumpCols = [
-    { label: '🌮 Last Place', get: awards((ts) => [...ts].sort((a, b) => (b.finalRank ?? b.regRank) - (a.finalRank ?? a.regRank))[0]) },
-    { label: '🤮 Fewest Points', get: awards(minBy((t) => t.pf)) },
-    { label: '💩 Worst All-Play', get: awards(minBy((t) => t.apW)) },
-    { label: '🧱 Most Points Against', get: awards(maxBy((t) => t.pa)) },
-    { label: '🍀 Unluckiest', get: awards(minBy((t) => t.luck)) },
+    { label: 'Last Place', get: awards((ts) => [...ts].sort((a, b) => (b.finalRank ?? b.regRank) - (a.finalRank ?? a.regRank))[0]) },
+    { label: 'Fewest Points', get: awards(minBy((t) => t.pf)) },
+    { label: 'Worst All-Play', get: awards(minBy((t) => t.apW)) },
+    { label: 'Most Points Against', get: awards(maxBy((t) => t.pa)) },
+    { label: 'Unluckiest', get: awards(minBy((t) => t.luck)) },
   ]
   const cols = mode === 'Champions' ? champCols : chumpCols
   return (
@@ -133,7 +133,7 @@ function SeasonTable({ lg, mode }: { lg: League; mode: 'Champions' | 'Chumpions'
               <td><Link to={`/season/${s.year}`}><b>{s.year}</b></Link>{!s.complete && <span className="pill">in progress</span>}</td>
               {cols.map((c) => {
                 const id = c.get(s.teamSeasons)
-                const placement = c.label.includes('Champion') || c.label.includes('2nd') || c.label.includes('3rd') || c.label.includes('Last')
+                const placement = ['Champion', 'Runner-up', 'Third', 'Last Place'].includes(c.label)
                 return <td key={c.label}>{placement && !s.complete ? <span className="muted">—</span> : <MemberLink id={id} />}</td>
               })}
             </tr>

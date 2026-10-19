@@ -4,6 +4,7 @@ import { useLeague } from '../lib/data'
 import { buildRecords, CATEGORIES, recordHolders, type RecordDef } from '../lib/records'
 import { careers } from '../lib/stats'
 import { Card, MemberLink, Table, Tabs, type Col } from '../components/ui'
+import { Icon } from '../components/Icon'
 
 const VIEWS = ['Overview', ...CATEGORIES] as const
 
@@ -50,7 +51,7 @@ export default function RecordBook() {
             <div className="highlights">
               {milestoneWatch.map(({ d, r }) => (
                 <Link key={d.id + r.memberId} to={`/member/${r.memberId}`} className="highlight">
-                  <span className="highlight-icon">🎯</span>
+                  <span className="highlight-icon"><Icon name="target" /></span>
                   <div>
                     <div className="highlight-who">{lg.memberById[r.memberId]?.name}</div>
                     <div className="highlight-title">{d.title}</div>
@@ -80,11 +81,11 @@ function RecordCard({ d }: { d: RecordDef }) {
     <section className={`card record ${d.positive ? '' : 'blunder'}`}>
       <header className="card-head">
         <div>
-          <h2>{d.positive ? '🏅' : '💀'} {d.title}</h2>
+          <h2>{d.title}</h2>
           <p className="muted">{d.desc}</p>
         </div>
       </header>
-      <table>
+      <div className="table-wrap"><table>
         <tbody>
           {rows.map((r, i) => (
             <tr key={i} className={r.value === best ? 'holder' : ''}>
@@ -95,7 +96,7 @@ function RecordCard({ d }: { d: RecordDef }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       {d.rows.length > 5 && <button className="link-btn" onClick={() => setOpen(!open)}>{open ? 'Show less' : `Show top ${Math.min(25, d.rows.length)}`}</button>}
     </section>
   )

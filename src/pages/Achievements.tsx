@@ -50,16 +50,16 @@ export default function Achievements() {
       </Card>
       <div className="two-col">
         <Card title="Recent Badges">
-          <table><tbody>{scoped.slice(0, 15).map((e, i) => (
+          <div className="table-wrap"><table><tbody>{scoped.slice(0, 15).map((e, i) => (
             <tr key={i}>
               <td><MemberLink id={e.memberId} /></td>
               <td><span className={`badge ${e.badge.kind}`} title={e.badge.desc}>{e.badge.icon} {e.badge.name}</span></td>
               <td className="muted small">{e.season}{e.week ? ` · W${e.week}` : ''}</td>
             </tr>
-          ))}</tbody></table>
+          ))}</tbody></table></div>
         </Card>
         <Card title="Badge Catalog" sub="How often each badge has been earned.">
-          <table><tbody>{catalog.map((b) => {
+          <div className="table-wrap"><table><tbody>{catalog.map((b) => {
             const earned = scoped.filter((e) => e.badge.id === b.id)
             return (
               <tr key={b.id}>
@@ -68,7 +68,7 @@ export default function Achievements() {
                 <td className="right"><b>{earned.length}</b></td>
               </tr>
             )
-          })}</tbody></table>
+          })}</tbody></table></div>
         </Card>
       </div>
       <Card title="Achievements by Season">

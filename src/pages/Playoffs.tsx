@@ -81,10 +81,10 @@ export default function Playoffs() {
 function StreakList({ rows }: { rows: { memberId: string; display: string; context: string }[] }) {
   if (!rows.length) return <p className="muted">No multi-season streaks yet.</p>
   return (
-    <table>
+    <div className="table-wrap"><table>
       <thead><tr><th>Member</th><th>Streak</th><th>Seasons</th></tr></thead>
       <tbody>{rows.map((r, i) => <tr key={i}><td><MemberLink id={r.memberId} /></td><td><b>{r.display}</b></td><td className="muted">{r.context}</td></tr>)}</tbody>
-    </table>
+    </table></div>
   )
 }
 
@@ -107,12 +107,12 @@ function PredictorTable({ seasons, all, pred }: { seasons: Season[]; all: Season
     return (
       <>
         <p className="muted">On average, <b>{Math.round(avg * 100)}%</b> of last year's playoff teams make it back.</p>
-        <table>
+        <div className="table-wrap"><table>
           <thead><tr><th>Season</th><th>Returned</th><th>Who</th><th>Rate</th></tr></thead>
           <tbody>{rows.map(({ s, back, of }) => (
             <tr key={s.year}><td>{s.year}</td><td>{back.length} of {of}</td><td><span className="row">{back.map((t) => <MemberLink key={t.memberId} id={t.memberId} />)}</span></td><td><Bar pct={back.length / of} /></td></tr>
           ))}</tbody>
-        </table>
+        </table></div>
       </>
     )
   }
@@ -134,17 +134,17 @@ function PredictorTable({ seasons, all, pred }: { seasons: Season[]; all: Season
       <p className="muted">
         {note} made the playoffs <b>{made}/{rows.length}</b> times and won the title <b>{won}/{rows.length}</b> times.
       </p>
-      <table>
+      <div className="table-wrap"><table>
         <thead><tr><th>Season</th><th>Team</th><th>Reg. Rank</th><th>Made Playoffs</th><th>Finish</th><th>Champion</th></tr></thead>
         <tbody>{rows.map(({ s, t }) => (
           <tr key={s.year}>
             <td>{s.year}</td><td><MemberLink id={t!.memberId} /></td><td>{ordinal(t!.regRank)}</td>
-            <td>{t!.madePlayoffs ? <span className="pos">✔ Yes</span> : <span className="neg">✘ No</span>}</td>
-            <td>{ordinal(t!.finalRank!)}{t!.finalRank === 1 && ' 🏆'}</td>
+            <td>{t!.madePlayoffs ? <span className="pos">Yes</span> : <span className="neg">No</span>}</td>
+            <td>{ordinal(t!.finalRank!)}{t!.finalRank === 1 && <span className="pill">Champion</span>}</td>
             <td><MemberLink id={champ(s).memberId} /> <span className="muted small">({ordinal(champ(s).regRank)} seed)</span></td>
           </tr>
         ))}</tbody>
-      </table>
+      </table></div>
       {!rows.length && <p className="muted">{lg.seasons.length < 2 ? 'Needs two seasons.' : 'No data yet.'}</p>}
     </>
   )

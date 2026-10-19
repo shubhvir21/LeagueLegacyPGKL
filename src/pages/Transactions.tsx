@@ -73,11 +73,11 @@ export default function Transactions() {
         </div>
       </div>
       <div className="stat-grid">
-        <Stat icon="📝" label="Waiver / FA adds" value={moves.length.toLocaleString()} />
-        <Stat icon="🤝" label="Trades" value={realTrades.length} />
-        <Stat icon="📦" label="Total transactions" value={(moves.length + realTrades.length).toLocaleString()} />
-        {mostAdded && <Stat icon="🔁" label={`Most added · ${mostAdded[1]}×`} value={pm.info[mostAdded[0]]?.name ?? mostAdded[0]} />}
-        {best && <Stat icon="🧠" label="Best manager / season" value={lg.memberById[best.id]?.name} />}
+        <Stat icon="plus" label="Waiver / FA adds" value={moves.length.toLocaleString()} />
+        <Stat icon="swap" label="Trades" value={realTrades.length} />
+        <Stat icon="repeat" label="Total transactions" value={(moves.length + realTrades.length).toLocaleString()} />
+        {mostAdded && <Stat icon="repeat" label={`Most added · ${mostAdded[1]}×`} value={pm.info[mostAdded[0]]?.name ?? mostAdded[0]} />}
+        {best && <Stat icon="zap" label="Best manager / season" value={lg.memberById[best.id]?.name} />}
       </div>
       <Card title="Manager Rankings" sub="Value added through waivers and trades, averaged per season.">
         <Table rows={rankRows} cols={rankCols} initialSort="total" rowKey={(r) => r.id} />
@@ -101,7 +101,7 @@ export default function Transactions() {
                     <div className="row"><MemberLink id={s.memberId} /><b className={s.value >= 0 ? 'pos' : 'neg'}>{signed(s.value)}</b></div>
                     <div className="small muted">Gets</div>
                     {s.gets.map((p) => <div key={p}><PlayerLink id={p} /></div>)}
-                    {s.picksIn.map((p) => <div key={p} className="small">📄 {p} pick</div>)}
+                    {s.picksIn.map((p) => <div key={p} className="small"><span className="pill" style={{ marginLeft: 0 }}>Pick</span> {p}</div>)}
                     {!s.gets.length && !s.picksIn.length && <div className="muted small">—</div>}
                   </div>
                 ))}

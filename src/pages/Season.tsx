@@ -71,18 +71,18 @@ export default function Season() {
                 <Avatar id={t.memberId} size={48} />
                 <div className="podium-name">{t.teamName}</div>
                 <div className="muted small">{name(t)}</div>
-                <div className="podium-place">{['🥈', '🏆', '🥉'][i]}</div>
+                <div className={`podium-place place p${[2, 1, 3][i]}`}>{['2nd', 'Champion', '3rd'][i]}</div>
               </Link>
             ))}
           </div>
         )}
         <div className="stat-grid">
-          <Stat icon="🥇" label={`${s.complete ? "Reg. season champ" : "Current leader"} · ${record(regChamp.wins, regChamp.losses, regChamp.ties)}`} value={name(regChamp)} />
-          <Stat icon="⭐" label={`Points champ · ${fmt(ptsChamp.pf)}`} value={name(ptsChamp)} />
-          <Stat icon="👑" label={`All-play champ · ${record(apChamp.apW, apChamp.apL, apChamp.apT)}`} value={name(apChamp)} />
-          <Stat icon="🌮" label={s.complete ? 'Last place' : 'Currently last'} value={name(last)} />
-          <Stat icon="🤮" label={`Lowest scorer · ${fmt(lowest.pf)}`} value={name(lowest)} />
-          <Stat icon="💩" label={`Worst all-play · ${record(worstAp.apW, worstAp.apL, worstAp.apT)}`} value={name(worstAp)} />
+          <Stat icon="crown" label={`${s.complete ? "Reg. season champ" : "Current leader"} · ${record(regChamp.wins, regChamp.losses, regChamp.ties)}`} value={name(regChamp)} />
+          <Stat icon="star" label={`Points champ · ${fmt(ptsChamp.pf)}`} value={name(ptsChamp)} />
+          <Stat icon="crown" label={`All-play champ · ${record(apChamp.apW, apChamp.apL, apChamp.apT)}`} value={name(apChamp)} />
+          <Stat icon="trendDown" label={s.complete ? 'Last place' : 'Currently last'} value={name(last)} />
+          <Stat icon="trendDown" label={`Lowest scorer · ${fmt(lowest.pf)}`} value={name(lowest)} />
+          <Stat icon="trendDown" label={`Worst all-play · ${record(worstAp.apW, worstAp.apL, worstAp.apT)}`} value={name(worstAp)} />
         </div>
       </Card>
 
@@ -105,7 +105,7 @@ export default function Season() {
 
 function StandingsTable({ s }: { s: SeasonT }) {
   const cols: Col<TeamSeason>[] = [
-    { key: 'rank', label: 'Rank', render: (t) => <RankBadge rank={t.finalRank ?? t.regRank} n={s.teams} />, sort: (t) => -(t.finalRank ?? t.regRank) },
+    { key: 'rank', label: 'Rank', render: (t) => <RankBadge rank={t.finalRank ?? t.regRank} n={s.teams} final={s.complete} />, sort: (t) => -(t.finalRank ?? t.regRank) },
     { key: 'team', label: 'Team', render: (t) => <Link to={`/season/${s.year}/team/${t.memberId}`} className="member-link"><Avatar id={t.memberId} /><span>{t.teamName}</span></Link> },
     { key: 'mgr', label: 'Manager', render: (t) => <MemberLink id={t.memberId} avatar={false} /> },
     { key: 'rec', label: 'Record', render: (t) => record(t.wins, t.losses, t.ties), sort: (t) => t.wins + t.pf / 1e5, tip: TIPS.median },
@@ -133,7 +133,7 @@ export function Bracket({ s, games }: { s: SeasonT; games: Game[] }) {
           <h3>{roundName(i)} <span className="muted small">Week {wk}</span></h3>
           {games.filter((g) => g.week === wk).sort((x, y) => (x.place ?? 0) - (y.place ?? 0)).map((g) => (
             <div key={g.a + g.b}>
-              {g.place && <div className="muted small">{g.place === 1 ? '🏆 Championship' : `${ordinal(g.place)} place game`}</div>}
+              {g.place && <div className={`game-label ${g.place === 1 ? 'final' : ''}`}>{g.place === 1 ? 'Championship' : `${ordinal(g.place)} place`}</div>}
               <GameCard g={g} label={teamName} />
             </div>
           ))}
@@ -172,7 +172,7 @@ export function WeekMatchups({ s, games }: { s: SeasonT; games: Game[] }) {
       <div className="game-grid">
         {wk.map((g) => (
           <div key={g.a + g.b}>
-            {g.bracket && <div className="muted small">{g.bracket === 'winners' ? 'Playoffs' : 'Consolation'}</div>}
+            {g.bracket && <div className="game-label">{g.bracket === 'winners' ? 'Playoffs' : 'Consolation'}</div>}
             <GameCard g={g} label={teamName} />
           </div>
         ))}
@@ -205,18 +205,18 @@ export function TeamSeason() {
         <SeasonPicker year={year} path={(yy) => `/season/${yy}/team/${t.memberId}`} />
       </div>
       <div className="stat-grid">
-        <Stat icon="🏅" label={s.complete ? 'Final finish' : 'Current rank'} value={ordinal(t.finalRank ?? t.regRank)} />
-        <Stat icon="📋" label="Record" value={record(t.wins, t.losses, t.ties)} tip={TIPS.median} />
-        <Stat icon="⚔️" label="H2H record" value={record(t.h2hW, t.h2hL, t.h2hT)} />
-        <Stat icon="👑" label="All-play" value={record(t.apW, t.apL, t.apT)} tip={TIPS.allPlay} />
-        <Stat icon="⭐" label="Points for" value={fmt(t.pf)} />
-        <Stat icon="🛡" label="Points against" value={fmt(t.pa)} />
-        <Stat icon="💪" label="Strength of schedule" value={fmt(t.sos)} tip={TIPS.sos} />
-        <Stat icon="🍀" label="Luck" value={signed(t.luck)} tip={TIPS.luck} />
-        <Stat icon="🧠" label="Coach score" value={t.coachScore != null ? t.coachScore.toFixed(1) : '—'} tip={TIPS.coach} />
-        <Stat icon="📊" label="Points share" value={`${t.pointsShare.toFixed(2)}%`} tip={TIPS.share} />
-        <Stat icon="📈" label="Season score" value={t.seasonScore.toFixed(1)} tip={TIPS.score} />
-        <Stat icon="🔥" label="Weekly high scores" value={t.highScores} />
+        <Stat icon="medal" label={s.complete ? 'Final finish' : 'Current rank'} value={ordinal(t.finalRank ?? t.regRank)} />
+        <Stat icon="list" label="Record" value={record(t.wins, t.losses, t.ties)} tip={TIPS.median} />
+        <Stat icon="swords" label="H2H record" value={record(t.h2hW, t.h2hL, t.h2hT)} />
+        <Stat icon="crown" label="All-play" value={record(t.apW, t.apL, t.apT)} tip={TIPS.allPlay} />
+        <Stat icon="star" label="Points for" value={fmt(t.pf)} />
+        <Stat icon="shield" label="Points against" value={fmt(t.pa)} />
+        <Stat icon="shield" label="Strength of schedule" value={fmt(t.sos)} tip={TIPS.sos} />
+        <Stat icon="scale" label="Luck" value={signed(t.luck)} tip={TIPS.luck} />
+        <Stat icon="zap" label="Coach score" value={t.coachScore != null ? t.coachScore.toFixed(1) : '—'} tip={TIPS.coach} />
+        <Stat icon="chart" label="Points share" value={`${t.pointsShare.toFixed(2)}%`} tip={TIPS.share} />
+        <Stat icon="trendUp" label="Season score" value={t.seasonScore.toFixed(1)} tip={TIPS.score} />
+        <Stat icon="flame" label="Weekly high scores" value={t.highScores} />
       </div>
       <Card title="Weekly Results">
         <div className="table-wrap">

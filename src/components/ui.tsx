@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useLeague } from '../lib/data'
+import { Icon } from './Icon'
 
 export function Avatar({ id, size = 24 }: { id: string; size?: number }) {
   const m = useLeague().memberById[id]
@@ -38,18 +39,27 @@ export function Card({ title, sub, children, right }: { title: string; sub?: str
   )
 }
 
-export function Stat({ label, value, icon, tip }: { label: string; value: ReactNode; icon?: string; tip?: string }) {
+/** `icon` is an Icon name; legacy emoji values are ignored so tiles stay clean. */
+export function Stat({ label, value, icon, tip, tone }: { label: string; value: ReactNode; icon?: string; tip?: string; tone?: 'pos' | 'neg' | 'accent' }) {
+  const isIcon = !!icon && /^[a-zA-Z]+$/.test(icon)
   return (
-    <div className="stat">
-      {icon && <span className="stat-icon">{icon}</span>}
+    <div className={`stat ${tone ?? ''}`}>
+      <div className="stat-label">
+        {isIcon && <Icon name={icon!} size={14} />}
+        <span>{label}</span>
+        {tip && <Tip text={tip} />}
+      </div>
       <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}{tip && <Tip text={tip} />}</div>
     </div>
   )
 }
 
 export function Tip({ text }: { text: string }) {
-  return <span className="tip" title={text}>ⓘ</span>
+  return (
+    <span className="tip" tabIndex={0} aria-label={text} data-tip={text}>
+      <Icon name="info" size={13} />
+    </span>
+  )
 }
 
 export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: readonly T[]; value: T; onChange: (t: T) => void }) {
@@ -97,8 +107,10 @@ export function Table<R>({ rows, cols, initialSort, rowKey }: { rows: R[]; cols:
                   else { setSortKey(c.key); setDesc(true) }
                 }}
               >
-                {c.label}{c.tip && <Tip text={c.tip} />}
-                {sortKey === c.key && <span className="sort-arrow">{desc ? '▼' : '▲'}</span>}
+                <span className="th-inner">
+                  {c.label}{c.tip && <Tip text={c.tip} />}
+                  {sortKey === c.key && <span className="sort-arrow">{desc ? '↓' : '↑'}</span>}
+                </span>
               </th>
             ))}
           </tr>
@@ -118,16 +130,17 @@ export function Table<R>({ rows, cols, initialSort, rowKey }: { rows: R[]; cols:
 export function Trophies({ gold, silver, bronze }: { gold: number; silver: number; bronze: number }) {
   return (
     <span className="trophies">
-      {gold > 0 && <span title="Championships">🏆×{gold}</span>}
-      {silver > 0 && <span title="Runner-up">🥈×{silver}</span>}
-      {bronze > 0 && <span title="Third place">🥉×{bronze}</span>}
+      {gold > 0 && <span className="trophy gold" title="Championships"><Icon name="trophy" size={13} />{gold}</span>}
+      {silver > 0 && <span className="trophy silver" title="Runner-up"><Icon name="medal" size={13} />{silver}</span>}
+      {bronze > 0 && <span className="trophy bronze" title="Third place"><Icon name="medal" size={13} />{bronze}</span>}
     </span>
   )
 }
 
-export function RankBadge({ rank, n }: { rank: number | null; n: number }) {
+/** `final` = medal colors; in-progress standings use plain chips. */
+export function RankBadge({ rank, n, final = true }: { rank: number | null; n: number; final?: boolean }) {
   if (rank == null) return <span className="muted">—</span>
-  const cls = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : rank === n ? 'last' : ''
+  const cls = !final ? '' : rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : rank === n ? 'last' : ''
   return <span className={`rank ${cls}`}>{rank}</span>
 }
 

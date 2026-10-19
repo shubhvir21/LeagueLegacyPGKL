@@ -4,7 +4,7 @@ import { useLeague } from '../lib/data'
 import { playersOf, type PlayerModel } from '../lib/players'
 import { fmt, type League } from '../lib/stats'
 import { Card, MemberLink, Stat, Table, type Col } from '../components/ui'
-import { PlayerLink, PosFilter } from '../components/PlayerLink'
+import { KeeperTag, PlayerLink, PosFilter } from '../components/PlayerLink'
 import { signed } from './History'
 
 interface Career {
@@ -75,7 +75,7 @@ export default function Players() {
     { key: 'ad', label: 'Added', render: (r) => r.added, sort: (r) => r.added, align: 'right' },
     { key: 'dp', label: 'Dropped', render: (r) => r.dropped, sort: (r) => r.dropped, align: 'right' },
     { key: 'ap', label: 'All-Pro', render: (r) => r.allPro || '', sort: (r) => r.allPro, align: 'right' },
-    { key: 'ring', label: 'Rings', render: (r) => (r.rings ? `💍×${r.rings}` : ''), sort: (r) => r.rings, align: 'right' },
+    { key: 'ring', label: 'Rings', render: (r) => (r.rings ? <span className="trophy gold">{r.rings}×</span> : ''), sort: (r) => r.rings, align: 'right' },
   ]
   const name = (id?: string) => (id ? pm.info[id]?.name ?? id : '—')
 
@@ -84,14 +84,14 @@ export default function Players() {
       <h1>Players</h1>
       <PosFilter value={pos} onChange={setPos} />
       <div className="stat-grid">
-        <Stat icon="⭐" label={`Top scorer · ${fmt(top('pts')?.pts ?? 0)} pts`} value={name(top('pts')?.id)} />
-        <Stat icon="📈" label={`Best avg / start (8+ starts) · ${bestAvg ? fmt(bestAvg.startedPts / bestAvg.starts) : '—'}`} value={name(bestAvg?.id)} />
-        <Stat icon="💥" label={`Best single week · ${fmt(bestWeek?.pts ?? 0)} (${bestWeek?.season} W${bestWeek?.week})`} value={name(bestWeek?.playerId)} />
-        <Stat icon="📋" label={`Most drafted · ${top('drafted')?.drafted ?? 0}×`} value={name(top('drafted')?.id)} />
-        <Stat icon="➕" label={`Most added · ${top('added')?.added ?? 0}×`} value={name(top('added')?.id)} />
-        <Stat icon="✂️" label={`Most dropped · ${top('dropped')?.dropped ?? 0}×`} value={name(top('dropped')?.id)} />
-        <Stat icon="🎯" label={`Best draft value · ${signed(top('bestPick')?.bestPick ?? 0)}`} value={name(top('bestPick')?.id)} />
-        <Stat icon="💍" label={`Most rings · ${top('rings')?.rings ?? 0}`} value={name(top('rings')?.id)} />
+        <Stat icon="star" label={`Top scorer · ${fmt(top('pts')?.pts ?? 0)} pts`} value={name(top('pts')?.id)} />
+        <Stat icon="trendUp" label={`Best avg / start (8+ starts) · ${bestAvg ? fmt(bestAvg.startedPts / bestAvg.starts) : '—'}`} value={name(bestAvg?.id)} />
+        <Stat icon="zap" label={`Best single week · ${fmt(bestWeek?.pts ?? 0)} (${bestWeek?.season} W${bestWeek?.week})`} value={name(bestWeek?.playerId)} />
+        <Stat icon="list" label={`Most drafted · ${top('drafted')?.drafted ?? 0}×`} value={name(top('drafted')?.id)} />
+        <Stat icon="plus" label={`Most added · ${top('added')?.added ?? 0}×`} value={name(top('added')?.id)} />
+        <Stat icon="minus" label={`Most dropped · ${top('dropped')?.dropped ?? 0}×`} value={name(top('dropped')?.id)} />
+        <Stat icon="target" label={`Best draft value · ${signed(top('bestPick')?.bestPick ?? 0)}`} value={name(top('bestPick')?.id)} />
+        <Stat icon="trophy" label={`Most rings · ${top('rings')?.rings ?? 0}`} value={name(top('rings')?.id)} />
       </div>
 
       <Card title="All-Pro Teams" sub="Best rostered players at each lineup slot by season points." right={<select value={apYear} onChange={(e) => setApYear(Number(e.target.value))}>{years.map((y) => <option key={y}>{y}</option>)}</select>}>
@@ -99,9 +99,9 @@ export default function Players() {
           {(['first', 'second'] as const).map((k) => (
             <div key={k}>
               <h3>{k === 'first' ? '1st Team' : '2nd Team'}</h3>
-              <table><tbody>{allPro[apYear]?.[k].map((p) => (
+              <div className="table-wrap"><table><tbody>{allPro[apYear]?.[k].map((p) => (
                 <tr key={p.id}><td className="muted">{p.slot}</td><td><PlayerLink id={p.id} /></td><td className="right">{fmt(p.pts)}</td></tr>
-              ))}</tbody></table>
+              ))}</tbody></table></div>
             </div>
           ))}
         </div>
@@ -140,7 +140,7 @@ export function Player() {
         <Stat label="Times added" value={moves.length} />
       </div>
       <Card title="Seasons">
-        <table>
+        <div className="table-wrap"><table>
           <thead><tr><th>Season</th><th>Rostered By</th><th className="right">Points</th><th className="right">Started Pts</th><th className="right">Starts</th><th className="right">Value</th><th>Draft</th></tr></thead>
           <tbody>{seasons.map((s) => {
             const pk = picks.find((x) => x.season === s.season)
@@ -150,24 +150,24 @@ export function Player() {
                 <td><span className="row">{s.members.map((m) => <MemberLink key={m} id={m} />)}</span></td>
                 <td className="right">{fmt(s.pts)}</td><td className="right">{fmt(s.startedPts)}</td><td className="right">{s.starts}</td>
                 <td className="right">{signed(s.vor)}</td>
-                <td>{pk ? <>R{pk.round} by <MemberLink id={pk.memberId} avatar={false} />{pk.keeper && ' 🔒'}</> : <span className="muted">Undrafted</span>}</td>
+                <td>{pk ? <>R{pk.round} by <MemberLink id={pk.memberId} avatar={false} />{pk.keeper && <KeeperTag />}</> : <span className="muted">Undrafted</span>}</td>
               </tr>
             )
           })}</tbody>
-        </table>
+        </table></div>
       </Card>
       <Card title="Started Points by Franchise">
-        <table><tbody>{Object.entries(byMember).sort((a, b) => b[1] - a[1]).map(([m, v]) => <tr key={m}><td><MemberLink id={m} /></td><td className="right">{fmt(v)}</td></tr>)}</tbody></table>
+        <div className="table-wrap"><table><tbody>{Object.entries(byMember).sort((a, b) => b[1] - a[1]).map(([m, v]) => <tr key={m}><td><MemberLink id={m} /></td><td className="right">{fmt(v)}</td></tr>)}</tbody></table></div>
       </Card>
       <Card title="Transaction History">
-        <table><tbody>
+        <div className="table-wrap"><table><tbody>
           {[
             ...picks.map((x) => ({ k: x.season * 100, t: <>Drafted R{x.round} (#{x.pickNo}) by <MemberLink id={x.memberId} avatar={false} />{x.keeper && ' (keeper)'}</>, when: `${x.season} draft` })),
             ...moves.map((x) => ({ k: x.season * 100 + x.week, t: <>Added by <MemberLink id={x.memberId} avatar={false} /> ({x.type === 'free_agent' ? 'FA' : 'waivers'})</>, when: `${x.season} W${x.week}` })),
             ...drops.map((x) => ({ k: x.season * 100 + x.week + 0.5, t: <>Dropped by <MemberLink id={x.memberId} avatar={false} /></>, when: `${x.season} W${x.week}` })),
             ...trades.map((t) => ({ k: t.season * 100 + t.week, t: <>Traded to <MemberLink id={t.sides.find((s) => s.gets.includes(id))!.memberId} avatar={false} /></>, when: `${t.season} W${t.week}` })),
           ].sort((a, b) => b.k - a.k).map((e, i) => <tr key={i}><td className="muted">{e.when}</td><td>{e.t}</td></tr>)}
-        </tbody></table>
+        </tbody></table></div>
       </Card>
     </div>
   )

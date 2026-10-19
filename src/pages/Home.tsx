@@ -20,6 +20,7 @@ export default function Home() {
     <div className="page">
       <div className="hero">
         <div>
+          <div className="eyebrow">Est. {lg.seasons.at(-1)?.year} · Sleeper</div>
           <h1>{current.name}</h1>
           <p className="muted">{lg.seasons.length} seasons · {current.teams} teams · {current.year} {current.complete ? 'complete' : `through week ${current.weeksPlayed}`}</p>
         </div>
@@ -29,7 +30,7 @@ export default function Home() {
               <Link key={t.memberId} to={`/member/${t.memberId}`} className={`hero-step p${[2, 1, 3][i]}`}>
                 <Avatar id={t.memberId} size={i === 1 ? 56 : 44} />
                 <b>{lg.memberById[t.memberId]?.name}</b>
-                <span className="small muted">{['🥈 Runner-up', `🏆 ${lastDone.year} Champ`, '🥉 Third'][i]}</span>
+                <span className={`place p${[2, 1, 3][i]}`}>{['Runner-up', `${lastDone.year} Champion`, 'Third'][i]}</span>
               </Link>
             ))}
           </div>
@@ -38,23 +39,23 @@ export default function Home() {
 
       <div className="two-col">
         <Card title={`${current.year} Standings`} right={<Link to={`/season/${current.year}`}>Full season →</Link>}>
-          <table><tbody>{current.teamSeasons.map((t) => (
+          <div className="table-wrap"><table><tbody>{current.teamSeasons.map((t) => (
             <tr key={t.memberId}>
-              <td><RankBadge rank={t.finalRank ?? t.regRank} n={current.teams} /></td>
+              <td><RankBadge rank={t.finalRank ?? t.regRank} n={current.teams} final={current.complete} /></td>
               <td><Link to={`/season/${current.year}/team/${t.memberId}`} className="member-link"><Avatar id={t.memberId} /><span>{t.teamName}</span></Link></td>
               <td>{record(t.wins, t.losses, t.ties)}</td>
               <td className="right">{fmt(t.pf)}</td>
             </tr>
-          ))}</tbody></table>
+          ))}</tbody></table></div>
         </Card>
         <Card title="League Activity" sub="Latest badges earned." right={<Link to="/achievements">All →</Link>}>
-          <table><tbody>{badges.map((e, i) => (
+          <div className="table-wrap"><table><tbody>{badges.map((e, i) => (
             <tr key={i}>
               <td><MemberLink id={e.memberId} /></td>
               <td><span className={`badge ${e.badge.kind}`} title={e.badge.desc}>{e.badge.icon} {e.badge.name}</span></td>
               <td className="muted small">{e.season} W{e.week}</td>
             </tr>
-          ))}</tbody></table>
+          ))}</tbody></table></div>
         </Card>
       </div>
 

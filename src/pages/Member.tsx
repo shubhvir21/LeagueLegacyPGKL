@@ -72,14 +72,14 @@ export default function Member() {
       <Card title="Overview">
         <p className="blurb">{blurb}</p>
         <div className="stat-grid">
-          <Stat icon="🏆" label={titles.length ? `Championships · ${titles.join(', ')}` : 'Championships'} value={row.titles} />
-          <Stat icon="🎖" label="Medal score" value={medalScore} tip="10 per title, 6 per runner-up, 4 per third, 2 per playoff trip." />
-          <Stat icon="📈" label="League rating" value={row.elo} tip={TIPS.elo} />
-          <Stat icon="📊" label="Avg season score" value={row.avgScore.toFixed(1)} tip={TIPS.score} />
-          <Stat icon="⭐" label="Avg points" value={fmt(row.pf / (row.games || 1))} />
-          <Stat icon="🛡" label="Avg opp. points" value={fmt(row.pa / (row.games || 1))} />
-          <Stat icon="🎟" label="Playoff record" value={record(row.playoffW, row.playoffL)} />
-          <Stat icon="🏅" label="Avg finish" value={row.avgFinish != null ? row.avgFinish.toFixed(1) : '—'} />
+          <Stat icon="trophy" label={titles.length ? `Championships · ${titles.join(', ')}` : 'Championships'} value={row.titles} />
+          <Stat icon="medal" label="Medal score" value={medalScore} tip="10 per title, 6 per runner-up, 4 per third, 2 per playoff trip." />
+          <Stat icon="trendUp" label="League rating" value={row.elo} tip={TIPS.elo} />
+          <Stat icon="chart" label="Avg season score" value={row.avgScore.toFixed(1)} tip={TIPS.score} />
+          <Stat icon="star" label="Avg points" value={fmt(row.pf / (row.games || 1))} />
+          <Stat icon="shield" label="Avg opp. points" value={fmt(row.pa / (row.games || 1))} />
+          <Stat icon="target" label="Playoff record" value={record(row.playoffW, row.playoffL)} />
+          <Stat icon="medal" label="Avg finish" value={row.avgFinish != null ? row.avgFinish.toFixed(1) : '—'} />
         </div>
         <div className="finish-strip">
           {[...seasons].reverse().map(({ s, t }) => (
@@ -103,8 +103,8 @@ export default function Member() {
             <XAxis dataKey="season" stroke="var(--muted)" />
             <YAxis stroke="var(--muted)" domain={['auto', 'auto']} />
             <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }} />
-            <Bar dataKey="PF" name="Avg points for" fill="#4f8cff" />
-            <Bar dataKey="PA" name="Avg points against" fill="#ff7a59" />
+            <Bar dataKey="PF" name="Avg points for" fill="#7c8cff" />
+            <Bar dataKey="PA" name="Avg points against" fill="#ff7a8a" />
           </BarChart>
         </ResponsiveContainer>
       </Card>

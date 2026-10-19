@@ -44,8 +44,8 @@ export default function Matchups() {
             <XAxis dataKey="season" stroke="var(--muted)" />
             <YAxis stroke="var(--muted)" />
             <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }} />
-            <Bar dataKey="avg" name="Avg team score" fill="#4f8cff" />
-            <Bar dataKey="margin" name="Avg margin" fill="#f5c542" />
+            <Bar dataKey="avg" name="Avg team score" fill="#7c8cff" />
+            <Bar dataKey="margin" name="Avg margin" fill="#f2c35b" />
           </BarChart>
         </ResponsiveContainer>
       </Card>

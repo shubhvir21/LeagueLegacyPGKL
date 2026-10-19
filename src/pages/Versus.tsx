@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLeague } from '../lib/data'
 import { careers, fmt, headToHead, pct, record, type Game } from '../lib/stats'
 import { Avatar, Card, MemberLink, Stat } from '../components/ui'
+import { Icon } from '../components/Icon'
 import { signed } from './History'
 
 export default function Versus() {
@@ -23,7 +24,7 @@ export default function Versus() {
 
   const hl = (icon: string, title: string, who: string, detail: string, to?: string) => (
     <Link to={to ?? '#'} className="highlight">
-      <span className="highlight-icon">{icon}</span>
+      <span className="highlight-icon"><Icon name={icon} /></span>
       <div><div className="highlight-who">{who}</div><div className="highlight-title">{title}</div><div className="muted small">{detail}</div></div>
     </Link>
   )
@@ -34,14 +35,14 @@ export default function Versus() {
     <div className="page">
       <h1>League Versus</h1>
       <div className="highlights">
-        {tightest && hl('⚔️', 'Closest long-running series', `${name(tightest.a)} vs ${name(tightest.b)}`, `${fmt(Math.abs(tightest.h.pf - tightest.h.pa) / tightest.h.games.length)} pts/game apart`, `/versus/${tightest.a}/${tightest.b}`)}
-        {contested && hl('⚖️', 'Most contested', `${name(contested.a)} vs ${name(contested.b)}`, record(contested.h.w, contested.h.l, contested.h.t), `/versus/${contested.a}/${contested.b}`)}
-        {streak && (() => { const s = streak.h.streak; const [w, l] = s[0] === 'W' ? [streak.a, streak.b] : [streak.b, streak.a]; return hl('🔥', 'Longest active streak', name(w), `W${s.slice(1)} vs ${name(l)}`, `/versus/${w}/${l}`) })()}
-        {highest && (() => { const x = gameLine(highest); return hl('🚀', 'Highest scoring game', x.who, `${x.d} · ${fmt(highest.aPts + highest.bPts)} combined`) })()}
-        {blowout && (() => { const x = gameLine(blowout); return hl('💣', 'Biggest blowout', x.who, `${x.d} (+${fmt(margin(blowout))})`) })()}
-        {most && hl('🔁', 'Most matchups', `${name(most.a)} vs ${name(most.b)}`, `${most.h.games.length} meetings`, `/versus/${most.a}/${most.b}`)}
-        {closest && (() => { const x = gameLine(closest); return hl('🎯', 'Closest game ever', x.who, `${x.d} (+${fmt(margin(closest))})`) })()}
-        {lopsided && (() => { const [o, v, w, l] = ownerOf(lopsided); return hl('👑', 'Most lopsided rivalry', `${name(o)} owns ${name(v)}`, `${w}-${l} · ${((w / (w + l)) * 100).toFixed(1)}%`, `/versus/${o}/${v}`) })()}
+        {tightest && hl('swords', 'Closest long-running series', `${name(tightest.a)} vs ${name(tightest.b)}`, `${fmt(Math.abs(tightest.h.pf - tightest.h.pa) / tightest.h.games.length)} pts/game apart`, `/versus/${tightest.a}/${tightest.b}`)}
+        {contested && hl('scale', 'Most contested', `${name(contested.a)} vs ${name(contested.b)}`, record(contested.h.w, contested.h.l, contested.h.t), `/versus/${contested.a}/${contested.b}`)}
+        {streak && (() => { const s = streak.h.streak; const [w, l] = s[0] === 'W' ? [streak.a, streak.b] : [streak.b, streak.a]; return hl('flame', 'Longest active streak', name(w), `W${s.slice(1)} vs ${name(l)}`, `/versus/${w}/${l}`) })()}
+        {highest && (() => { const x = gameLine(highest); return hl('rocket', 'Highest scoring game', x.who, `${x.d} · ${fmt(highest.aPts + highest.bPts)} combined`) })()}
+        {blowout && (() => { const x = gameLine(blowout); return hl('bomb', 'Biggest blowout', x.who, `${x.d} (+${fmt(margin(blowout))})`) })()}
+        {most && hl('repeat', 'Most matchups', `${name(most.a)} vs ${name(most.b)}`, `${most.h.games.length} meetings`, `/versus/${most.a}/${most.b}`)}
+        {closest && (() => { const x = gameLine(closest); return hl('target', 'Closest game ever', x.who, `${x.d} (+${fmt(margin(closest))})`) })()}
+        {lopsided && (() => { const [o, v, w, l] = ownerOf(lopsided); return hl('crown', 'Most lopsided rivalry', `${name(o)} owns ${name(v)}`, `${w}-${l} · ${((w / (w + l)) * 100).toFixed(1)}%`, `/versus/${o}/${v}`) })()}
       </div>
 
       <Card title="Head-to-Head Grid" sub="Each row is that member's record against the column. Click a cell for the full series. Includes playoff and consolation games.">
