@@ -59,7 +59,7 @@ export default function Layout() {
     <div className="brand">
       <span className="brand-mark">PGKL</span>
       <div className="brand-text">
-        <div className="brand-name">PGKL Legacy</div>
+        <div className="brand-name">League Dashboard</div>
         <div className="brand-sub">{league?.seasons[0]?.name ?? 'Keeper League'}</div>
       </div>
     </div>
