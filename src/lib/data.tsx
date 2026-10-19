@@ -1,7 +1,8 @@
 // Loads the league: committed snapshot or a newer browser cache, plus in-browser Resync.
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { fetchAll, type RawData } from './sleeper'
-import { buildLeague, type League } from './stats'
+import { buildLeague } from './stats'
+import { DataCtx } from './ctx'
 
 const DB = 'pgkl-legacy', STORE = 'kv', KEY = 'raw'
 
@@ -22,13 +23,6 @@ function idb<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest)
   })
 }
 
-interface Ctx {
-  league: League | null
-  error: string | null
-  syncing: boolean
-  resync: () => Promise<void>
-}
-const DataCtx = createContext<Ctx>(null!)
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [raw, setRaw] = useState<RawData | null>(null)
@@ -41,7 +35,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         fetch('data/league.json').then((r) => (r.ok ? (r.json() as Promise<RawData>) : null)).catch(() => null),
         idb<RawData>('readonly', (s) => s.get(KEY)),
       ])
-      const best = [snap, cached].filter((x): x is RawData => !!x).sort((a, b) => b.syncedAt.localeCompare(a.syncedAt))[0]
+      // Ignore caches written by an older version of the app (missing newer fields).
+      const best = [snap, cached].filter((x): x is RawData => !!x?.players).sort((a, b) => b.syncedAt.localeCompare(a.syncedAt))[0]
       if (best) setRaw(best)
       else setError('No data yet — click Resync to pull from Sleeper.')
     })()

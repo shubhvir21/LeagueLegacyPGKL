@@ -10,6 +10,11 @@ import Versus, { VersusDetail } from './pages/Versus'
 import Matchups from './pages/Matchups'
 import Playoffs from './pages/Playoffs'
 import RecordBook from './pages/RecordBook'
+import Draft from './pages/Draft'
+import Transactions from './pages/Transactions'
+import Players, { Player } from './pages/Players'
+import Achievements from './pages/Achievements'
+import Home, { Schedule } from './pages/Home'
 import './styles.css'
 
 createRoot(document.getElementById('root')!).render(
@@ -18,7 +23,14 @@ createRoot(document.getElementById('root')!).render(
       <HashRouter>
         <Routes>
           <Route element={<Layout />}>
-            <Route index element={<History />} />
+            <Route index element={<Home />} />
+            <Route path="history" element={<History />} />
+            <Route path="schedule" element={<Schedule />} />
+            <Route path="draft" element={<Draft />} />
+            <Route path="transactions" element={<Transactions />} />
+            <Route path="players" element={<Players />} />
+            <Route path="player/:id" element={<Player />} />
+            <Route path="achievements" element={<Achievements />} />
             <Route path="seasons" element={<SeasonIndex />} />
             <Route path="season/:year" element={<Season />} />
             <Route path="season/:year/team/:member" element={<TeamSeason />} />

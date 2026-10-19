@@ -22,6 +22,7 @@ export interface SleeperUser {
 export interface SleeperRoster {
   roster_id: number
   owner_id: string | null
+  players?: string[] | null
   settings: Record<string, number | undefined>
 }
 export interface SleeperMatchup {
@@ -41,6 +42,27 @@ export interface BracketMatch {
   l: number | null
   p?: number
 }
+export interface DraftPick {
+  round: number
+  pick_no: number
+  roster_id: number
+  player_id: string
+  is_keeper: boolean | null
+}
+export interface Transaction {
+  type: 'trade' | 'waiver' | 'free_agent' | 'commissioner'
+  status: string
+  leg: number
+  created: number
+  roster_ids: number[]
+  adds: Record<string, number> | null
+  drops: Record<string, number> | null
+  draft_picks: { round: number; season: string; roster_id: number; owner_id: number; previous_owner_id: number }[]
+  waiver_bid?: number
+}
+/** Compact player directory: id -> [full name, position, NFL team] */
+export type PlayerMap = Record<string, [string, string, string]>
+
 export interface RawSeason {
   league: SleeperLeague
   users: SleeperUser[]
@@ -48,11 +70,15 @@ export interface RawSeason {
   matchups: SleeperMatchup[][] // index = week - 1
   winnersBracket: BracketMatch[]
   losersBracket: BracketMatch[]
+  lastScored: number // weeks after this are scheduled / in progress
+  draft: { type: string; rounds: number; picks: DraftPick[] } | null
+  transactions: Transaction[]
 }
 export interface RawData {
   syncedAt: string
   nflState: { season: string; week: number; season_type: string }
   seasons: RawSeason[] // oldest first
+  players: PlayerMap
 }
 
 async function get<T>(path: string): Promise<T> {
@@ -63,20 +89,32 @@ async function get<T>(path: string): Promise<T> {
 
 async function fetchSeason(leagueId: string): Promise<RawSeason> {
   const league = await get<SleeperLeague>(`/league/${leagueId}`)
-  const lastWeek = Number(league.settings.last_scored_leg ?? league.settings.leg ?? 17) || 17
+  const lastScored = Number(league.settings.last_scored_leg ?? 0)
+  // Fetch the whole regular season + playoffs so upcoming weeks give us the schedule.
+  const lastWeek = league.status === 'complete' ? lastScored : 17
   const weeks = Array.from({ length: lastWeek }, (_, i) => i + 1)
-  const [users, rosters, winnersBracket, losersBracket, matchups] = await Promise.all([
+  const [users, rosters, winnersBracket, losersBracket, matchups, drafts, transactions] = await Promise.all([
     get<SleeperUser[]>(`/league/${leagueId}/users`),
     get<SleeperRoster[]>(`/league/${leagueId}/rosters`),
     get<BracketMatch[] | null>(`/league/${leagueId}/winners_bracket`).catch(() => null),
     get<BracketMatch[] | null>(`/league/${leagueId}/losers_bracket`).catch(() => null),
-    Promise.all(weeks.map((w) => get<SleeperMatchup[]>(`/league/${leagueId}/matchups/${w}`))),
+    Promise.all(weeks.map((w) => get<SleeperMatchup[]>(`/league/${leagueId}/matchups/${w}`).catch(() => []))),
+    get<{ draft_id: string; type: string; status: string; settings: { rounds: number } }[]>(`/league/${leagueId}/drafts`).catch(() => []),
+    Promise.all(Array.from({ length: 18 }, (_, i) => get<Transaction[]>(`/league/${leagueId}/transactions/${i + 1}`).catch(() => []))),
   ])
-  // Trim player-level detail we don't use yet to keep the snapshot small.
   const slim = matchups.map((wk) =>
-    (wk ?? []).map(({ roster_id, matchup_id, points, starters, starters_points }) => ({
-      roster_id, matchup_id, points, starters, starters_points,
+    (wk ?? []).map(({ roster_id, matchup_id, points, starters, starters_points, players_points }) => ({
+      roster_id, matchup_id, points, starters, starters_points, players_points,
     })),
+  )
+  const d = drafts.find((x) => x.status === 'complete') ?? null
+  const picks = d ? await get<DraftPick[]>(`/draft/${d.draft_id}/picks`).catch(() => []) : []
+  const draft = d
+    ? { type: d.type, rounds: d.settings.rounds, picks: picks.map(({ round, pick_no, roster_id, player_id, is_keeper }) => ({ round, pick_no, roster_id, player_id, is_keeper })) }
+    : null
+  const txns = transactions.flat().filter((t) => t.status === 'complete').map(
+    ({ type, status, leg, created, roster_ids, adds, drops, draft_picks, settings }: Transaction & { settings?: { waiver_bid?: number } | null }) =>
+      ({ type, status, leg, created, roster_ids, adds, drops, draft_picks: draft_picks ?? [], waiver_bid: settings?.waiver_bid }),
   )
   // Managers who later left the league aren't in /users; look them up directly.
   const known = new Set(users.map((u) => u.user_id))
@@ -84,8 +122,9 @@ async function fetchSeason(leagueId: string): Promise<RawSeason> {
   const departed = await Promise.all(missing.map((id) => get<SleeperUser>(`/user/${id}`).catch(() => null)))
   for (const u of departed) if (u) users.push({ user_id: u.user_id, display_name: u.display_name, avatar: u.avatar })
   return {
-    league, users, rosters, matchups: slim,
-    winnersBracket: winnersBracket ?? [], losersBracket: losersBracket ?? [],
+    league, users, rosters: rosters.map(({ roster_id, owner_id, players, settings }) => ({ roster_id, owner_id, players, settings })),
+    matchups: slim, winnersBracket: winnersBracket ?? [], losersBracket: losersBracket ?? [],
+    lastScored, draft, transactions: txns,
   }
 }
 
@@ -99,5 +138,24 @@ export async function fetchAll(currentId = CURRENT_LEAGUE_ID): Promise<RawData> 
     id = s.league.previous_league_id
   }
   const nflState = await get<RawData['nflState']>('/state/nfl')
-  return { syncedAt: new Date().toISOString(), nflState, seasons }
+  return { syncedAt: new Date().toISOString(), nflState, seasons, players: await fetchPlayers(seasons) }
+}
+
+/** Sleeper's full player list is large; keep only players who appear in this league. */
+async function fetchPlayers(seasons: RawSeason[]): Promise<PlayerMap> {
+  const ids = new Set<string>()
+  for (const s of seasons) {
+    for (const wk of s.matchups) for (const m of wk) for (const id of Object.keys(m.players_points ?? {})) ids.add(id)
+    for (const p of s.draft?.picks ?? []) ids.add(p.player_id)
+    for (const t of s.transactions) for (const id of [...Object.keys(t.adds ?? {}), ...Object.keys(t.drops ?? {})]) ids.add(id)
+  }
+  const all = await get<Record<string, { full_name?: string; first_name?: string; last_name?: string; position?: string; team?: string | null }>>('/players/nfl')
+  const out: PlayerMap = {}
+  for (const id of ids) {
+    const p = all[id]
+    out[id] = p
+      ? [p.full_name || `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || id, p.position ?? '?', p.team ?? 'FA']
+      : [id, /^[A-Z]{2,3}$/.test(id) ? 'DEF' : '?', id]
+  }
+  return out
 }

@@ -2,13 +2,19 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useData } from '../lib/data'
 
 const NAV = [
-  { to: '/', label: 'History', icon: '📜', end: true },
+  { to: '/', label: 'Home', icon: '🏠', end: true },
+  { to: '/history', label: 'History', icon: '📜' },
   { to: '/seasons', label: 'Seasons', icon: '📅' },
   { to: '/members', label: 'Members', icon: '👥' },
-  { to: '/versus', label: 'Versus', icon: '⚔️' },
+  { to: '/schedule', label: 'Schedule', icon: '🗓' },
   { to: '/matchups', label: 'Matchups', icon: '🏈' },
   { to: '/playoffs', label: 'Playoffs', icon: '🏆' },
+  { to: '/draft', label: 'Draft', icon: '📋' },
+  { to: '/transactions', label: 'Transactions', icon: '🔁' },
+  { to: '/players', label: 'Players', icon: '🧍' },
+  { to: '/versus', label: 'Versus', icon: '⚔️' },
   { to: '/records', label: 'Record Book', icon: '📖' },
+  { to: '/achievements', label: 'Achievements', icon: '🎖' },
 ]
 
 export default function Layout() {

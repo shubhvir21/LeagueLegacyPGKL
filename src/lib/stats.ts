@@ -62,7 +62,20 @@ export interface Season {
   third: string | null
 }
 
+export interface ScheduledGame {
+  season: number
+  week: number
+  a: string
+  b: string
+  playoff: boolean
+}
+
 export interface League {
+  raw: RawData
+  /** season -> roster_id -> member id (franchise merges applied) */
+  rosterOwner: Record<number, Record<number, string>>
+  schedule: ScheduledGame[] // upcoming / in-progress pairings of the current season
+  nflWeek: number
   syncedAt: string
   members: Member[]
   memberById: Record<string, Member>
@@ -92,7 +105,7 @@ function placementsFromBracket(br: BracketMatch[]): Record<number, number> {
   return place
 }
 
-function buildSeason(raw: RawSeason, games: Game[]) {
+function buildSeason(raw: RawSeason, games: Game[], schedule: ScheduledGame[]) {
   const { league } = raw
   const year = Number(league.season)
   const n = league.total_rosters
@@ -121,6 +134,15 @@ function buildSeason(raw: RawSeason, games: Game[]) {
   let leaguePts = 0
   raw.matchups.forEach((wk, i) => {
     const week = i + 1
+    if (week > raw.lastScored) {
+      // Not final yet: keep the pairings as the schedule.
+      const byId: Record<number, number[]> = {}
+      for (const m of wk) if (m.matchup_id != null) (byId[m.matchup_id] ??= []).push(m.roster_id)
+      for (const [x, y] of Object.values(byId).filter((p) => p.length === 2)) {
+        schedule.push({ season: year, week, a: owner[x], b: owner[y], playoff: week >= playoffStart })
+      }
+      return
+    }
     const scored = wk.filter((m) => m.points > 0)
     if (scored.length === 0) return
     if (week < playoffStart) {
@@ -224,7 +246,8 @@ function buildSeason(raw: RawSeason, games: Game[]) {
 
 export function buildLeague(raw: RawData): League {
   const games: Game[] = []
-  const seasons = raw.seasons.map((s) => buildSeason(s, games))
+  const schedule: ScheduledGame[] = []
+  const seasons = raw.seasons.map((s) => buildSeason(s, games, schedule))
 
   // Members: newest season's user info wins for display.
   const members: Record<string, Member> = {}
@@ -263,12 +286,18 @@ export function buildLeague(raw: RawData): League {
     eloHistory.push({ label: String(s.year), season: s.year, week: 0, ratings: Object.fromEntries(Object.entries(elo).map(([k, v]) => [k, Math.round(v)])) })
   }
 
+  const rosterOwner: League['rosterOwner'] = {}
+  for (const s of seasons) rosterOwner[s.year] = Object.fromEntries(s.teamSeasons.map((t) => [t.rosterId, t.memberId]))
   return {
+    raw,
+    rosterOwner,
     syncedAt: raw.syncedAt,
     members: Object.values(members),
     memberById: members,
     seasons: [...seasons].reverse(),
     games,
+    schedule,
+    nflWeek: raw.nflState.week,
     elo: Object.fromEntries(Object.entries(elo).map(([k, v]) => [k, Math.round(v)])),
     eloHistory,
   }
