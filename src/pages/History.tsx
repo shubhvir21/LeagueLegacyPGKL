@@ -197,8 +197,8 @@ function Meter({ v }: { v: number }) {
 
 function TeamRankings({ lg }: { lg: League }) {
   const all = teamRankings(lg)
-  const [view, setView] = useState<'Best 25' | 'Worst 25'>('Best 25')
-  const rows = view === 'Best 25' ? all.slice(0, 25) : [...all].reverse().slice(0, 25)
+  const [view, setView] = useState<'Best 15' | 'Worst 15'>('Best 15')
+  const rows = view === 'Best 15' ? all.slice(0, 15) : [...all].reverse().slice(0, 15)
   const place = new Map(all.map((r, i) => [r, i + 1]))
   const cols: Col<TeamRank>[] = [
     { key: 'rk', label: '#', render: (r) => <b>{place.get(r)}</b>, sort: (r) => -place.get(r)! },
@@ -224,9 +224,9 @@ function TeamRankings({ lg }: { lg: League }) {
   ]
   return (
     <Card title="Team Rankings" sub={`The best and worst single-season teams in league history (${all.length} completed team-seasons). Click a column to sort.`}>
-      <Tabs tabs={['Best 25', 'Worst 25'] as const} value={view} onChange={setView} />
-      <Table key={view} rows={rows} cols={cols} initialSort="score" initialAsc={view === 'Worst 25'} rowKey={(r) => `${r.t.season}-${r.t.memberId}`} />
-      {all.length < 50 && <p className="muted small" style={{ marginTop: 12 }}>With {all.length} completed team-seasons so far, the two lists overlap. They’ll separate as more seasons finish.</p>}
+      <Tabs tabs={['Best 15', 'Worst 15'] as const} value={view} onChange={setView} />
+      <Table key={view} rows={rows} cols={cols} initialSort="score" initialAsc={view === 'Worst 15'} rowKey={(r) => `${r.t.season}-${r.t.memberId}`} />
+      {all.length < 30 && <p className="muted small" style={{ marginTop: 12 }}>With {all.length} completed team-seasons so far, the two lists overlap. They’ll separate as more seasons finish.</p>}
     </Card>
   )
 }
