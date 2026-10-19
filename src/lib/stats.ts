@@ -13,6 +13,7 @@ export interface Game {
   week: number
   playoff: boolean
   bracket: 'winners' | 'losers' | null
+  place?: number // bracket match deciding this place (1 = championship)
   a: string // member id
   b: string
   aPts: number
@@ -158,16 +159,18 @@ function buildSeason(raw: RawSeason, games: Game[]) {
       if (pair.length !== 2) continue
       const [x, y] = pair
       let bracket: Game['bracket'] = null
+      let place: number | undefined
       if (isPlayoff) {
-        const inBr = (br: BracketMatch[]) =>
-          br.some((b) => b.r === bracketRound && ((b.t1 === x.roster_id && b.t2 === y.roster_id) || (b.t1 === y.roster_id && b.t2 === x.roster_id)))
-        if (inBr(raw.winnersBracket)) bracket = 'winners'
-        else if (inBr(raw.losersBracket)) bracket = 'losers'
+        const find = (br: BracketMatch[]) =>
+          br.find((b) => b.r === bracketRound && ((b.t1 === x.roster_id && b.t2 === y.roster_id) || (b.t1 === y.roster_id && b.t2 === x.roster_id)))
+        const wm = find(raw.winnersBracket), lm = find(raw.losersBracket)
+        if (wm) { bracket = 'winners'; place = wm.p }
+        else if (lm) bracket = 'losers'
         else continue // not a real playoff game
       }
       games.push({
         season: year, week, playoff: isPlayoff, bracket,
-        a: owner[x.roster_id], b: owner[y.roster_id], aPts: x.points, bPts: y.points,
+        a: owner[x.roster_id], b: owner[y.roster_id], aPts: x.points, bPts: y.points, place,
       })
       if (!isPlayoff) {
         const tx = ts[x.roster_id], ty = ts[y.roster_id]

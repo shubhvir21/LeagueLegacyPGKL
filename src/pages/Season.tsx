@@ -121,7 +121,7 @@ function StandingsTable({ s }: { s: SeasonT }) {
   return <Table rows={s.teamSeasons} cols={cols} rowKey={(t) => t.memberId} />
 }
 
-function Bracket({ s, games }: { s: SeasonT; games: Game[] }) {
+export function Bracket({ s, games }: { s: SeasonT; games: Game[] }) {
   const lg = useLeague()
   const teamName = (id: string) => s.teamSeasons.find((t) => t.memberId === id)?.teamName ?? lg.memberById[id]?.name
   const rounds = [...new Set(games.map((g) => g.week))].sort((a, b) => a - b)
@@ -131,7 +131,12 @@ function Bracket({ s, games }: { s: SeasonT; games: Game[] }) {
       {rounds.map((wk, i) => (
         <div key={wk} className="bracket-round">
           <h3>{roundName(i)} <span className="muted small">Week {wk}</span></h3>
-          {games.filter((g) => g.week === wk).map((g) => <GameCard key={g.a + g.b} g={g} label={teamName} />)}
+          {games.filter((g) => g.week === wk).sort((x, y) => (x.place ?? 0) - (y.place ?? 0)).map((g) => (
+            <div key={g.a + g.b}>
+              {g.place && <div className="muted small">{g.place === 1 ? '🏆 Championship' : `${ordinal(g.place)} place game`}</div>}
+              <GameCard g={g} label={teamName} />
+            </div>
+          ))}
         </div>
       ))}
     </div>
@@ -150,7 +155,7 @@ export function GameCard({ g, label }: { g: Game; label?: (id: string) => string
   )
 }
 
-function WeekMatchups({ s, games }: { s: SeasonT; games: Game[] }) {
+export function WeekMatchups({ s, games }: { s: SeasonT; games: Game[] }) {
   const weeks = [...new Set(games.map((g) => g.week))].sort((a, b) => a - b)
   const [week, setWeek] = useState(weeks.at(-1) ?? 1)
   const teamName = (id: string) => s.teamSeasons.find((t) => t.memberId === id)?.teamName

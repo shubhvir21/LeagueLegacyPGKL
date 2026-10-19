@@ -6,6 +6,9 @@ const NAV = [
   { to: '/seasons', label: 'Seasons', icon: '📅' },
   { to: '/members', label: 'Members', icon: '👥' },
   { to: '/versus', label: 'Versus', icon: '⚔️' },
+  { to: '/matchups', label: 'Matchups', icon: '🏈' },
+  { to: '/playoffs', label: 'Playoffs', icon: '🏆' },
+  { to: '/records', label: 'Record Book', icon: '📖' },
 ]
 
 export default function Layout() {

@@ -7,6 +7,9 @@ import History from './pages/History'
 import Season, { SeasonIndex, TeamSeason } from './pages/Season'
 import Member, { Members } from './pages/Member'
 import Versus, { VersusDetail } from './pages/Versus'
+import Matchups from './pages/Matchups'
+import Playoffs from './pages/Playoffs'
+import RecordBook from './pages/RecordBook'
 import './styles.css'
 
 createRoot(document.getElementById('root')!).render(
@@ -23,6 +26,9 @@ createRoot(document.getElementById('root')!).render(
             <Route path="member/:id" element={<Member />} />
             <Route path="versus" element={<Versus />} />
             <Route path="versus/:a/:b" element={<VersusDetail />} />
+            <Route path="matchups" element={<Matchups />} />
+            <Route path="playoffs" element={<Playoffs />} />
+            <Route path="records" element={<RecordBook />} />
           </Route>
         </Routes>
       </HashRouter>

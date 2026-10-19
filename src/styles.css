@@ -142,3 +142,25 @@ tbody tr:hover { background: var(--panel-2); }
   .sidebar { position: static; height: auto; }
   .content { padding: 16px; }
 }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.part { display: inline-block; min-width: 38px; padding: 3px 6px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+i.part { min-width: 14px; height: 14px; padding: 0; vertical-align: middle; margin-right: 4px; }
+.part.gold { background: var(--gold); color: #000; }
+.part.silver { background: var(--silver); color: #000; }
+.part.bronze { background: var(--bronze); color: #000; }
+.part.made { background: #1f4d3a; color: #9ff0c8; }
+.part.missed { background: var(--panel-2); color: var(--muted); }
+.legend { display: flex; gap: 16px; margin-top: 12px; color: var(--muted); font-size: 12px; }
+.bar-wrap { display: inline-flex; align-items: center; gap: 8px; width: 160px; }
+.bar { height: 8px; border-radius: 4px; background: var(--accent); }
+.cat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.cat-card { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; padding: 16px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.cat-card:hover { border-color: var(--accent); }
+.cat-count { font-size: 26px; font-weight: 800; color: var(--accent); }
+.record-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; align-items: start; }
+.card.record { border-top: 3px solid var(--accent-2); }
+.card.record.blunder { border-top-color: var(--neg); }
+.card.record h2 { font-size: 13px; }
+tr.holder td { background: color-mix(in srgb, var(--gold) 10%, transparent); }
+.link-btn { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; padding: 8px 0 0; }
