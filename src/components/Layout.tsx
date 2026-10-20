@@ -13,6 +13,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/seasons', label: 'Seasons', icon: 'calendar', also: '/season/' },
       { to: '/members', label: 'Members', icon: 'users', also: '/member/' },
       { to: '/schedule', label: 'Schedule', icon: 'clock' },
+      { to: '/recap', label: 'Season Recap', icon: 'star', also: '/recap/' },
       { to: '/rules', label: 'Rules', icon: 'scale' },
     ],
   },
@@ -21,6 +22,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { to: '/matchups', label: 'Matchups', icon: 'football' },
       { to: '/playoffs', label: 'Playoffs', icon: 'trophy' },
+      { to: '/power', label: 'Power Rankings', icon: 'chart' },
       { to: '/odds', label: 'Playoff Odds', icon: 'target' },
       { to: '/versus', label: 'Versus', icon: 'swords' },
     ],
@@ -38,6 +40,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Legacy',
     items: [
+      { to: '/dynasty', label: 'Dynasty Timeline', icon: 'crown' },
       { to: '/records', label: 'Record Book', icon: 'book' },
       { to: '/achievements', label: 'Achievements', icon: 'medal' },
     ],

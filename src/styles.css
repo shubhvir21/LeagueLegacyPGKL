@@ -615,3 +615,31 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
 .sub-head { font-size: 12.5px; font-weight: 650; color: var(--muted); margin: 8px 0; text-transform: none; }
 @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Power rankings legend */
+.legend-row { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.legend-row i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+/* Season recap */
+.podium { display: flex; justify-content: center; align-items: flex-end; gap: 14px; margin: 4px 0 8px; }
+.podium-step { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 18px 12px; border-radius: var(--radius-sm); background: var(--panel-2); border: 1px solid var(--border); min-width: 120px; }
+.podium-step.p1 { padding-top: 24px; border-color: rgba(242, 195, 91, .5); background: rgba(242, 195, 91, .08); }
+.podium-name { font-weight: 700; }
+.award-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.award { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.award-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+.award.neg .award-head { color: var(--neg); }
+.award-who { font-size: 15px; font-weight: 650; }
+.award-detail { font-size: 12.5px; }
+
+/* Dynasty timeline */
+.timeline td { padding: 4px; }
+.tl-cell { display: inline-flex; flex-direction: column; align-items: center; min-width: 58px; padding: 5px 6px; border-radius: 7px; text-decoration: none; color: var(--text); background: var(--panel-3); font-size: 12px; line-height: 1.25; }
+.tl-cell span { font-size: 10.5px; color: var(--muted); }
+.tl-cell.gold { background: rgba(242, 195, 91, .28); }
+.tl-cell.silver { background: rgba(200, 208, 220, .22); }
+.tl-cell.bronze { background: rgba(205, 127, 50, .25); }
+.tl-cell.playoff { background: rgba(61, 220, 151, .16); }
+.tl-cell.last { background: rgba(255, 122, 138, .22); }
+.tl-cell.live { outline: 1px dashed var(--border-strong); background: transparent; }
+@media (max-width: 600px) { .podium-step { min-width: 0; padding: 10px; } }

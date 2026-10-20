@@ -19,6 +19,9 @@ import Home, { Schedule } from './pages/Home'
 import Keepers from './pages/Keepers'
 import Odds from './pages/Odds'
 import TradeTree from './pages/TradeTree'
+import Power from './pages/Power'
+import Recap, { RecapIndex } from './pages/Recap'
+import Dynasty from './pages/Dynasty'
 import './styles.css'
 
 createRoot(document.getElementById('root')!).render(
@@ -49,6 +52,10 @@ createRoot(document.getElementById('root')!).render(
             <Route path="keepers" element={<Keepers />} />
             <Route path="odds" element={<Odds />} />
             <Route path="trades" element={<TradeTree />} />
+            <Route path="power" element={<Power />} />
+            <Route path="recap" element={<RecapIndex />} />
+            <Route path="recap/:year" element={<Recap />} />
+            <Route path="dynasty" element={<Dynasty />} />
             <Route path="records" element={<RecordBook />} />
           </Route>
         </Routes>
