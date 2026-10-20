@@ -5,7 +5,7 @@ import { rivalries, type Rivalry } from '../lib/rivalry'
 import { fmt, record, type Game } from '../lib/stats'
 import { Avatar, Card, Table, type Col } from '../components/ui'
 
-export const RIVALRY_TIP = 'Intensity 0–100: balance of the series (25%), how close the games are (25%), playoff meetings (20%, finals count double), games played (15%), and drama — 50-point blowouts and trades with each other (15%).'
+export const RIVALRY_TIP = 'Intensity 0–100: balance of the series (25%), how close the games are (25%), playoff stakes (20%: first round 2, semifinal 3, 3rd-place game 3, toilet bowl final 3, championship 5), games played (15%), and drama — 50-point blowouts and trades with each other (15%). Each part is relative to the league: a pair at the 80th percentile or above gets full marks.'
 
 const PART_LABELS: [keyof Rivalry['parts'], string][] = [['balance', 'Balance'], ['closeness', 'Closeness'], ['stakes', 'Stakes'], ['volume', 'Volume'], ['drama', 'Drama']]
 
@@ -37,7 +37,7 @@ export default function Rivalries() {
     { key: 'g', label: 'Games', render: (r) => r.games, sort: (r) => r.games, align: 'right' },
     { key: 'm', label: 'Avg Margin', render: (r) => fmt(r.avgMargin, 1), sort: (r) => -r.avgMargin, align: 'right' },
     { key: 'c', label: 'Within 10', render: (r) => `${Math.round(r.closeShare * 100)}%`, sort: (r) => r.closeShare, align: 'right' },
-    { key: 'po', label: 'Playoff', render: (r) => r.playoff || '—', sort: (r) => r.playoff, align: 'right' },
+    { key: 'po', label: 'Stakes', render: (r) => (r.stakes ? <span title={r.stakeGames.map((g) => `${g.season} ${g.label} (${g.pts})`).join(', ')}>{r.stakes} pts</span> : '—'), sort: (r) => r.stakes, align: 'right', tip: 'Playoff meeting points: first round 2, semifinal 3, 3rd-place game 3, toilet bowl final 3, championship 5.' },
     { key: 'b', label: '50+ Blowouts', render: (r) => r.blowouts || '—', sort: (r) => r.blowouts, align: 'right' },
     { key: 't', label: 'Trades', render: (r) => r.trades || '—', sort: (r) => r.trades, align: 'right' },
     { key: 'tags', label: '', render: (r) => r.tags.slice(0, 2).map((t) => <span key={t} className="pill">{t}</span>) },
@@ -62,7 +62,7 @@ export default function Rivalries() {
             <div className="riv-tags">{r.tags.map((t) => <span key={t} className="pill">{t}</span>)}</div>
             <RivalryMeter r={r} />
             <div className="riv-foot muted">
-              {r.games} games · avg margin {fmt(r.avgMargin, 1)}{r.playoff ? ` · ${r.playoff} in the playoffs` : ''}
+              {r.games} games · avg margin {fmt(r.avgMargin, 1)}{r.stakeGames.length ? ` · ${r.stakeGames.map((g) => `${g.season} ${g.label.toLowerCase()}`).join(', ')}` : ''}
               {r.streak.id && r.streak.n > 1 ? <> · {name(r.streak.id)} has won {r.streak.n} straight</> : null}
               {r.last ? <> · last met {when(r.last)}</> : null}
             </div>
