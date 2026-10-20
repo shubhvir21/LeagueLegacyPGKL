@@ -1,10 +1,10 @@
 // Rivalries: every pair of franchises scored 0–100 for how heated it is.
 //
-//   Balance     25%  how even the series is (1 − |W − L| / games)
-//   Closeness   25%  half average margin (0 at 40+ pts), half share of games within 10
-//   Stakes      20%  playoff meeting points: first round 2, semifinal 3, 3rd-place game 2,
+//   Balance     15%  how even the series is (1 − |W − L| / games)
+//   Closeness   20%  half average margin (0 at 40+ pts), half share of games within 10
+//   Stakes      30%  playoff meeting points: first round 2, semifinal 3, 3rd-place game 2,
 //                    toilet bowl final 3, championship 5 (other consolation games 0)
-//   Volume      15%  games played
+//   Volume      20%  games played
 //   Drama       15%  50-point blowouts (rename rights!) plus trades with each other
 //
 // Every part is relative to this league: a pair at or above the 80th percentile of all pairs
@@ -29,6 +29,7 @@ export interface Rivalry {
 }
 
 const REF_PCTL = 0.8
+export const W = { stakes: 0.3, volume: 0.2, closeness: 0.2, balance: 0.15, drama: 0.15 }
 const pctl = (xs: number[], q: number) => { const s = [...xs].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(q * (s.length - 1)))] ?? 0 }
 const rel = (v: number, ref: number) => (ref > 0 ? Math.min(1, v / ref) : 0)
 
@@ -99,7 +100,7 @@ export function rivalries(lg: League): Rivalry[] {
       balance: rel(r.balance, mark.balance), closeness: rel(r.closeness, mark.closeness), stakes: rel(r.stakes, mark.stakes),
       volume: rel(r.volume, mark.volume), drama: rel(r.drama, mark.drama),
     }
-    p.score = 100 * (0.25 * p.parts.balance + 0.25 * p.parts.closeness + 0.2 * p.parts.stakes + 0.15 * p.parts.volume + 0.15 * p.parts.drama)
+    p.score = 100 * (W.balance * p.parts.balance + W.closeness * p.parts.closeness + W.stakes * p.parts.stakes + W.volume * p.parts.volume + W.drama * p.parts.drama)
     if (p.finals) p.tags.push('Title rivals')
     else if (p.playoff >= 2) p.tags.push('Playoff rivals')
     if (p.closeShare >= 0.35) p.tags.push('Nail-biters')
