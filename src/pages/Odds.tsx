@@ -12,7 +12,9 @@ const p = (x: number) => (x >= 0.9995 ? '100%' : x > 0 && x < 0.001 ? '<0.1%' : 
 const heat = (x: number) => ({ background: `rgba(124, 140, 255, ${Math.min(0.85, x * 1.6)})`, color: x > 0.3 ? '#fff' : undefined })
 
 const T = {
-  rating: 'Projected points per week: this season’s average shrunk toward the league’s all-time average. Early in the year the league average dominates; it fades as weeks are played.',
+  rating: 'Expected points next week. With projections: 70% the best lineup from the current roster, 30% actual scoring. Otherwise actual scoring only.',
+  roster: 'Best possible lineup next week from the current roster. Each player = Sleeper projection blended with his actual points this season, zeroed for byes and Out/IR, discounted if Questionable.',
+  scoring: 'Actual points per week, recent weeks weighted more (6-week half-life), shrunk toward the league’s all-time average early in the year.',
   swing: 'Playoff odds if this team wins vs. loses its head-to-head game next week. The gap is how much the game matters.',
   model: 'Every simulation draws each team’s true scoring level (with uncertainty), plays the rest of the regular season including the median game, seeds by wins then points for, and plays the bracket.',
 }
@@ -43,7 +45,9 @@ export default function Odds() {
   const cols: Col<TeamOdds>[] = [
     { key: 'm', label: 'Team', render: (t) => <MemberLink id={t.memberId} /> },
     { key: 'r', label: 'Record', render: (t) => record(t.wins, t.losses), sort: (t) => t.wins - t.losses / 100, align: 'right' },
-    { key: 'rt', label: 'Rating', render: (t) => fmt(t.rating, 1), sort: (t) => t.rating, align: 'right', tip: T.rating },
+    { key: 'rt', label: 'Next Wk', render: (t) => <b>{fmt(t.rating, 1)}</b>, sort: (t) => t.rating, align: 'right', tip: T.rating },
+    ...(run.rosterAware ? [{ key: 'ro', label: 'Roster', render: (t: TeamOdds) => fmt(t.rosterRating ?? 0, 1), sort: (t: TeamOdds) => t.rosterRating ?? 0, align: 'right' as const, tip: T.roster }] : []),
+    { key: 'sc', label: 'Scoring', render: (t) => fmt(t.scoreRating, 1), sort: (t) => t.scoreRating, align: 'right', tip: T.scoring },
     { key: 'pw', label: 'Proj W', render: (t) => fmt(t.projWins, 1), sort: (t) => t.projWins, align: 'right' },
     { key: 'po', label: 'Playoffs', render: (t) => <span style={{ whiteSpace: 'nowrap' }}><b>{p(t.playoff)}</b><span className="odds-bar" style={{ width: Math.round(t.playoff * 48) }} /></span>, sort: (t) => t.playoff, align: 'right' },
     { key: 'by', label: 'Bye', render: (t) => p(t.bye), sort: (t) => t.bye, align: 'right' },
@@ -68,6 +72,9 @@ export default function Odds() {
           {years.map((y) => <option key={y}>{y}</option>)}
         </select>
       </div>
+      {!season.complete && <div className="banner">{run.rosterAware
+        ? 'Roster-aware: uses current rosters, Sleeper projections, byes and injuries for every remaining week, assuming everyone starts their best lineup.'
+        : 'Earlier weeks use scoring only: rosters and projections are only known as of today.'}</div>}
       {season.complete && <div className="banner">{year} is finished — this replays what the odds said at the time. Champion: {name(season.champion ?? undefined)}.</div>}
 
       <div className="stat-grid">

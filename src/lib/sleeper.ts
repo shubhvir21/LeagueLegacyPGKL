@@ -73,6 +73,12 @@ export interface RawSeason {
   lastScored: number // weeks after this are scheduled / in progress
   draft: { type: string; rounds: number; picks: DraftPick[] } | null
   transactions: Transaction[]
+  /** In-progress seasons only: Sleeper projections for remaining weeks, scored with league settings. */
+  projections?: Projections
+}
+export interface Projections {
+  weeks: Record<string, Record<string, number>> // week -> player id -> projected league points (rostered players)
+  status: Record<string, string> // player id -> current injury status (Out, IR, Questionable, ...)
 }
 export interface RawData {
   syncedAt: string
@@ -85,6 +91,35 @@ async function get<T>(path: string): Promise<T> {
   const res = await fetch(API + path)
   if (!res.ok) throw new Error(`Sleeper ${path}: ${res.status}`)
   return res.json() as Promise<T>
+}
+
+const PROJ = 'https://api.sleeper.app/projections/nfl'
+const PROJ_POS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].map((p) => `position[]=${p}`).join('&')
+type ProjRow = { player_id: string; stats: Record<string, number>; player?: { injury_status?: string | null } | null }
+
+// Projections come from Sleeper's unofficial endpoint; failures just leave them out.
+async function fetchProjections(league: SleeperLeague, rosters: SleeperRoster[], fromWeek: number): Promise<Projections | undefined> {
+  const scoring = (league as SleeperLeague & { scoring_settings?: Record<string, number> }).scoring_settings ?? {}
+  const rostered = new Set(rosters.flatMap((r) => r.players ?? []))
+  const weeks: Projections['weeks'] = {}
+  const status: Projections['status'] = {}
+  const list = Array.from({ length: Math.max(0, 18 - fromWeek) }, (_, i) => fromWeek + i)
+  const rows = await Promise.all(list.map((w) =>
+    fetch(`${PROJ}/${league.season}/${w}?season_type=regular&${PROJ_POS}`).then((r) => (r.ok ? (r.json() as Promise<ProjRow[]>) : [])).catch(() => [] as ProjRow[]),
+  ))
+  rows.forEach((wk, i) => {
+    if (!wk.length) return
+    const out: Record<string, number> = {}
+    for (const p of wk) {
+      if (!rostered.has(p.player_id)) continue
+      let pts = 0
+      for (const [k, v] of Object.entries(p.stats ?? {})) if (scoring[k] != null) pts += v * scoring[k]
+      out[p.player_id] = Math.round(pts * 100) / 100
+      if (i === 0 && p.player?.injury_status) status[p.player_id] = p.player.injury_status
+    }
+    weeks[list[i]] = out
+  })
+  return Object.keys(weeks).length ? { weeks, status } : undefined
 }
 
 async function fetchSeason(leagueId: string): Promise<RawSeason> {
@@ -121,7 +156,9 @@ async function fetchSeason(leagueId: string): Promise<RawSeason> {
   const missing = rosters.map((r) => r.owner_id).filter((id): id is string => !!id && !known.has(id))
   const departed = await Promise.all(missing.map((id) => get<SleeperUser>(`/user/${id}`).catch(() => null)))
   for (const u of departed) if (u) users.push({ user_id: u.user_id, display_name: u.display_name, avatar: u.avatar })
+  const projections = league.status === 'complete' ? undefined : await fetchProjections(league, rosters, lastScored + 1)
   return {
+    projections,
     league, users, rosters: rosters.map(({ roster_id, owner_id, players, settings }) => ({ roster_id, owner_id, players, settings })),
     matchups: slim, winnersBracket: winnersBracket ?? [], losersBracket: losersBracket ?? [],
     lastScored, draft, transactions: txns,

@@ -3,13 +3,17 @@
 // weeks are played), then plays out the rest of the regular season — head-to-head plus the
 // median game — seeds the bracket by wins then points for, and plays the bracket.
 import type { League, Season } from './stats'
+import { lineupSlots, optimalLineup } from './lineup'
+import { playersOf } from './players'
 
 export interface TeamOdds {
   memberId: string
   wins: number // current wins (h2h + median)
   losses: number
   pf: number
-  rating: number // posterior mean points per week
+  rating: number // projected points next week (roster-aware when projections exist)
+  scoreRating: number // from actual scores only
+  rosterRating: number | null // best lineup from player ratings, next week
   projWins: number
   playoff: number // 0-1
   bye: number
@@ -21,10 +25,49 @@ export interface TeamOdds {
   ifLoss: number | null
 }
 
-export interface OddsRun { season: number; afterWeek: number; nextWeek: number | null; sims: number; teams: TeamOdds[] }
+export interface OddsRun { season: number; afterWeek: number; nextWeek: number | null; sims: number; rosterAware: boolean; teams: TeamOdds[] }
 
 const PRIOR_WEEKS = 4 // the league mean counts as this many weeks of evidence
 const SD_PRIOR_WEEKS = 6
+const HALF_LIFE = 6 // weeks: recent scores count more
+const ROSTER_WEIGHT = 0.7 // team mean = 70% roster projection, 30% actual scoring
+const OUT = new Set(['Out', 'Doubtful', 'IR', 'PUP', 'NA', 'Sus', 'DNR', 'COV'])
+const LONG = new Set(['IR', 'PUP', 'NA'])
+
+/** Expected points per team per future week: best lineup from player ratings that blend
+ *  Sleeper projections with how each player has actually scored this season. */
+function rosterMeans(lg: League, year: number, fromWeek: number): Record<string, Record<number, number>> | null {
+  const raw = lg.raw.seasons.find((s) => Number(s.league.season) === year)
+  const proj = raw?.projections
+  if (!raw || !proj) return null
+  const pm = playersOf(lg)
+  const slots = lineupSlots(raw.league.roster_positions)
+  const perf: Record<string, number[]> = {}
+  for (const w of pm.weeks) if (w.season === year && w.pts !== 0) (perf[w.playerId] ??= []).push(w.pts)
+  const out: Record<string, Record<number, number>> = {}
+  for (const r of raw.rosters) {
+    const id = lg.rosterOwner[year][r.roster_id]
+    out[id] = {}
+    for (const [wk, pts] of Object.entries(proj.weeks)) {
+      const w = Number(wk)
+      if (w < fromWeek) continue
+      const ahead = w - fromWeek
+      const players = (r.players ?? []).map((pid) => {
+        const p = pts[pid] ?? 0
+        const xs = perf[pid] ?? []
+        const avg = xs.reduce((a, b) => a + b, 0) / (xs.length || 1)
+        const a = xs.length ? (0.5 * xs.length) / (xs.length + 6) : 0
+        let v = p > 0 ? (1 - a) * p + a * avg : 0 // no projection = bye / not playing
+        const st = proj.status[pid]
+        if (st && ((ahead === 0 && OUT.has(st)) || (ahead < 4 && LONG.has(st)))) v = 0
+        else if (st === 'Questionable' && ahead === 0) v *= 0.8
+        return { pos: pm.info[pid]?.pos ?? '?', pts: v }
+      })
+      out[id][w] = optimalLineup(slots, players)
+    }
+  }
+  return out
+}
 
 function rng(seed: number) {
   let a = seed >>> 0
@@ -84,7 +127,7 @@ function weeksScored(c: Ctx) {
   return w
 }
 
-function simulate(c: Ctx, afterWeek: number, sims: number, seed: number): OddsRun {
+function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, roster: Record<string, Record<number, number>> | null = null): OddsRun {
   const { ids, scores, pairings, lastReg, median, season } = c
   const n = ids.length
   const idx = Object.fromEntries(ids.map((id, i) => [id, i]))
@@ -104,15 +147,36 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number): OddsRu
     wk.forEach((p, i) => (basePf[i] += p))
   }
   ids.forEach((id, i) => {
-    const xs = scores[id].slice(0, afterWeek).filter((p) => p != null)
+    const xs = scores[id].slice(0, afterWeek).map((p, w) => ({ p, wt: 0.5 ** ((afterWeek - 1 - w) / HALF_LIFE) })).filter((x) => x.p != null)
     const k = xs.length
-    const mean = xs.reduce((a, b) => a + b, 0) / (k || 1)
-    const v = xs.reduce((a, p) => a + (p - mean) ** 2, 0)
-    mu[i] = (k * mean + PRIOR_WEEKS * c.priorMean) / (k + PRIOR_WEEKS)
+    const sw = xs.reduce((a, x) => a + x.wt, 0)
+    const kEff = sw ** 2 / (xs.reduce((a, x) => a + x.wt ** 2, 0) || 1) // effective sample size after decay
+    const mean = xs.reduce((a, x) => a + x.p * x.wt, 0) / (sw || 1)
+    const v = xs.reduce((a, x) => a + (x.p - mean) ** 2, 0)
+    mu[i] = (kEff * mean + PRIOR_WEEKS * c.priorMean) / (kEff + PRIOR_WEEKS)
     sd[i] = Math.sqrt((v + SD_PRIOR_WEEKS * c.priorSd ** 2) / (Math.max(0, k - 1) + SD_PRIOR_WEEKS))
     // Spread of true team talent is narrower than week-to-week noise: ~0.45 of game sd.
-    muSd[i] = Math.sqrt(1 / (1 / (0.45 * c.priorSd) ** 2 + k / sd[i] ** 2))
+    muSd[i] = Math.sqrt(1 / (1 / (0.45 * c.priorSd) ** 2 + kEff / sd[i] ** 2))
   })
+
+  // Weekly means: roster projections blended with scoring, rescaled so the league-wide level
+  // matches actual scoring (expected-value lineups run a little low/high vs. real games).
+  const lastWeek = lastReg + 3
+  const M = ids.map((_, i) => new Float64Array(lastWeek + 1).fill(mu[i]))
+  const rosterAware = !!roster && ids.every((id) => roster[id])
+  if (rosterAware) {
+    const vals = ids.flatMap((id) => Object.entries(roster![id]).filter(([w]) => Number(w) <= lastReg).map(([, v]) => v))
+    const avgR = vals.reduce((a, b) => a + b, 0) / (vals.length || 1)
+    const avgMu = mu.reduce((a, b) => a + b, 0) / n
+    const scale = avgR ? Math.min(1.2, Math.max(0.85, avgMu / avgR)) : 1
+    ids.forEach((id, i) => {
+      for (let w = afterWeek + 1; w <= lastWeek; w++) {
+        const rv = roster![id][w]
+        if (rv != null) M[i][w] = ROSTER_WEIGHT * rv * scale + (1 - ROSTER_WEIGHT) * mu[i]
+      }
+      muSd[i] *= 0.6 // knowing the roster narrows how wrong the rating can be
+    })
+  }
 
   const nextWeek = afterWeek < lastReg ? afterWeek + 1 : null
   const nextOpp = new Int32Array(n).fill(-1)
@@ -125,12 +189,12 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number): OddsRu
   const r = rng(seed)
   const W = new Float64Array(n), PF = new Float64Array(n), str = new Float64Array(n), wk = new Float64Array(n)
   const nextWon = new Int8Array(n)
-  const play = (i: number) => str[i] + sd[i] * gauss(r)
+  const play = (i: number, w: number) => M[i][Math.min(w, lastWeek)] + str[i] + sd[i] * gauss(r)
 
   for (let s = 0; s < sims; s++) {
-    for (let i = 0; i < n; i++) { W[i] = baseW[i]; PF[i] = basePf[i]; str[i] = mu[i] + muSd[i] * gauss(r); nextWon[i] = 0 }
+    for (let i = 0; i < n; i++) { W[i] = baseW[i]; PF[i] = basePf[i]; str[i] = muSd[i] * gauss(r); nextWon[i] = 0 }
     for (let w = afterWeek + 1; w <= lastReg; w++) {
-      for (let i = 0; i < n; i++) { wk[i] = play(i); PF[i] += wk[i] }
+      for (let i = 0; i < n; i++) { wk[i] = play(i, w); PF[i] += wk[i] }
       for (const [a, b] of pairings[w] ?? []) {
         const x = idx[a], y = idx[b]
         const winner = wk[x] >= wk[y] ? x : y
@@ -153,32 +217,36 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number): OddsRu
       if (nextWon[i]) { winN[i]++; winPo[i] += made } else { lossN[i]++; lossPo[i] += made }
     }
     // Bracket: higher seed plays lowest remaining seed each round.
-    const game = (a: number, b: number) => (play(a) >= play(b) ? a : b)
+    let round = season.playoffStart
+    const game = (a: number, b: number) => (play(a, round) >= play(b, round) ? a : b)
     let alive = field
     if (byes) {
       const rest = alive.slice(byes)
       const adv: number[] = []
       for (let k = 0; k < rest.length / 2; k++) adv.push(game(rest[k], rest[rest.length - 1 - k]))
       alive = [...alive.slice(0, byes), ...adv.sort((a, b) => field.indexOf(a) - field.indexOf(b))]
+      round++
     }
     while (alive.length > 2) {
       const adv: number[] = []
       for (let k = 0; k < alive.length / 2; k++) adv.push(game(alive[k], alive[alive.length - 1 - k]))
       alive = adv.sort((a, b) => field.indexOf(a) - field.indexOf(b))
+      round++
     }
     acc.fin[alive[0]]++; acc.fin[alive[1]]++
     acc.title[game(alive[0], alive[1])]++
   }
 
   const teams: TeamOdds[] = ids.map((id, i) => ({
-    memberId: id, wins: baseW[i], losses: baseL[i], pf: basePf[i], rating: mu[i],
+    memberId: id, wins: baseW[i], losses: baseL[i], pf: basePf[i],
+    rating: M[i][Math.min(afterWeek + 1, lastWeek)], scoreRating: mu[i], rosterRating: rosterAware ? roster![id][afterWeek + 1] ?? null : null,
     projWins: acc.wins[i] / sims, playoff: acc.po[i] / sims, bye: acc.bye[i] / sims,
     final: acc.fin[i] / sims, title: acc.title[i] / sims, last: acc.last[i] / sims,
     seeds: Array.from(seeds[i], (x) => x / sims),
     ifWin: nextWeek && winN[i] ? winPo[i] / winN[i] : null,
     ifLoss: nextWeek && lossN[i] ? lossPo[i] / lossN[i] : null,
   })).sort((a, b) => b.playoff - a.playoff || b.title - a.title)
-  return { season: season.year, afterWeek, nextWeek, sims, teams }
+  return { season: season.year, afterWeek, nextWeek, sims, rosterAware, teams }
 }
 
 const cache = new WeakMap<League, Record<string, unknown>>()
@@ -193,7 +261,10 @@ export function playoffOdds(lg: League, year: number, afterWeek?: number, sims =
   return memo(lg, `odds|${year}|${afterWeek}|${sims}`, () => {
     const c = context(lg, year)
     if (!c) return null
-    return simulate(c, Math.min(afterWeek ?? weeksScored(c), weeksScored(c)), sims, year * 100 + (afterWeek ?? 99))
+    const latest = weeksScored(c)
+    const w = Math.min(afterWeek ?? latest, latest)
+    // Rosters and projections are only known as of today, so only the latest week uses them.
+    return simulate(c, w, sims, year * 100 + (afterWeek ?? 99), w === latest ? rosterMeans(lg, year, w + 1) : null)
   })
 }
 
@@ -203,6 +274,6 @@ export function oddsHistory(lg: League, year: number, sims = 2500): OddsRun[] {
     const c = context(lg, year)
     if (!c) return []
     const last = weeksScored(c)
-    return Array.from({ length: last + 1 }, (_, w) => simulate(c, w, sims, year * 1000 + w))
+    return Array.from({ length: last + 1 }, (_, w) => simulate(c, w, sims, year * 1000 + w, w === last ? rosterMeans(lg, year, w + 1) : null))
   })
 }
