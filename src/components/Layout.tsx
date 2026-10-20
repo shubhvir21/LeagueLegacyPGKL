@@ -21,6 +21,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { to: '/matchups', label: 'Matchups', icon: 'football' },
       { to: '/playoffs', label: 'Playoffs', icon: 'trophy' },
+      { to: '/odds', label: 'Playoff Odds', icon: 'target' },
       { to: '/versus', label: 'Versus', icon: 'swords' },
     ],
   },
@@ -29,6 +30,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { to: '/management', label: 'Management', icon: 'list' },
       { to: '/transactions', label: 'Transactions', icon: 'swap' },
+      { to: '/trades', label: 'Trade Trees', icon: 'repeat' },
+      { to: '/keepers', label: 'Keepers', icon: 'lock' },
       { to: '/players', label: 'Players', icon: 'user', also: '/player/' },
     ],
   },

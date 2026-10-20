@@ -16,6 +16,9 @@ import Transactions from './pages/Transactions'
 import Players, { Player } from './pages/Players'
 import Achievements from './pages/Achievements'
 import Home, { Schedule } from './pages/Home'
+import Keepers from './pages/Keepers'
+import Odds from './pages/Odds'
+import TradeTree from './pages/TradeTree'
 import './styles.css'
 
 createRoot(document.getElementById('root')!).render(
@@ -43,6 +46,9 @@ createRoot(document.getElementById('root')!).render(
             <Route path="versus/:a/:b" element={<VersusDetail />} />
             <Route path="matchups" element={<Matchups />} />
             <Route path="playoffs" element={<Playoffs />} />
+            <Route path="keepers" element={<Keepers />} />
+            <Route path="odds" element={<Odds />} />
+            <Route path="trades" element={<TradeTree />} />
             <Route path="records" element={<RecordBook />} />
           </Route>
         </Routes>

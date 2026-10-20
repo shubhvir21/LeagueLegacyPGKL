@@ -167,7 +167,8 @@ export function buildPlayers(lg: League): PlayerModel {
       const kept = !!prev && prevRoster[p.roster_id]?.has(p.player_id) && (prevRound[p.player_id] === p.round || prevRound[p.player_id] == null)
       picks.push({
         season: year, round: p.round, pickNo: p.pick_no, memberId: lg.rosterOwner[year][p.roster_id], playerId: p.player_id,
-        keeper: !!p.is_keeper || kept || (forced[String(year)] ?? []).includes(p.player_id),
+        // keepers.json is the commissioner's list; when a season is listed it replaces the guess.
+        keeper: forced[String(year)] ? forced[String(year)].includes(p.player_id) : !!p.is_keeper || kept,
         value: 0, expected: 0, surplus: 0, pending: false,
       })
     }

@@ -590,3 +590,20 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
   .rules-toc::-webkit-scrollbar { display: none; }
   .rules-toc a { white-space: nowrap; }
 }
+
+/* Trade trees */
+.accent { color: var(--accent); }
+.tree-layout { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 16px; align-items: start; }
+.tree-sides { display: grid; gap: 16px; min-width: 0; }
+.tree-list { display: flex; flex-direction: column; gap: 4px; max-height: 640px; overflow-y: auto; }
+.tree-item { display: flex; flex-direction: column; gap: 2px; text-align: left; background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.tree-item:hover { background: var(--panel-2); }
+.tree-item.active { background: var(--accent-soft); border-color: var(--accent); }
+.tree-item .muted { font-size: 11.5px; }
+.tree { list-style: none; margin: 0; padding-left: 18px; border-left: 2px solid var(--border-strong); }
+.tree-sides > * > * > .tree { border-left: none; padding-left: 0; }
+.tree li { margin: 6px 0; }
+.tree-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; }
+.tree-pts { font-variant-numeric: tabular-nums; font-weight: 650; }
+.tree-note { font-size: 12px; }
+@media (max-width: 860px) { .tree-layout { grid-template-columns: 1fr; } .tree-list { max-height: 260px; } }
