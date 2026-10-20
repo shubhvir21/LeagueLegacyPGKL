@@ -46,7 +46,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setSyncing(true)
     setError(null)
     try {
-      const fresh = await fetchAll()
+      const fresh = await fetchAll(raw ?? undefined)
       await idb('readwrite', (s) => s.put(fresh, KEY))
       setRaw(fresh)
     } catch (e) {
@@ -54,7 +54,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } finally {
       setSyncing(false)
     }
-  }, [])
+  }, [raw])
 
   const league = useMemo(() => (raw ? buildLeague(raw) : null), [raw])
   return <DataCtx.Provider value={{ league, error, syncing, resync }}>{children}</DataCtx.Provider>

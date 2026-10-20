@@ -1,4 +1,5 @@
 // Raw Sleeper API fetching. Shared by the browser Resync button and scripts/sync.ts.
+import type { OddsModel } from './model'
 
 export const CURRENT_LEAGUE_ID = '1362926045359013888'
 const API = 'https://api.sleeper.app/v1'
@@ -78,13 +79,16 @@ export interface RawSeason {
 }
 export interface Projections {
   weeks: Record<string, Record<string, number>> // week -> player id -> projected league points (rostered players)
-  status: Record<string, string> // player id -> current injury status (Out, IR, Questionable, ...)
+  repl: Record<string, Record<string, number>> // week -> position -> waiver-wire level (3rd best unrostered)
+  nfl: Record<string, string> // player id -> NFL team (for same-team correlation)
+  status: Record<string, string> // player id -> current injury status (current season only)
 }
 export interface RawData {
   syncedAt: string
   nflState: { season: string; week: number; season_type: string }
   seasons: RawSeason[] // oldest first
   players: PlayerMap
+  model?: OddsModel // fitted offline by scripts/sync.ts (variance, bias, blend weight, backtest)
 }
 
 async function get<T>(path: string): Promise<T> {
@@ -95,34 +99,45 @@ async function get<T>(path: string): Promise<T> {
 
 const PROJ = 'https://api.sleeper.app/projections/nfl'
 const PROJ_POS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].map((p) => `position[]=${p}`).join('&')
-type ProjRow = { player_id: string; stats: Record<string, number>; player?: { injury_status?: string | null } | null }
+type ProjRow = { player_id: string; team?: string | null; stats: Record<string, number>; player?: { injury_status?: string | null; position?: string } | null }
 
 // Projections come from Sleeper's unofficial endpoint; failures just leave them out.
-async function fetchProjections(league: SleeperLeague, rosters: SleeperRoster[], fromWeek: number): Promise<Projections | undefined> {
+// Weeks already played never change, so they're reused from the previous snapshot when present.
+async function fetchProjections(league: SleeperLeague, matchups: SleeperMatchup[][], rosters: SleeperRoster[], lastScored: number, prev?: Projections): Promise<Projections | undefined> {
   const scoring = (league as SleeperLeague & { scoring_settings?: Record<string, number> }).scoring_settings ?? {}
-  const rostered = new Set(rosters.flatMap((r) => r.players ?? []))
-  const weeks: Projections['weeks'] = {}
-  const status: Projections['status'] = {}
-  const list = Array.from({ length: Math.max(0, 18 - fromWeek) }, (_, i) => fromWeek + i)
-  const rows = await Promise.all(list.map((w) =>
+  const current = new Set(rosters.flatMap((r) => r.players ?? []))
+  const out: Projections = { weeks: {}, repl: {}, nfl: { ...(prev?.nfl ?? {}) }, status: {} }
+  const fetchWeeks: number[] = []
+  for (let w = 1; w <= 17; w++) {
+    if (prev?.weeks[w] && w <= lastScored && prev.repl?.[w]) { out.weeks[w] = prev.weeks[w]; out.repl[w] = prev.repl[w] }
+    else if (league.status !== 'complete' || w <= lastScored) fetchWeeks.push(w)
+  }
+  const rows = await Promise.all(fetchWeeks.map((w) =>
     fetch(`${PROJ}/${league.season}/${w}?season_type=regular&${PROJ_POS}`).then((r) => (r.ok ? (r.json() as Promise<ProjRow[]>) : [])).catch(() => [] as ProjRow[]),
   ))
   rows.forEach((wk, i) => {
     if (!wk.length) return
-    const out: Record<string, number> = {}
+    const w = fetchWeeks[i]
+    const rostered = w <= lastScored ? new Set((matchups[w - 1] ?? []).flatMap((m) => Object.keys(m.players_points ?? {}))) : current
+    const week: Record<string, number> = {}
+    const free: Record<string, number[]> = {}
     for (const p of wk) {
-      if (!rostered.has(p.player_id)) continue
       let pts = 0
       for (const [k, v] of Object.entries(p.stats ?? {})) if (scoring[k] != null) pts += v * scoring[k]
-      out[p.player_id] = Math.round(pts * 100) / 100
-      if (i === 0 && p.player?.injury_status) status[p.player_id] = p.player.injury_status
+      pts = Math.round(pts * 100) / 100
+      if (rostered.has(p.player_id) || current.has(p.player_id)) {
+        week[p.player_id] = pts
+        if (p.team) out.nfl[p.player_id] = p.team
+        if (w === lastScored + 1 && p.player?.injury_status) out.status[p.player_id] = p.player.injury_status
+      } else if (p.player?.position && pts > 0) (free[p.player.position] ??= []).push(pts)
     }
-    weeks[list[i]] = out
+    out.weeks[w] = week
+    out.repl[w] = Object.fromEntries(Object.entries(free).map(([pos, xs]) => [pos, xs.sort((a, b) => b - a)[2] ?? 0]))
   })
-  return Object.keys(weeks).length ? { weeks, status } : undefined
+  return Object.keys(out.weeks).length ? out : undefined
 }
 
-async function fetchSeason(leagueId: string): Promise<RawSeason> {
+async function fetchSeason(leagueId: string, prev?: RawData): Promise<RawSeason> {
   const league = await get<SleeperLeague>(`/league/${leagueId}`)
   const lastScored = Number(league.settings.last_scored_leg ?? 0)
   // Fetch the whole regular season + playoffs so upcoming weeks give us the schedule.
@@ -156,7 +171,7 @@ async function fetchSeason(leagueId: string): Promise<RawSeason> {
   const missing = rosters.map((r) => r.owner_id).filter((id): id is string => !!id && !known.has(id))
   const departed = await Promise.all(missing.map((id) => get<SleeperUser>(`/user/${id}`).catch(() => null)))
   for (const u of departed) if (u) users.push({ user_id: u.user_id, display_name: u.display_name, avatar: u.avatar })
-  const projections = league.status === 'complete' ? undefined : await fetchProjections(league, rosters, lastScored + 1)
+  const projections = await fetchProjections(league, slim, rosters, lastScored, prev?.seasons.find((s) => s.league.league_id === leagueId)?.projections)
   return {
     projections,
     league, users, rosters: rosters.map(({ roster_id, owner_id, players, settings }) => ({ roster_id, owner_id, players, settings })),
@@ -166,16 +181,17 @@ async function fetchSeason(leagueId: string): Promise<RawSeason> {
 }
 
 /** Walks previous_league_id back from the current league and fetches every season. */
-export async function fetchAll(currentId = CURRENT_LEAGUE_ID): Promise<RawData> {
+/** prev: the last snapshot, so finished weeks' projections aren't downloaded again. */
+export async function fetchAll(prev?: RawData, currentId = CURRENT_LEAGUE_ID): Promise<RawData> {
   const seasons: RawSeason[] = []
   let id: string | null = currentId
   while (id && id !== '0') {
-    const s = await fetchSeason(id)
+    const s = await fetchSeason(id, prev)
     seasons.unshift(s)
     id = s.league.previous_league_id
   }
   const nflState = await get<RawData['nflState']>('/state/nfl')
-  return { syncedAt: new Date().toISOString(), nflState, seasons, players: await fetchPlayers(seasons) }
+  return { syncedAt: new Date().toISOString(), nflState, seasons, players: await fetchPlayers(seasons), model: prev?.model }
 }
 
 /** Sleeper's full player list is large; keep only players who appear in this league. */

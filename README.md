@@ -15,6 +15,9 @@ npm run sync   # refresh the committed snapshot in public/data/league.json
   lineup efficiency, bench points, lineup-cost losses, plus Coach and Manager scores.
 - Transaction values are value over replacement: started-week points minus a replacement-level
   player at that position (QB/DEF bars are higher because they're easy to stream).
+- Playoff odds (src/lib/odds.ts) simulate every starter from Sleeper projections scored with league settings
+  (byes, injuries, waiver fill-ins, same-NFL-team correlation). `npm run sync` refits the model from league
+  history (src/lib/model.ts) and backtests past seasons to choose the roster-vs-scoring blend.
 - Stat definitions live in `src/lib/stats.ts` and in the ⓘ tooltips.
 
 See `PROMPT.md` for the full build plan.
