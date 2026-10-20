@@ -2,7 +2,7 @@
 //
 //   Balance     25%  how even the series is (1 − |W − L| / games)
 //   Closeness   25%  half average margin (0 at 40+ pts), half share of games within 10
-//   Stakes      20%  playoff meeting points: first round 2, semifinal 3, 3rd-place game 3,
+//   Stakes      20%  playoff meeting points: first round 2, semifinal 3, 3rd-place game 2,
 //                    toilet bowl final 3, championship 5 (other consolation games 0)
 //   Volume      15%  games played
 //   Drama       15%  50-point blowouts (rename rights!) plus trades with each other
@@ -39,7 +39,7 @@ function stakeOf(lg: League, g: Game): { label: string; pts: number } {
   const round = g.week - s.playoffStart
   if (g.bracket === 'winners') {
     if (g.place === 1) return { label: 'Championship', pts: 5 }
-    if (g.place === 3) return { label: '3rd-place game', pts: 3 }
+    if (g.place === 3) return { label: '3rd-place game', pts: 2 }
     if (g.place == null && round === 0) return { label: 'First round', pts: 2 }
     if (g.place == null && round === 1) return { label: 'Semifinal', pts: 3 }
   }
