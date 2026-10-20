@@ -27,6 +27,11 @@ import AllTime from './pages/AllTime'
 import WhatIf from './pages/WhatIf'
 import './styles.css'
 
+// Installable app + offline support (production only, so dev hot reload isn't cached).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}))
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <DataProvider>
