@@ -1,5 +1,8 @@
 // Record Book: ranked lists computed from the league model.
 import { careers, fmt, pct, record, type Game, type League, type TeamSeason } from './stats'
+import { gameOdds, UPSET_LINE, type GameOdds } from './upsets'
+
+const UPSET_TIP = 'pre-game chance from projected lineups and form'
 
 export interface RecordRow {
   memberId: string
@@ -108,6 +111,27 @@ export function buildRecords(lg: League): RecordDef[] {
   }
   add('Matchup', 'm-combined', 'Highest Combined Score', 'Both teams together.', true, top(games, (g) => g.aPts + g.bPts).map((g) => gameRow(g, g.aPts + g.bPts)))
   add('Matchup', 'm-combined-low', 'Lowest Combined Score', 'Both teams together.', false, top(games, (g) => g.aPts + g.bPts, true).map((g) => gameRow(g, g.aPts + g.bPts)))
+
+  // ---------- Upsets ----------
+  const odds = gameOdds(lg).filter((o) => o.winner)
+  const pctStr = (p: number) => `${Math.round(p * 100)}%`
+  const oddsCtx = (o: GameOdds, side: string) =>
+    `${o.g.season} ${o.g.playoff ? `playoffs W${o.g.week}` : `W${o.g.week}`} vs ${name(side === o.winner ? o.loser! : o.winner!)} · proj ${fmt(side === o.g.a ? o.expA : o.expB, 1)}–${fmt(side === o.g.a ? o.expB : o.expA, 1)}`
+  add('Matchup', 'm-upset', 'Biggest Upsets', `Wins with the lowest pre-game win chance (${UPSET_TIP}).`, true,
+    top(odds, (o) => o.pWinner, true).map((o) => ({ memberId: o.winner!, value: o.pWinner, display: `${pctStr(o.pWinner)} chance`, context: oddsCtx(o, o.winner!), link: `/versus/${o.winner}/${o.loser}` })))
+  add('Matchup', 'm-choke', 'Biggest Chokes', `Losses as the heaviest pre-game favorite (${UPSET_TIP}).`, false,
+    top(odds, (o) => 1 - o.pWinner).map((o) => ({ memberId: o.loser!, value: 1 - o.pWinner, display: `${pctStr(1 - o.pWinner)} favorite`, context: oddsCtx(o, o.loser!), link: `/versus/${o.loser}/${o.winner}` })))
+  const upsets = odds.filter((o) => o.pWinner < UPSET_LINE)
+  const count = (key: (o: GameOdds) => string) => upsets.reduce<Record<string, number>>((m, o) => { m[key(o)] = (m[key(o)] ?? 0) + 1; return m }, {})
+  const careerUp = count((o) => o.winner!), careerDown = count((o) => o.loser!)
+  const ids = lg.members.map((m) => m.id)
+  add('League', 'upset-wins', 'Most Upset Wins', `Career wins with under a ${pctStr(UPSET_LINE)} pre-game chance.`, true,
+    top(ids, (id) => careerUp[id] ?? 0).filter((id) => careerUp[id]).map((id) => ({ memberId: id, value: careerUp[id], display: String(careerUp[id]), context: `best: ${pctStr(Math.min(...upsets.filter((o) => o.winner === id).map((o) => o.pWinner)))} chance`, link: `/member/${id}` })))
+  add('League', 'upset-losses', 'Most Upset Losses', `Career losses with over a ${pctStr(1 - UPSET_LINE)} pre-game chance.`, false,
+    top(ids, (id) => careerDown[id] ?? 0).filter((id) => careerDown[id]).map((id) => ({ memberId: id, value: careerDown[id], display: String(careerDown[id]), context: `worst: lost at ${pctStr(Math.max(...upsets.filter((o) => o.loser === id).map((o) => 1 - o.pWinner)))}`, link: `/member/${id}` })))
+  const seasonUp = Object.entries(count((o) => `${o.g.season}|${o.winner}`))
+  add('Season', 's-upsets', 'Most Upset Wins in a Season', `Wins with under a ${pctStr(UPSET_LINE)} pre-game chance.`, true,
+    top(seasonUp, ([, n]) => n).map(([k, n]) => { const [y, id] = k.split('|'); return { memberId: id, value: n, display: String(n), context: y, link: `/season/${y}/team/${id}` } }))
 
   // ---------- Streaks & droughts ----------
   const members = cr.map((r) => r.member.id)
