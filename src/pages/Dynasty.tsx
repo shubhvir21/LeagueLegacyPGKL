@@ -124,7 +124,7 @@ export default function Dynasty() {
           <LineChart data={chart}>
             <CartesianGrid stroke="var(--grid)" />
             <XAxis dataKey="season" stroke="var(--muted)" />
-            <YAxis stroke="var(--muted)" reversed={metric === 'Finish'} domain={metric === 'Finish' ? [1, 'dataMax'] : ['auto', 'auto']} allowDecimals={metric !== 'Finish'}
+            <YAxis stroke="var(--muted)" padding={{ top: 8, bottom: 8 }} reversed={metric === 'Finish'} domain={metric === 'Finish' ? [1, 'dataMax'] : ['auto', 'auto']} allowDecimals={metric !== 'Finish'}
               tickFormatter={(v) => (metric === 'Franchise Value' ? money(v) : String(v))} />
             <Tooltip contentStyle={{ background: 'var(--panel-2)', border: '1px solid var(--border)' }} formatter={(v) => (metric === 'Franchise Value' ? money(Number(v)) : String(v))}
               itemSorter={(x) => (metric === 'Finish' ? 1 : -1) * Number(x.value)} />

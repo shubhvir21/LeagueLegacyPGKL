@@ -88,7 +88,7 @@ function Rankings({ year }: { year: number }) {
           <LineChart data={bump} margin={{ right: 16 }}>
             <CartesianGrid stroke="var(--grid)" />
             <XAxis dataKey="week" stroke="var(--muted)" />
-            <YAxis reversed domain={[1, n]} ticks={Array.from({ length: n }, (_, i) => i + 1)} stroke="var(--muted)" allowDecimals={false} />
+            <YAxis reversed domain={[1, n]} padding={{ top: 8, bottom: 8 }} interval={0} ticks={Array.from({ length: n }, (_, i) => i + 1)} stroke="var(--muted)" allowDecimals={false} />
             <Tooltip contentStyle={{ background: 'var(--panel-2)', border: '1px solid var(--border)' }} itemSorter={(x) => x.value as number} />
             {ids.map((id, i) => <Line key={id} dataKey={id} name={name(id)} stroke={PALETTE[i % PALETTE.length]} strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive={false} />)}
           </LineChart>

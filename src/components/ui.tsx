@@ -81,6 +81,8 @@ export interface Col<R> {
   align?: 'left' | 'right' | 'center'
 }
 
+const STICKY_KEYS = new Set(['m', 'p', 'member', 'team', 'player', 'name'])
+
 export function Table<R>({ rows, cols, initialSort, initialAsc = false, rowKey }: { rows: R[]; cols: Col<R>[]; initialSort?: string; initialAsc?: boolean; rowKey: (r: R) => string }) {
   const [sortKey, setSortKey] = useState(initialSort)
   const [desc, setDesc] = useState(!initialAsc)
@@ -92,6 +94,9 @@ export function Table<R>({ rows, cols, initialSort, initialAsc = false, rowKey }
         return desc ? -c : c
       })
     : rows
+  // On phones the name column (team / player) stays pinned while the rest scrolls.
+  const stickyKey = (cols.find((c) => STICKY_KEYS.has(c.key)) ?? cols[0])?.key
+  const cls = (c: Col<R>) => `${c.align ?? ''} ${c.key === stickyKey ? 'sticky-col' : ''}`
   return (
     <div className="table-wrap">
       <table>
@@ -100,7 +105,7 @@ export function Table<R>({ rows, cols, initialSort, initialAsc = false, rowKey }
             {cols.map((c) => (
               <th
                 key={c.key}
-                className={`${c.sort ? 'sortable' : ''} ${c.align ?? ''}`}
+                className={`${c.sort ? 'sortable' : ''} ${cls(c)}`}
                 onClick={() => {
                   if (!c.sort) return
                   if (sortKey === c.key) setDesc(!desc)
@@ -118,7 +123,7 @@ export function Table<R>({ rows, cols, initialSort, initialAsc = false, rowKey }
         <tbody>
           {sorted.map((r, i) => (
             <tr key={rowKey(r)}>
-              {cols.map((c) => <td key={c.key} className={c.align ?? ''}>{c.render(r, i)}</td>)}
+              {cols.map((c) => <td key={c.key} className={cls(c)}>{c.render(r, i)}</td>)}
             </tr>
           ))}
         </tbody>

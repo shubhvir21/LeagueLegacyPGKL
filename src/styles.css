@@ -687,3 +687,59 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
 .wi-game { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; margin-bottom: 8px; border-radius: var(--radius-sm); background: var(--panel-2); font-size: 13px; }
 .wi-game > span { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); }
 .wi-game > span.win { color: var(--text); font-weight: 650; }
+
+/* ---------- Phone polish ---------- */
+/* Tables that fit the card exactly: the name column takes the leftover width and truncates. */
+.fit-table td { width: 1%; }
+.fit-table td.grow { width: auto; white-space: normal; }
+.fit-table td.grow .member-link { max-width: 100%; }
+.fit-table td.grow .member-link span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; overflow: hidden; overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  /* Scrolling tables: pinned name column + edge shadows that show there's more to swipe. */
+  .table-wrap {
+    background:
+      linear-gradient(to right, var(--panel) 30%, transparent) left / 32px 100% no-repeat local,
+      linear-gradient(to left, var(--panel) 30%, transparent) right / 32px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgba(0,0,0,.55), transparent) left / 12px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,.55), transparent) right / 12px 100% no-repeat scroll;
+    scrollbar-width: none;
+    margin: 0 -16px; padding: 0;
+  }
+  .table-wrap::-webkit-scrollbar { display: none; }
+  .table-wrap tr > :first-child { padding-left: 16px; }
+  .table-wrap tr > :last-child { padding-right: 16px; }
+  .sticky-col, table:not(:has(.sticky-col)):not(.fit-table) tr > :first-child {
+    position: sticky; left: 0; z-index: 2; background: var(--panel);
+    box-shadow: 8px 0 8px -8px rgba(0,0,0,.6);
+  }
+  tbody tr:hover td.sticky-col { background: var(--panel); }
+  .sticky-col { padding-right: 14px !important; }
+  td { padding: 9px 8px; font-size: 12.5px; }
+  th { padding: 0 8px 8px; font-size: 10.5px; letter-spacing: .05em; }
+  td .avatar { width: 20px !important; height: 20px !important; }
+  td .member-link { gap: 7px; }
+  td .member-link span, td .player-link span:last-child {
+    width: max-content; max-width: 124px; flex: 0 1 auto; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    line-height: 1.25; overflow: hidden; overflow-wrap: break-word;
+  }
+  .fit-table td.grow .member-link span { max-width: none; width: auto; }
+  .odds-bar { display: none; }
+
+  /* Values wrap instead of getting cut with an ellipsis. */
+  .stat-value { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.2; font-size: 17px; }
+  .game-side span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
+  .podium-name, .award-who, .riv-vs b, .wi-champ { overflow-wrap: anywhere; }
+
+  /* Horizontal chip rows fade out at the edge instead of hard-cutting. */
+  .tabs, .rules-toc { -webkit-mask-image: linear-gradient(to right, #000 85%, transparent); mask-image: linear-gradient(to right, #000 85%, transparent); }
+  .tabs { width: 100%; }
+
+  /* Tooltips stay on screen. */
+  .tip:hover::after, .tip:focus::after { position: fixed; left: 16px; right: 16px; bottom: auto; top: 30%; transform: none; max-width: none; width: auto; }
+
+  /* iOS zooms into form fields under 16px; keep them at 16px. */
+  select, input[type="text"], input[type="search"], input:not([type]) { font-size: 16px; }
+
+  .recharts-legend-wrapper { font-size: 11px; }
+}

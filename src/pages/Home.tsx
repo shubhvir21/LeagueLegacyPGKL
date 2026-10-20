@@ -50,10 +50,10 @@ export default function Home() {
 
       <div className="two-col">
         <Card title={`${current.year} Standings`} right={<Link to={`/season/${current.year}`}>Full season →</Link>}>
-          <div className="table-wrap"><table><tbody>{current.teamSeasons.map((t) => (
+          <div className="table-wrap"><table className="fit-table"><tbody>{current.teamSeasons.map((t) => (
             <tr key={t.memberId}>
               <td><RankBadge rank={t.finalRank ?? t.regRank} n={current.teams} final={current.complete} /></td>
-              <td><Link to={`/season/${current.year}/team/${t.memberId}`} className="member-link"><Avatar id={t.memberId} /><span>{t.teamName}</span></Link></td>
+              <td className="grow"><Link to={`/season/${current.year}/team/${t.memberId}`} className="member-link"><Avatar id={t.memberId} /><span>{t.teamName}</span></Link></td>
               <td>{record(t.wins, t.losses, t.ties)}</td>
               <td className="right">{fmt(t.pf)}</td>
             </tr>
