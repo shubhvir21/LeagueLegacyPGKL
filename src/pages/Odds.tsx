@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { memo, useMemo, useState } from 'react'
+import { CartesianGrid, Legend, Line, ReferenceLine, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
-import { oddsHistory, playoffOdds, type TeamOdds } from '../lib/odds'
+import { oddsHistory, playoffOdds, type OddsRun, type TeamOdds } from '../lib/odds'
 import { fmt, record } from '../lib/stats'
 import { Card, MemberLink, Stat, Table, Tabs, type Col } from '../components/ui'
 import { PALETTE } from './History'
@@ -27,15 +27,13 @@ export default function Odds() {
   const last = history.length - 1
   const [weekSel, setWeekSel] = useState<number | null>(null)
   const week = weekSel == null || weekSel > last ? last : weekSel
-  const run = useMemo(() => playoffOdds(lg, year, week), [lg, year, week])
+  // While dragging, show the cached per-week runs (instant); the full 10k run happens on release.
+  const [dragging, setDragging] = useState(false)
+  const full = useMemo(() => (dragging ? null : playoffOdds(lg, year, week)), [lg, year, week, dragging])
+  const run = full ?? history[week]
   if (!run) return null
   const name = (id?: string) => (id ? lg.memberById[id]?.name ?? id : '—')
 
-  const ids = run.teams.map((t) => t.memberId)
-  const chart = history.map((h) => ({
-    week: h.afterWeek === 0 ? 'Pre' : `W${h.afterWeek}`,
-    ...Object.fromEntries(h.teams.map((t) => [t.memberId, +(t[METRICS[metric]] * 100).toFixed(1)])),
-  }))
   const P = season.playoffTeams
   const favorite = [...run.teams].sort((a, b) => b.title - a.title)[0]
   const bubble = [...run.teams].sort((a, b) => Math.abs(a.playoff - 0.5) - Math.abs(b.playoff - 0.5))[0]
@@ -47,7 +45,7 @@ export default function Odds() {
     { key: 'r', label: 'Record', render: (t) => record(t.wins, t.losses), sort: (t) => t.wins - t.losses / 100, align: 'right' },
     { key: 'rt', label: 'Rating', render: (t) => fmt(t.rating, 1), sort: (t) => t.rating, align: 'right', tip: T.rating },
     { key: 'pw', label: 'Proj W', render: (t) => fmt(t.projWins, 1), sort: (t) => t.projWins, align: 'right' },
-    { key: 'po', label: 'Playoffs', render: (t) => <b>{p(t.playoff)}</b>, sort: (t) => t.playoff, align: 'right' },
+    { key: 'po', label: 'Playoffs', render: (t) => <span style={{ whiteSpace: 'nowrap' }}><b>{p(t.playoff)}</b><span className="odds-bar" style={{ width: Math.round(t.playoff * 48) }} /></span>, sort: (t) => t.playoff, align: 'right' },
     { key: 'by', label: 'Bye', render: (t) => p(t.bye), sort: (t) => t.bye, align: 'right' },
     { key: 'f', label: 'Final', render: (t) => p(t.final), sort: (t) => t.final, align: 'right' },
     { key: 't', label: 'Title', render: (t) => <b className="pos">{p(t.title)}</b>, sort: (t) => t.title, align: 'right' },
@@ -80,21 +78,14 @@ export default function Odds() {
       </div>
 
       <Card title="Simulation" sub="Drag to rewind the odds to any week" right={<span className="muted">{week === 0 ? 'Preseason' : `After week ${week}`}</span>}>
-        <input type="range" min={0} max={last} value={week} onChange={(e) => setWeekSel(Number(e.target.value))} style={{ width: '100%' }} />
+        <input type="range" min={0} max={last} value={week} className="odds-range"
+          onPointerDown={() => setDragging(true)} onPointerUp={() => setDragging(false)} onKeyUp={() => setDragging(false)} onBlur={() => setDragging(false)}
+          onChange={(e) => setWeekSel(Number(e.target.value))} />
         <Table rows={run.teams} cols={cols} initialSort="po" rowKey={(t) => t.memberId} />
       </Card>
 
       <Card title="Odds Over Time" sub="Re-simulated after every week" right={<Tabs tabs={Object.keys(METRICS) as Metric[]} value={metric} onChange={setMetric} />}>
-        <ResponsiveContainer width="100%" height={340}>
-          <LineChart data={chart}>
-            <CartesianGrid stroke="var(--grid)" />
-            <XAxis dataKey="week" stroke="var(--muted)" />
-            <YAxis stroke="var(--muted)" domain={[0, 100]} unit="%" />
-            <Tooltip contentStyle={{ background: 'var(--panel-2)', border: '1px solid var(--border)' }} itemSorter={(x) => -(x.value as number)} />
-            <Legend />
-            {ids.map((id, i) => <Line key={id} dataKey={id} name={name(id)} stroke={PALETTE[i % PALETTE.length]} strokeWidth={2} dot={false} />)}
-          </LineChart>
-        </ResponsiveContainer>
+        <OddsChart history={history} metric={metric} marker={dragging ? null : week} />
       </Card>
 
       <Card title="Seed Distribution" sub="Chance of finishing the regular season in each spot">
@@ -119,3 +110,27 @@ export default function Odds() {
     </div>
   )
 }
+
+// Memoized so dragging the week slider doesn't redraw the chart; the marker moves on release.
+const OddsChart = memo(function OddsChart({ history, metric, marker }: { history: OddsRun[]; metric: Metric; marker: number | null }) {
+  const lg = useLeague()
+  const last = history[history.length - 1]
+  const ids = last ? [...last.teams].sort((a, b) => b[METRICS[metric]] - a[METRICS[metric]]).map((t) => t.memberId) : []
+  const chart = useMemo(() => history.map((h) => ({
+    week: h.afterWeek === 0 ? 'Pre' : `W${h.afterWeek}`,
+    ...Object.fromEntries(h.teams.map((t) => [t.memberId, +(t[METRICS[metric]] * 100).toFixed(1)])),
+  })), [history, metric])
+  return (
+    <ResponsiveContainer width="100%" height={340}>
+      <LineChart data={chart}>
+        <CartesianGrid stroke="var(--grid)" />
+        <XAxis dataKey="week" stroke="var(--muted)" />
+        <YAxis stroke="var(--muted)" domain={[0, 100]} unit="%" />
+        <Tooltip contentStyle={{ background: 'var(--panel-2)', border: '1px solid var(--border)' }} itemSorter={(x) => -(x.value as number)} />
+        <Legend />
+        {marker != null && <ReferenceLine x={chart[marker]?.week} stroke="var(--muted)" strokeDasharray="4 4" />}
+        {ids.map((id, i) => <Line key={id} dataKey={id} name={lg.memberById[id]?.name ?? id} stroke={PALETTE[i % PALETTE.length]} strokeWidth={2} dot={false} isAnimationActive={false} />)}
+      </LineChart>
+    </ResponsiveContainer>
+  )
+})

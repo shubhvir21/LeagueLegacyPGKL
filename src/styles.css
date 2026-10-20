@@ -607,3 +607,8 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
 .tree-pts { font-variant-numeric: tabular-nums; font-weight: 650; }
 .tree-note { font-size: 12px; }
 @media (max-width: 860px) { .tree-layout { grid-template-columns: 1fr; } .tree-list { max-height: 260px; } }
+
+/* Playoff odds slider */
+.odds-range { width: 100%; margin: 4px 0 12px; accent-color: var(--accent); cursor: grab; touch-action: none; }
+.odds-range:active { cursor: grabbing; }
+.odds-bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--accent); margin-left: 8px; vertical-align: middle; transition: width .25s ease; }
