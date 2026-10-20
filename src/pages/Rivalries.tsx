@@ -5,7 +5,7 @@ import { rivalries, type Rivalry } from '../lib/rivalry'
 import { fmt, record, type Game } from '../lib/stats'
 import { Avatar, Card, Table, type Col } from '../components/ui'
 
-export const RIVALRY_TIP = 'Intensity 0–100: playoff stakes (30%: first round 2, semifinal 3, 3rd-place game 2, toilet bowl final 3, championship 5), games played (20%), how close the games are (20%), balance of the series (15%), and drama — 50-point blowouts and trades with each other (15%). Each part is relative to the league: a pair at the 80th percentile or above gets full marks.'
+export const RIVALRY_TIP = 'Intensity 0–100: playoff stakes (35%: first round 2, semifinal 3, 3rd-place game 2, toilet bowl final 3, championship 5), games played (25%), how close the games are (15%), balance of the series (15%), and drama — 50-point blowouts and trades with each other (10%). Each part is relative to the league: a pair at the 80th percentile or above gets full marks.'
 
 const PART_LABELS: [keyof Rivalry['parts'], string][] = [['balance', 'Balance'], ['closeness', 'Closeness'], ['stakes', 'Stakes'], ['volume', 'Volume'], ['drama', 'Drama']]
 
