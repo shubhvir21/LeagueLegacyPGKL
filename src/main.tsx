@@ -22,6 +22,9 @@ import TradeTree from './pages/TradeTree'
 import Power from './pages/Power'
 import Recap, { RecapIndex } from './pages/Recap'
 import Dynasty from './pages/Dynasty'
+import Rivalries from './pages/Rivalries'
+import AllTime from './pages/AllTime'
+import WhatIf from './pages/WhatIf'
 import './styles.css'
 
 createRoot(document.getElementById('root')!).render(
@@ -56,6 +59,9 @@ createRoot(document.getElementById('root')!).render(
             <Route path="recap" element={<RecapIndex />} />
             <Route path="recap/:year" element={<Recap />} />
             <Route path="dynasty" element={<Dynasty />} />
+            <Route path="rivalries" element={<Rivalries />} />
+            <Route path="alltime" element={<AllTime />} />
+            <Route path="whatif" element={<WhatIf />} />
             <Route path="records" element={<RecordBook />} />
           </Route>
         </Routes>

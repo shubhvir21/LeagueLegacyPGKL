@@ -25,6 +25,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/power', label: 'Power Rankings', icon: 'chart' },
       { to: '/odds', label: 'Playoff Odds', icon: 'target' },
       { to: '/versus', label: 'Versus', icon: 'swords' },
+      { to: '/rivalries', label: 'Rivalries', icon: 'flame' },
+      { to: '/whatif', label: 'What-If Machine', icon: 'zap' },
     ],
   },
   {
@@ -41,6 +43,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: 'Legacy',
     items: [
       { to: '/dynasty', label: 'Dynasty Timeline', icon: 'crown' },
+      { to: '/alltime', label: 'All-Time Teams', icon: 'star' },
       { to: '/records', label: 'Record Book', icon: 'book' },
       { to: '/achievements', label: 'Achievements', icon: 'medal' },
     ],

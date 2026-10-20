@@ -1,5 +1,7 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLeague } from '../lib/data'
+import { rivalries } from '../lib/rivalry'
+import { RivalryMeter } from './Rivalries'
 import { careers, fmt, headToHead, pct, record, type Game } from '../lib/stats'
 import { Avatar, Card, MemberLink, Stat } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -88,6 +90,9 @@ export function VersusDetail() {
   const po = h.games.filter((g) => g.playoff)
   const sub = (gs: Game[]) => { const w = gs.filter((g) => g.aPts > g.bPts).length, l = gs.filter((g) => g.aPts < g.bPts).length; return record(w, l, gs.length - w - l) }
   const biggest = [...h.games].sort((x, y) => Math.abs(y.aPts - y.bPts) - Math.abs(x.aPts - x.bPts))[0]
+  const all = rivalries(lg)
+  const rank = all.findIndex((r) => (r.a === a && r.b === b) || (r.a === b && r.b === a)) + 1
+  const riv = all[rank - 1]
   const pick = (side: 'a' | 'b', v: string) => nav(side === 'a' ? `/versus/${v}/${b}` : `/versus/${a}/${v}`)
   return (
     <div className="page">
@@ -104,6 +109,11 @@ export function VersusDetail() {
         <div className="vs-score">{record(h.w, h.l, h.t)}<div className="muted small">{h.games.length} meetings</div></div>
         <Link to={`/member/${b}`} className="vs-side"><Avatar id={b} size={64} /><b>{name(b)}</b></Link>
       </div>
+      {riv && (
+        <Card title={`Rivalry intensity · ${fmt(riv.score, 0)} / 100`} sub={`#${rank} of ${all.length} pairings`} right={<span>{riv.tags.map((x) => <span key={x} className="pill">{x}</span>)}</span>}>
+          <RivalryMeter r={riv} />
+        </Card>
+      )}
       {h.games.length === 0 ? <p className="muted">These two have never played.</p> : (
         <>
           <div className="stat-grid">
