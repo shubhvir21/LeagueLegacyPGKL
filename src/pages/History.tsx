@@ -240,5 +240,5 @@ function RankFinish({ r, lg }: { r: TeamRank; lg: League }) {
   const s = lg.seasons.find((x) => x.year === r.t.season)!
   const f = r.t.finalRank!
   const cls = f === 1 ? 'gold' : f === 2 ? 'silver' : f === 3 ? 'bronze' : ''
-  return <span className={`rank ${cls}`}>{f === 1 ? 'Champ' : s.toiletBowlLoser === r.t.memberId ? 'Toilet' : f}</span>
+  return <span className={`rank ${cls}`}>{s.toiletBowlLoser === r.t.memberId ? 'Toilet' : f}</span>
 }

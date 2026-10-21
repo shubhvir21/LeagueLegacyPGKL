@@ -49,27 +49,9 @@ export const finishBonus = (place: number, teams: number) => (place <= teams / 2
 export const REG_BONUS = [100, 75, 50, 25]
 export const regBonus = (rank: number, teams: number) => (rank <= teams / 2 ? REG_BONUS[rank - 1] ?? 0 : -(REG_BONUS[teams - rank] ?? 0))
 
-/** Final placement 1..N for a finished season, from the playoff games themselves. */
-export function placements(lg: League, s: Season): Record<string, number> {
-  const out: Record<string, number> = {}
-  const gs = lg.games.filter((g) => g.season === s.year && g.playoff)
-  const wl = (g: (typeof gs)[number]) => (g.aPts >= g.bPts ? [g.a, g.b] : [g.b, g.a])
-  // Winners bracket: championship → 1/2, 3rd-place game → 3/4, 5th-place game → 5/6.
-  for (const [place, hi] of [[1, 1], [3, 3], [5, 5]] as const) {
-    const g = gs.find((x) => x.bracket === 'winners' && x.place === place)
-    if (g) { const [w, l] = wl(g); out[w] = hi; out[l] = hi + 1 }
-  }
-  // Toilet bowl (lower score advances): the final's loser is last, the other finalist next to
-  // last; the game between the teams that escaped decides the two places above that.
-  const late = gs.filter((x) => x.bracket === 'losers' && x.week > s.playoffStart)
-  for (const g of late) {
-    if (g.a === s.toiletBowlLoser || g.b === s.toiletBowlLoser) { out[s.toiletBowlLoser!] = s.teams; out[g.a === s.toiletBowlLoser ? g.b : g.a] = s.teams - 1 }
-    else { const [w, l] = wl(g); out[w] = s.teams - 3; out[l] = s.teams - 2 }
-  }
-  // Anyone the bracket didn't place keeps their regular-season rank order in the open spots.
-  const open = Array.from({ length: s.teams }, (_, i) => i + 1).filter((p) => !Object.values(out).includes(p))
-  for (const t of [...s.teamSeasons].filter((t) => out[t.memberId] == null).sort((a, b) => a.regRank - b.regRank)) out[t.memberId] = open.shift()!
-  return out
+/** Final placement 1..N for a finished season (winners bracket, toilet bowl, then regular-season order). */
+export function placements(_lg: League, s: Season): Record<string, number> {
+  return Object.fromEntries(s.teamSeasons.filter((t) => t.finalRank != null).map((t) => [t.memberId, t.finalRank!]))
 }
 
 /** Places a match's winner (side 'w') or loser ('l') can still finish in, from the bracket structure. */

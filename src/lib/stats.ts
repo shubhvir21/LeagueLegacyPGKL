@@ -206,6 +206,19 @@ function buildSeason(raw: RawSeason, games: Game[], schedule: ScheduledGame[]) {
 
   const complete = league.status === 'complete'
   const place = complete ? placementsFromBracket(raw.winnersBracket) : {}
+  if (complete) {
+    // Toilet bowl (lower score advances): the final's "winner" is last, its other team next to
+    // last; the game between the teams that escaped decides the two places above that by score.
+    const pts = (m: BracketMatch, rid: number) => raw.matchups[playoffStart + m.r - 2]?.find((x) => x.roster_id === rid)?.points ?? 0
+    for (const m of raw.losersBracket) {
+      if (!m.p || m.t1 == null || m.t2 == null) continue
+      if (m.p === 1 && m.w != null && m.l != null) { place[m.w] = n; place[m.l] = n - 1 }
+      else if (m.p === 3) {
+        const [hi, lo] = pts(m, m.t1) >= pts(m, m.t2) ? [m.t1, m.t2] : [m.t2, m.t1]
+        place[hi] = n - 3; place[lo] = n - 2
+      }
+    }
+  }
   const playoffIds = new Set(raw.winnersBracket.flatMap((b) => [b.t1, b.t2]).filter((x): x is number => x != null))
 
   const list = Object.values(ts)
@@ -222,9 +235,10 @@ function buildSeason(raw: RawSeason, games: Game[], schedule: ScheduledGame[]) {
   list.sort((a, b) => b.wins - a.wins || b.pf - a.pf)
   list.forEach((t, i) => (t.regRank = i + 1))
   if (complete) {
-    // Bracket decides the top spots; everyone else falls back to regular-season order.
-    let next = Math.max(0, ...Object.values(place)) + 1
-    for (const t of list) t.finalRank = place[t.rosterId] ?? next++
+    // Brackets decide the top and bottom spots; anyone left fills the open places in
+    // regular-season order.
+    const open = Array.from({ length: n }, (_, i) => i + 1).filter((p) => !Object.values(place).includes(p))
+    for (const t of list) t.finalRank = place[t.rosterId] ?? open.shift()!
     list.sort((a, b) => (a.finalRank ?? 99) - (b.finalRank ?? 99))
   }
   for (const t of list) {
