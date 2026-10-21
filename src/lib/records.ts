@@ -1,6 +1,7 @@
 // Record Book: ranked lists computed from the league model.
 import { careers, fmt, pct, record, type Game, type League, type TeamSeason } from './stats'
 import { gameOdds, UPSET_LINE, type GameOdds } from './upsets'
+import { franchiseElo } from './elo'
 
 const UPSET_TIP = 'pre-game chance from projected lineups and form'
 
@@ -68,7 +69,7 @@ export function buildRecords(lg: League): RecordDef[] {
   career('titles', 'Most Championships', 'League titles won.', true, (r) => r.titles, (r) => String(r.titles))
   career('playoffs', 'Most Playoff Appearances', 'Seasons reaching the winners bracket.', true, (r) => r.playoffs, (r) => String(r.playoffs))
   career('pwins', 'Most Playoff Wins', 'Winners-bracket games won.', true, (r) => r.playoffW, (r) => String(r.playoffW))
-  career('elo', 'Highest League Rating', 'Current 0–100 power rating.', true, (r) => r.elo, (r) => r.elo.toFixed(1))
+  career('elo', 'Highest Elo', 'Current Elo rating (500–3000).', true, (r) => r.elo, (r) => String(r.elo))
   career('luck', 'Luckiest All-Time', 'Total luck (actual minus expected H2H wins).', true, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)))
   career('unluck', 'Unluckiest All-Time', 'Lowest total luck.', false, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)), true)
   career('highs', 'Most Weekly High Scores', 'Weeks finishing as the top scorer.', true, (r) => careerSum(tsAll, r.member.id, (t) => t.highScores), (r) => String(careerSum(tsAll, r.member.id, (t) => t.highScores)))
@@ -111,6 +112,34 @@ export function buildRecords(lg: League): RecordDef[] {
   }
   add('Matchup', 'm-combined', 'Highest Combined Score', 'Both teams together.', true, top(games, (g) => g.aPts + g.bPts).map((g) => gameRow(g, g.aPts + g.bPts)))
   add('Matchup', 'm-combined-low', 'Lowest Combined Score', 'Both teams together.', false, top(games, (g) => g.aPts + g.bPts, true).map((g) => gameRow(g, g.aPts + g.bPts)))
+
+  // ---------- Elo ----------
+  const elo = franchiseElo(lg)
+  const eloIds = Object.keys(elo.history)
+  const when = (p: { season: number; week: number }) => (p.week ? `${p.season} W${p.week}` : `${p.season} start`)
+  add('League', 'elo-peak', 'Highest Peak Elo', 'Best Elo rating ever reached.', true,
+    top(eloIds, (id) => elo.peak[id]?.rating ?? 0).map((id) => ({ memberId: id, value: elo.peak[id].rating, display: String(elo.peak[id].rating), context: when(elo.peak[id]), link: `/member/${id}` })))
+  add('League', 'elo-low', 'Lowest Elo Ever', 'Worst Elo rating ever reached.', false,
+    top(eloIds, (id) => elo.low[id]?.rating ?? 9999, true).map((id) => ({ memberId: id, value: elo.low[id].rating, display: String(elo.low[id].rating), context: when(elo.low[id]), link: `/member/${id}` })))
+  add('Matchup', 'elo-gain', 'Biggest Single-Game Elo Gain', 'Most Elo points won in one game.', true,
+    top(elo.games, (g) => g.pts).map((g) => ({ memberId: g.winner, value: g.pts, display: `+${Math.round(g.pts)}`, context: `${g.season} W${g.week} over ${name(g.loser)}${g.kind === 'championship' ? ' (championship)' : g.kind === 'playoff' ? ' (playoffs)' : ''}`, link: `/versus/${g.winner}/${g.loser}` })))
+  const seasonSwing = eloIds.flatMap((id) => [...new Set(elo.history[id].map((p) => p.season))].map((y) => {
+    const h = elo.history[id].filter((p) => p.season === y)
+    return { id, y, d: h.at(-1)!.rating - h[0].rating }
+  }))
+  add('Season', 'elo-rise', 'Biggest Elo Rise in a Season', 'Elo gained from the start of a season to the end.', true,
+    top(seasonSwing, (x) => x.d).filter((x) => x.d > 0).map((x) => ({ memberId: x.id, value: x.d, display: `+${x.d}`, context: String(x.y), link: `/season/${x.y}/team/${x.id}` })))
+  add('Season', 'elo-fall', 'Biggest Elo Drop in a Season', 'Elo lost from the start of a season to the end.', false,
+    top(seasonSwing, (x) => x.d, true).filter((x) => x.d < 0).map((x) => ({ memberId: x.id, value: x.d, display: String(x.d), context: String(x.y), link: `/season/${x.y}/team/${x.id}` })))
+  const weeksAtTop: Record<string, number> = {}
+  const allKeys = [...new Set(Object.values(elo.history).flat().filter((p) => p.week > 0).map((p) => p.season * 100 + p.week))]
+  for (const k of allKeys) {
+    const pts = eloIds.map((id) => ({ id, r: elo.history[id].find((p) => p.season * 100 + p.week === k)?.rating })).filter((x) => x.r != null)
+    const best = pts.sort((a, b) => b.r! - a.r!)[0]
+    if (best) weeksAtTop[best.id] = (weeksAtTop[best.id] ?? 0) + 1
+  }
+  add('Streaks & Droughts', 'elo-top', 'Most Weeks as No. 1 in Elo', 'Weeks holding the league\'s top Elo rating.', true,
+    top(Object.keys(weeksAtTop), (id) => weeksAtTop[id]).map((id) => ({ memberId: id, value: weeksAtTop[id], display: String(weeksAtTop[id]), context: 'weeks', link: `/member/${id}` })))
 
   // ---------- Upsets ----------
   const odds = gameOdds(lg).filter((o) => o.winner)

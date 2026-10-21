@@ -790,3 +790,15 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
   .snap-value { font-size: 15px; }
   .week-recap { flex-direction: column; gap: 6px; font-size: 12.5px; }
 }
+
+/* Elo */
+.elo-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.elo-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text-2); font-size: 12.5px; }
+.elo-chip:hover { border-color: var(--border-strong); color: var(--text); }
+.elo-chip b { color: var(--text); font-variant-numeric: tabular-nums; }
+.tier-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 99px; background: var(--panel-3); color: var(--muted); }
+.tier-tag.dynasty { background: rgba(242, 195, 91, .2); color: var(--gold); }
+.tier-tag.contender { background: rgba(124, 140, 255, .2); color: #aab4ff; }
+.tier-tag.average { background: rgba(255, 255, 255, .06); color: var(--text-2); }
+.tier-tag.rebuilding { background: rgba(255, 122, 138, .14); color: var(--neg); }
+@media (max-width: 640px) { .elo-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); } .elo-chip { white-space: nowrap; } }

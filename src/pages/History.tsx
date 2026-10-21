@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
 import { careers, fmt, pct, record, type CareerRow, type League, type Season, type TeamSeason } from '../lib/stats'
-import { Avatar, Card, MemberLink, Table, Tabs, Trophies, TIPS, type Col } from '../components/ui'
+import { Avatar, Card, MemberLink, Table, Tabs, Tip, Trophies, TIPS, type Col } from '../components/ui'
+import { franchiseElo, tierOf, TIERS } from '../lib/elo'
 import { teamRankings, type TeamRank } from '../lib/teamRank'
 
 export const PALETTE = ['#7c8cff', '#3ddc97', '#f2c35b', '#ff7a8a', '#a78bfa', '#5ec8f2', '#ff9f5a', '#c6e66b', '#f0abfc', '#8a93a6', '#4fd1c5', '#e8b4b8']
@@ -11,7 +12,7 @@ export const PALETTE = ['#7c8cff', '#3ddc97', '#f2c35b', '#ff7a8a', '#a78bfa', '
 const STANDINGS_TABS = ['All-Time', 'Playoffs', 'Advanced'] as const
 const SEASON_TABS = ['Champions', 'Chumpions'] as const
 const METRICS = {
-  'League Rating': { get: (_t: TeamSeason) => _t.eloEnd, reversed: false },
+  Elo: { get: (t: TeamSeason) => t.eloEnd, reversed: false },
   'Season Score': { get: (t: TeamSeason) => t.seasonScore, reversed: false },
   'Points Share': { get: (t: TeamSeason) => +t.pointsShare.toFixed(2), reversed: false },
   'Final Rank': { get: (t: TeamSeason) => t.finalRank ?? t.regRank, reversed: true },
@@ -26,7 +27,7 @@ export default function History() {
   const rows = careers(lg)
   const [tab, setTab] = useState<(typeof STANDINGS_TABS)[number]>('All-Time')
   const [seasonTab, setSeasonTab] = useState<(typeof SEASON_TABS)[number]>('Champions')
-  const [metric, setMetric] = useState<Metric>('League Rating')
+  const [metric, setMetric] = useState<Metric>('Elo')
   const winPct = (w: number, l: number, t = 0) => (w + t / 2) / (w + l + t || 1)
   const base: Col<CareerRow>[] = [
     { key: 'rank', label: '#', render: (_r, i) => i + 1 },
@@ -40,7 +41,7 @@ export default function History() {
       { key: 'pct', label: 'Win %', render: (r) => pct(r.wins, r.losses, r.ties), sort: (r) => winPct(r.wins, r.losses, r.ties) },
       { key: 'ap', label: 'All-Play', render: (r) => record(r.apW, r.apL, r.apT), sort: (r) => r.apW - r.apL / 1000, tip: TIPS.allPlay },
       { key: 'appct', label: 'All-Play %', render: (r) => pct(r.apW, r.apL, r.apT), sort: (r) => winPct(r.apW, r.apL, r.apT) },
-      { key: 'elo', label: 'League Rating', render: (r) => <b>{r.elo.toFixed(1)}</b>, sort: (r) => r.elo, tip: TIPS.elo },
+      { key: 'elo', label: 'Elo', render: (r) => <b>{r.elo}</b>, sort: (r) => r.elo, tip: TIPS.elo },
       { key: 'troph', label: 'Trophies', render: (r) => <Trophies gold={r.titles} silver={r.seconds} bronze={r.thirds} />, sort: (r) => r.titles * 100 + r.seconds * 10 + r.thirds },
     ],
     Playoffs: [
@@ -93,7 +94,50 @@ export default function History() {
       >
         <TrendChart lg={lg} metric={metric} />
       </Card>
+
+      <Card title="Elo Ratings" sub="Every franchise's Elo after every week, all-time. Dashed lines mark the tiers; each season starts after a 10% pull toward 1750." right={<Tip text={TIPS.elo} />}>
+        <EloChart lg={lg} />
+      </Card>
     </div>
+  )
+}
+
+function EloChart({ lg }: { lg: League }) {
+  const e = franchiseElo(lg)
+  const ids = Object.entries(e.current).sort((a, b) => b[1] - a[1]).map(([id]) => id)
+  const keys = [...new Set(Object.values(e.history).flat().map((p) => p.season * 100 + p.week))].sort((a, b) => a - b)
+  const data = keys.map((k) => {
+    const season = Math.floor(k / 100), week = k % 100
+    const row: Record<string, number | string | null> = { key: week === 0 ? `${season}` : `${String(season).slice(2)} W${week}`, season }
+    for (const id of ids) row[id] = e.history[id]?.find((p) => p.season === season && p.week === week)?.rating ?? null
+    return row
+  })
+  const starts = data.filter((d) => !String(d.key).includes('W')).map((d) => d.key as string)
+  return (
+    <>
+      <div className="elo-chips">
+        {ids.map((id, i) => (
+          <Link key={id} to={`/member/${id}`} className="elo-chip">
+            <span className="muted">{i + 1}</span><Avatar id={id} size={18} /><span>{lg.memberById[id]?.name}</span>
+            <b>{e.current[id]}</b><span className={`tier-tag ${tierOf(e.current[id]).toLowerCase()}`}>{tierOf(e.current[id])}</span>
+          </Link>
+        ))}
+      </div>
+      <ResponsiveContainer width="100%" height={380}>
+        <LineChart data={data} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+          <CartesianGrid stroke="var(--grid)" vertical={false} />
+          <XAxis dataKey="key" stroke="var(--muted)" ticks={starts} interval={0} />
+          <YAxis stroke="var(--muted)" domain={[(m: number) => Math.floor((m - 25) / 250) * 250, (m: number) => Math.ceil((m + 25) / 250) * 250]} tickCount={8} allowDecimals={false} width={48} />
+          {starts.map((s) => <ReferenceLine key={s} x={s} stroke="var(--border-strong)" />)}
+          {TIERS.filter((t) => t.min > 0).map((t) => <ReferenceLine key={t.name} y={t.min} stroke="var(--muted)" strokeDasharray="4 4" label={{ value: t.name, position: 'insideTopLeft', fill: 'var(--muted)', fontSize: 10 }} />)}
+          <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }} itemSorter={(item) => -Number(item.value ?? 0)} />
+          <Legend />
+          {ids.map((id, i) => (
+            <Line key={id} dataKey={id} name={lg.memberById[id]?.name} stroke={PALETTE[i % PALETTE.length]} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </>
   )
 }
 

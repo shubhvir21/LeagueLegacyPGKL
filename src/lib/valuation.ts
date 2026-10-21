@@ -16,7 +16,7 @@
 // MULTIPLE (×, clamped 4–14) — starts at 7.0
 //   Trophy case    +1.2 per title, +0.4 per runner-up
 //   Pedigree       +2.0 × (playoff rate − 50%)
-//   Momentum       +0.06 per point of League Rating above 50
+//   Momentum       +0.06 per point of Franchise Form above 50
 //   Front office   +0.04 per point of avg Manager Score above 50
 //   Stigma         −0.5 per last place, −0.3 per toilet-bowl loss
 //
@@ -96,7 +96,7 @@ export function valuations(lg: League): Record<string, Valuation[]> {
       const playoffRate = mine.filter((x) => x.t!.madePlayoffs).length / (mine.length || 1)
       const lasts = mine.filter((x) => x.t!.finalRank === x.s.teams).length
       const toilets = mine.filter((x) => x.s.toiletBowlLoser === m.id).length
-      const rating = lg.eloHistory.find((h) => h.season === s.year)?.ratings[m.id] ?? 50
+      const rating = lg.formHistory.find((h) => h.season === s.year)?.ratings[m.id] ?? 50
       const mgr = managementCached(lg).filter((r) => r.memberId === m.id && !r.inProgress && r.season <= s.year)
       const mgrScore = mgr.length ? mgr.reduce((a, r) => a + r.managerScore, 0) / mgr.length : 50
 

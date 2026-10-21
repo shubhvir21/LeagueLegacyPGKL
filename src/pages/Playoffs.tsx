@@ -6,7 +6,7 @@ import { buildRecords } from '../lib/records'
 import { Card, MemberLink, Tabs } from '../components/ui'
 import { Bracket } from './Season'
 
-const PREDICTORS = ['Retention', 'Reg. Season #1', 'Most Points', 'All-Play #1', 'Coach Score #1', 'Defending Champ', 'League Rating #1'] as const
+const PREDICTORS = ['Retention', 'Reg. Season #1', 'Most Points', 'All-Play #1', 'Coach Score #1', 'Defending Champ', 'Elo #1'] as const
 type Predictor = (typeof PREDICTORS)[number]
 
 export default function Playoffs() {
@@ -123,12 +123,12 @@ function PredictorTable({ seasons, all, pred }: { seasons: Season[]; all: Season
     'All-Play #1': (s) => leader(s, (t) => t.apW),
     'Coach Score #1': (s) => leader(s, (t) => t.coachScore ?? 0),
     'Defending Champ': (s) => { const p = prev(s); const id = p?.champion; return id ? s.teamSeasons.find((t) => t.memberId === id) : undefined },
-    'League Rating #1': (s) => { const p = prev(s); if (!p) return undefined; const best = leader(p, (t) => t.eloEnd); return s.teamSeasons.find((t) => t.memberId === best.memberId) },
+    'Elo #1': (s) => { const p = prev(s); if (!p) return undefined; const best = leader(p, (t) => t.eloEnd); return s.teamSeasons.find((t) => t.memberId === best.memberId) },
   }
   const rows = seasons.map((s) => ({ s, t: pickers[pred](s) })).filter((x) => x.t)
   const made = rows.filter((r) => r.t!.madePlayoffs).length
   const won = rows.filter((r) => r.t!.finalRank === 1).length
-  const note = pred === 'Defending Champ' ? 'Last season’s champion' : pred === 'League Rating #1' ? 'Highest-rated member entering the season' : `The ${pred.replace(' #1', ' leader')}`
+  const note = pred === 'Defending Champ' ? 'Last season’s champion' : pred === 'Elo #1' ? 'Highest Elo entering the season' : `The ${pred.replace(' #1', ' leader')}`
   return (
     <>
       <p className="muted">

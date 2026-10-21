@@ -10,7 +10,7 @@ import { PALETTE } from './History'
 
 // Dynasty points: title 5, runner-up 3, third 2, any other playoff trip 1.
 const DYN_TIP = 'Dynasty points: 5 per title, 3 per runner-up, 2 per third place, 1 per other playoff trip.'
-const METRICS = ['Franchise Value', 'Legacy Score', 'League Rating', 'Finish'] as const
+const METRICS = ['Franchise Value', 'Legacy Score', 'Elo', 'Finish'] as const
 type Metric = (typeof METRICS)[number]
 
 function cellTone(t: TeamSeason, s: { champion: string | null; runnerUp: string | null; third: string | null; toiletBowlLoser: string | null; complete: boolean }) {
@@ -59,10 +59,10 @@ export default function Dynasty() {
   const getter: Record<Metric, (id: string, year: number) => number | null> = {
     'Franchise Value': (id, y) => vals[id]?.find((v) => v.year === y)?.value ?? null,
     'Legacy Score': (id, y) => (legacy[`${y}|${id}`] != null ? +legacy[`${y}|${id}`].toFixed(1) : null),
-    'League Rating': (id, y) => { const t = lg.seasons.find((s) => s.year === y)?.teamSeasons.find((t) => t.memberId === id); return t ? +t.eloEnd.toFixed(1) : null },
+    Elo: (id, y) => { const t = lg.seasons.find((s) => s.year === y)?.teamSeasons.find((t) => t.memberId === id); return t ? t.eloEnd : null },
     Finish: (id, y) => { const s = lg.seasons.find((x) => x.year === y); const t = s?.teamSeasons.find((t) => t.memberId === id); return s?.complete && t ? t.finalRank ?? t.regRank : null },
   }
-  const chartYears = seasons.filter((s) => metric === 'League Rating' || s.complete)
+  const chartYears = seasons.filter((s) => metric === 'Elo' || s.complete)
   const chart = chartYears.map((s) => ({ season: String(s.year), ...Object.fromEntries(rows.map((r) => [r.id, getter[metric](r.id, s.year)])) }))
 
   const cols: Col<(typeof rows)[number]>[] = [

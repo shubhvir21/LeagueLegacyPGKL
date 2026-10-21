@@ -59,7 +59,7 @@ export function FranchiseProfile({ id }: { id: string }) {
           <Fact k="Debt / value" v={`${v.debtPct}%`} />
           <Fact k="Championships" v={String(v.titles)} />
           <Fact k="Playoff rate" v={`${Math.round(v.playoffRate * 100)}%`} />
-          <Fact k="League rating" v={v.rating.toFixed(1)} />
+          <Fact k="Franchise form" v={v.rating.toFixed(1)} />
           <Fact k="League rank" v={`${rank} of ${table.length}`} />
         </dl>
       </div>

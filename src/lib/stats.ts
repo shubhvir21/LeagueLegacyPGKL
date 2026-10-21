@@ -1,5 +1,6 @@
 // Turns raw Sleeper data into the league model every page reads from.
 import type { RawData, RawSeason, BracketMatch } from './sleeper'
+import { ELO, franchiseElo } from './elo'
 import overrides from '../members.json'
 
 export interface Member {
@@ -43,7 +44,7 @@ export interface TeamSeason {
   finalRank: number | null // null until the season is finished
   madePlayoffs: boolean
   seasonScore: number // 0-100 composite
-  eloEnd: number
+  eloEnd: number // Elo rating at the end of this season (current rating while in progress)
 }
 
 export interface Season {
@@ -83,10 +84,9 @@ export interface League {
   seasons: Season[] // newest first
   games: Game[]
   elo: Record<string, number> // current
-  eloHistory: { label: string; season: number; week: number; ratings: Record<string, number> }[]
+  formHistory: { label: string; season: number; week: number; ratings: Record<string, number> }[] // Franchise Form (0–100), feeds valuations
 }
 
-const ELO_START = 50 // league rating before a member has a completed season
 const round2 = (n: number) => Math.round(n * 100) / 100
 const nameOverrides = (overrides as { names?: Record<string, string> }).names ?? {}
 // Franchise takeovers: the old owner's seasons count toward the new owner.
@@ -126,7 +126,7 @@ function buildSeason(raw: RawSeason, games: Game[], schedule: ScheduledGame[]) {
       h2hW: 0, h2hL: 0, h2hT: 0, medW: 0, medL: 0, wins: 0, losses: 0, ties: 0,
       pf: 0, pa: 0, games: 0, apW: 0, apL: 0, apT: 0, expectedWins: 0, luck: 0, sos: 0,
       pointsShare: 0, maxPf: max, coachScore: null, highScores: 0, regRank: 0, finalRank: null,
-      madePlayoffs: false, seasonScore: 0, eloEnd: ELO_START,
+      madePlayoffs: false, seasonScore: 0, eloEnd: ELO.start,
     }
   }
 
@@ -272,7 +272,7 @@ export function buildLeague(raw: RawData): League {
     }
   }
 
-  // League Rating (power rating, 0–100). Per completed season:
+  // Franchise Form (0–100, internal; feeds valuations). Per completed season:
   //   season power = 40% all-play win % + 35% PPG vs league average + 25% final finish
   // The rating is a recency-weighted average of a member's completed seasons
   // (most recent 5, then 3, 2, 1, 1, …), recomputed after each season for the trend line.
@@ -296,21 +296,20 @@ export function buildLeague(raw: RawData): League {
     played.forEach((y, i) => { const w = RECENCY[i] ?? 1; num += w * power[y][id]; den += w })
     return Math.round((num / den) * 10) / 10
   }
-  const elo: Record<string, number> = {}
-  const eloHistory: League['eloHistory'] = []
+  const form: Record<string, number> = {}
+  const formHistory: League['formHistory'] = []
   games.sort((x, y) => x.season - y.season || x.week - y.week)
   for (const s of seasons) {
     for (const t of s.teamSeasons) {
       const r = ratingAsOf(t.memberId, s.year)
-      if (r != null) elo[t.memberId] = r
-      t.eloEnd = elo[t.memberId] ?? 50
+      if (r != null) form[t.memberId] = r
     }
-    eloHistory.push({ label: String(s.year), season: s.year, week: 0, ratings: { ...elo } })
+    formHistory.push({ label: String(s.year), season: s.year, week: 0, ratings: { ...form } })
   }
 
   const rosterOwner: League['rosterOwner'] = {}
   for (const s of seasons) rosterOwner[s.year] = Object.fromEntries(s.teamSeasons.map((t) => [t.rosterId, t.memberId]))
-  return {
+  const lg: League = {
     raw,
     rosterOwner,
     syncedAt: raw.syncedAt,
@@ -320,9 +319,14 @@ export function buildLeague(raw: RawData): League {
     games,
     schedule,
     nflWeek: raw.nflState.week,
-    elo,
-    eloHistory,
+    elo: {},
+    formHistory,
   }
+  // Elo: the league's long-term rating (see elo.ts).
+  const e = franchiseElo(lg)
+  lg.elo = e.current
+  for (const s of seasons) for (const t of s.teamSeasons) t.eloEnd = e.history[t.memberId]?.filter((p) => p.season === s.year).at(-1)?.rating ?? ELO.start
+  return lg
 }
 
 // ---------- Derived views ----------
@@ -349,7 +353,7 @@ export function careers(lg: League): CareerRow[] {
         member: lg.memberById[t.memberId] ?? { id: t.memberId, name: t.teamName, avatar: null },
         seasons: [], wins: 0, losses: 0, ties: 0, apW: 0, apL: 0, apT: 0, pf: 0, pa: 0, games: 0,
         playoffs: 0, playoffW: 0, playoffL: 0, titles: 0, seconds: 0, thirds: 0, avgFinish: null, avgScore: 0,
-        elo: lg.elo[t.memberId] ?? ELO_START,
+        elo: lg.elo[t.memberId] ?? ELO.start,
       })
       r.seasons.push(s.year)
       r.wins += t.wins; r.losses += t.losses; r.ties += t.ties

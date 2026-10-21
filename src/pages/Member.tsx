@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
+import { tierOf } from '../lib/elo'
 import { careers, fmt, headToHead, ordinal, pct, record, type TeamSeason } from '../lib/stats'
 import { Avatar, Card, MemberLink, RankBadge, Stat, Table, Trophies, TIPS, type Col } from '../components/ui'
 import { seasonRange, signed } from './History'
@@ -101,7 +102,7 @@ export default function Member() {
         <div className="stat-grid">
           <Stat icon="trophy" label={titles.length ? `Championships · ${titles.join(', ')}` : 'Championships'} value={row.titles} />
           <Stat icon="medal" label="Medal score" value={medalScore} tip="10 per title, 6 per runner-up, 4 per third, 2 per playoff trip." />
-          <Stat icon="trendUp" label="League rating" value={row.elo.toFixed(1)} tip={TIPS.elo} />
+          <Stat icon="trendUp" label={`Elo · ${tierOf(row.elo)}`} value={row.elo} tip={TIPS.elo} />
           <Stat icon="chart" label="Avg season score" value={row.avgScore.toFixed(1)} tip={TIPS.score} />
           <Stat icon="star" label="Avg points" value={fmt(row.pf / (row.games || 1))} />
           <Stat icon="shield" label="Avg opp. points" value={fmt(row.pa / (row.games || 1))} />
