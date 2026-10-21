@@ -5,15 +5,14 @@
 // scaling linearly up to a 60-point margin. Median games: ±10 for finishing above / below the
 // weekly median.
 //
-// Finish: when a season ends, final placement pays out on a mirrored, zero-sum scale. With X the
-// champion's bonus, place p in the top half earns X / p and the mirror place in the bottom half
-// loses the same (10 teams: 1st +450 / 10th −450, 2nd +225 / 9th −225, 3rd +150 / 8th −150, …).
+// Finish: when a season ends, final placement pays out on a mirrored, zero-sum scale:
+//   1st +450 / 10th −450 · 2nd +250 / 9th −250 · 3rd +150 / 8th −150 · 4th +100 / 7th −100 · 5th +50 / 6th −50
 //
 // Everyone starts at 1750. Before each new season ratings regress 10% toward 1750. Ratings are
 // kept within 450–5000.
 import type { League, Season } from './stats'
 
-export const ELO = { start: 1750, min: 450, max: 5000, regress: 0.1, median: 10, marginCap: 60, game: [12, 35], champion: 450 }
+export const ELO = { start: 1750, min: 450, max: 5000, regress: 0.1, median: 10, marginCap: 60, game: [12, 35] }
 export const TIERS = [
   { name: 'Dynasty', min: 2200 },
   { name: 'Contender', min: 1800 },
@@ -36,8 +35,9 @@ export interface EloResult {
 
 const clamp = (r: number) => Math.max(ELO.min, Math.min(ELO.max, r))
 const gameValue = (margin: number) => ELO.game[0] + (ELO.game[1] - ELO.game[0]) * Math.min(1, Math.abs(margin) / ELO.marginCap)
-/** Mirrored finish bonus: top half earns X / place, bottom half loses X / (mirror place). */
-export const finishBonus = (place: number, teams: number) => (place <= teams / 2 ? ELO.champion / place : -ELO.champion / (teams + 1 - place))
+/** Season-ending payout by finish: the top half earns, the mirror place in the bottom half loses the same. */
+export const FINISH = [450, 250, 150, 100, 50]
+export const finishBonus = (place: number, teams: number) => (place <= teams / 2 ? FINISH[place - 1] ?? 0 : -(FINISH[teams - place] ?? 0))
 
 /** Final placement 1..N for a finished season, from the playoff games themselves. */
 export function placements(lg: League, s: Season): Record<string, number> {
