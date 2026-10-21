@@ -1,7 +1,11 @@
+import { useMemo, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useLeague } from '../lib/data'
-import { fmt, headToHead, record, type ScheduledGame } from '../lib/stats'
-import { Avatar, Card, MemberLink, RankBadge } from '../components/ui'
+import { fmt, headToHead, record, type Game, type ScheduledGame } from '../lib/stats'
+import { Avatar, Card, MemberLink, RankBadge, TeamName } from '../components/ui'
+import { powerRankings } from '../lib/weekly'
+import { gameOdds } from '../lib/upsets'
+import { useOdds } from './Odds'
 import { GameCard } from './Season'
 import { playersOf } from '../lib/players'
 import { PlayerLink } from '../components/PlayerLink'
@@ -26,21 +30,21 @@ export default function Home() {
 
   return (
     <div className="page">
-      <div className="hero">
+      <div className="hero compact">
         <div>
           <div className="eyebrow">Est. {lg.seasons.at(-1)?.year} · Sleeper</div>
           <h1>{current.name}</h1>
           <p className="muted">{lg.seasons.length} seasons · {current.teams} teams · {current.year} {current.complete ? 'complete' : `through week ${current.weeksPlayed}`}</p>
         </div>
         {champs.length > 0 && (
-          <ol className="champ-list" aria-label="Champions">
+          <ol className="champ-strip" aria-label="Champions">
             {champs.map((s, i) => (
               <li key={s.year}>
-                <Link to={`/season/${s.year}`} className={`champ-row ${i === 0 ? 'latest' : ''}`}>
+                <Link to={`/season/${s.year}`} className={`champ-chip ${i === 0 ? 'latest' : ''}`} title={i === 0 ? 'Reigning champion' : `${s.year} champion`}>
+                  {i === 0 ? <Icon name="trophy" size={13} /> : null}
                   <span className="champ-year">{s.year}</span>
-                  <Avatar id={s.champion!} size={i === 0 ? 34 : 26} />
+                  <Avatar id={s.champion!} size={20} />
                   <span className="champ-name">{lg.memberById[s.champion!]?.name}</span>
-                  {i === 0 && <span className="champ-tag"><Icon name="trophy" size={12} /> Reigning</span>}
                 </Link>
               </li>
             ))}
@@ -48,12 +52,14 @@ export default function Home() {
         )}
       </div>
 
+      {!current.complete && <Snapshots year={current.year} />}
+
       <div className="two-col">
         <Card title={`${current.year} Standings`} right={<Link to={`/season/${current.year}`}>Full season →</Link>}>
           <div className="table-wrap"><table className="fit-table"><tbody>{current.teamSeasons.map((t) => (
             <tr key={t.memberId}>
               <td><RankBadge rank={t.finalRank ?? t.regRank} n={current.teams} final={current.complete} /></td>
-              <td className="grow"><Link to={`/season/${current.year}/team/${t.memberId}`} className="member-link"><Avatar id={t.memberId} /><span>{t.teamName}</span></Link></td>
+              <td className="grow"><Link to={`/season/${current.year}/team/${t.memberId}`} className="member-link"><Avatar id={t.memberId} /><TeamName id={t.memberId} season={current.year} /></Link></td>
               <td>{record(t.wins, t.losses, t.ties)}</td>
               <td className="right">{fmt(t.pf)}</td>
             </tr>
@@ -97,7 +103,8 @@ export default function Home() {
       </div>
 
       {lastGames.length > 0 && (
-        <Card title={`Week ${lastWeek} Results`}>
+        <Card title={`Week ${lastWeek} Results`} right={<Link to={`/recap/${current.year}`}>Season recap →</Link>}>
+          <WeekRecap games={lastGames} />
           <div className="game-grid">{lastGames.map((g) => <GameCard key={g.a} g={g} />)}</div>
         </Card>
       )}
@@ -118,8 +125,8 @@ export function Preview({ g }: { g: ScheduledGame }) {
     const t = team(id)
     return (
       <Link to={`/member/${id}`} className="game-side win">
-        <Avatar id={id} size={20} /> <span>{t?.teamName ?? lg.memberById[id]?.name}</span>
-        <span className="muted small">{t ? record(t.wins, t.losses, t.ties) : ''}</span>
+        <Avatar id={id} size={22} /> <TeamName id={id} season={g.season} />
+        <span className="muted small rec">{t ? record(t.wins, t.losses, t.ties) : ''}</span>
       </Link>
     )
   }
@@ -154,6 +161,77 @@ export function Schedule() {
           <div className="game-grid">{lg.games.filter((g) => g.season === year && g.week === w).map((g) => <GameCard key={g.a} g={g} />)}</div>
         </Card>
       ))}
+    </div>
+  )
+}
+
+function Snap({ to, icon, label, children, detail, tone }: { to: string; icon: string; label: string; children: ReactNode; detail?: ReactNode; tone?: 'pos' | 'neg' }) {
+  return (
+    <Link to={to} className={`stat snap ${tone ?? ''}`}>
+      <div className="stat-label"><Icon name={icon} size={14} /><span>{label}</span></div>
+      <div className="snap-value">{children}</div>
+      {detail && <div className="snap-detail muted">{detail}</div>}
+    </Link>
+  )
+}
+
+/** This-season snapshot: power No. 1, playoff bubble, hottest team, last week's biggest upset. */
+function Snapshots({ year }: { year: number }) {
+  const lg = useLeague()
+  const power = useMemo(() => powerRankings(lg, year), [lg, year])
+  const latest = power.at(-1)
+  const { full } = useOdds(lg, year, null, false, false)
+  const lastWeek = latest?.week
+  const upset = useMemo(() => gameOdds(lg).filter((o) => o.g.season === year && o.g.week === lastWeek && o.winner).sort((a, b) => a.pWinner - b.pWinner)[0], [lg, year, lastWeek])
+  if (!latest) return null
+  const top = latest.rows[0]
+  const move = top.prev == null ? null : top.prev - top.rank
+  const hot = [...latest.rows].sort((a, b) => b.recent - a.recent)[0]
+  const bubble = full ? [...full.teams].sort((a, b) => Math.abs(a.playoff - 0.5) - Math.abs(b.playoff - 0.5))[0] : null
+  const pct = (p: number) => `${Math.round(p * 100)}%`
+  return (
+    <div className="snap-grid">
+      <Snap to="/power" icon="crown" label={`Power No. 1 · week ${latest.week}`}
+        detail={<>{fmt(top.score, 1)} power{move ? <> · <span className={move > 0 ? 'pos' : 'neg'}>{move > 0 ? '▲' : '▼'}{Math.abs(move)}</span></> : ' · held the spot'}</>}>
+        <TeamName id={top.memberId} season={year} />
+      </Snap>
+      <Snap to="/odds" icon="target" label="Playoff bubble" detail={bubble ? <>{pct(bubble.playoff)} to make the playoffs</> : 'Simulating…'}>
+        {bubble ? <TeamName id={bubble.memberId} season={year} /> : <span className="muted">—</span>}
+      </Snap>
+      <Snap to="/power" icon="flame" label="Hottest team" detail={`${fmt(hot.recent, 1)} per game over the last 3`}>
+        <TeamName id={hot.memberId} season={year} />
+      </Snap>
+      {upset && upset.pWinner < 0.5 ? (
+        <Snap to="/records" icon="zap" label={`Week ${lastWeek} upset`} tone="pos"
+          detail={<>won at {pct(upset.pWinner)} vs {lg.memberById[upset.loser!]?.name}</>}>
+          <TeamName id={upset.winner!} season={year} />
+        </Snap>
+      ) : (
+        <Snap to="/records" icon="zap" label={`Week ${lastWeek} upset`} detail="every favorite won">
+          <span className="muted">No upsets</span>
+        </Snap>
+      )}
+    </div>
+  )
+}
+
+/** One line on last week: top and low score (recap video duty), closest game, biggest blowout. */
+function WeekRecap({ games }: { games: Game[] }) {
+  const lg = useLeague()
+  const sides = games.flatMap((g) => [{ id: g.a, pts: g.aPts, opp: g.b, oppPts: g.bPts }, { id: g.b, pts: g.bPts, opp: g.a, oppPts: g.aPts }]).filter((x) => x.pts > 0)
+  if (!sides.length) return null
+  const nm = (id: string) => lg.memberById[id]?.name ?? id
+  const top = [...sides].sort((a, b) => b.pts - a.pts)[0]
+  const low = [...sides].sort((a, b) => a.pts - b.pts)[0]
+  const wins = sides.filter((x) => x.pts > x.oppPts)
+  const close = [...wins].sort((a, b) => (a.pts - a.oppPts) - (b.pts - b.oppPts))[0]
+  const blow = [...wins].sort((a, b) => (b.pts - b.oppPts) - (a.pts - a.oppPts))[0]
+  return (
+    <div className="week-recap">
+      <span><Icon name="rocket" size={13} /> Top score <b>{nm(top.id)}</b> {fmt(top.pts, 1)}</span>
+      <span><Icon name="minus" size={13} /> Low score <b>{nm(low.id)}</b> {fmt(low.pts, 1)} <span className="muted">· owes the recap video</span></span>
+      {close && <span><Icon name="scale" size={13} /> Closest <b>{nm(close.id)}</b> over {nm(close.opp)} by {fmt(close.pts - close.oppPts, 1)}</span>}
+      {blow && blow !== close && <span><Icon name="zap" size={13} /> Blowout <b>{nm(blow.id)}</b> over {nm(blow.opp)} by {fmt(blow.pts - blow.oppPts, 1)}</span>}
     </div>
   )
 }

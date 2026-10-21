@@ -24,6 +24,20 @@ export function MemberLink({ id, avatar = true }: { id: string | null; avatar?: 
   )
 }
 
+/** Team name for a season with the manager's username underneath (just one line if they match). */
+export function TeamName({ id, season }: { id: string; season?: number }) {
+  const lg = useLeague()
+  const s = season == null ? lg.seasons[0] : lg.seasons.find((x) => x.year === season)
+  const team = s?.teamSeasons.find((t) => t.memberId === id)?.teamName?.trim()
+  const user = lg.memberById[id]?.name ?? 'Unknown'
+  return (
+    <span className="team-name">
+      <b>{team || user}</b>
+      {team && team.toLowerCase() !== user.toLowerCase() && <small>{user}</small>}
+    </span>
+  )
+}
+
 export function Card({ title, sub, children, right }: { title: string; sub?: string; children: ReactNode; right?: ReactNode }) {
   return (
     <section className="card">

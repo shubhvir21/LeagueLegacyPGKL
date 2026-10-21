@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useLeague } from '../lib/data'
 import { fmt, ordinal, pct, record, type Game, type Season as SeasonT, type TeamSeason } from '../lib/stats'
-import { Avatar, Card, MemberLink, RankBadge, Stat, Table, TIPS, type Col } from '../components/ui'
+import { Avatar, Card, MemberLink, RankBadge, Stat, Table, TeamName, TIPS, type Col } from '../components/ui'
 import { signed } from './History'
 
 export function SeasonIndex() {
@@ -123,7 +123,6 @@ function StandingsTable({ s }: { s: SeasonT }) {
 
 export function Bracket({ s, games }: { s: SeasonT; games: Game[] }) {
   const lg = useLeague()
-  const teamName = (id: string) => s.teamSeasons.find((t) => t.memberId === id)?.teamName ?? lg.memberById[id]?.name
   const rounds = [...new Set(games.map((g) => g.week))].sort((a, b) => a - b)
   const roundName = (i: number) => (i === rounds.length - 1 ? 'Finals' : i === rounds.length - 2 ? 'Semifinals' : 'Quarterfinals')
   return (
@@ -134,7 +133,7 @@ export function Bracket({ s, games }: { s: SeasonT; games: Game[] }) {
           {games.filter((g) => g.week === wk).sort((x, y) => (x.place ?? 0) - (y.place ?? 0)).map((g) => (
             <div key={g.a + g.b}>
               {g.place && <div className={`game-label ${g.place === 1 ? 'final' : ''}`}>{g.place === 1 ? 'Championship' : `${ordinal(g.place)} place`}</div>}
-              <GameCard g={g} label={teamName} />
+              <GameCard g={g} />
             </div>
           ))}
         </div>
@@ -145,12 +144,12 @@ export function Bracket({ s, games }: { s: SeasonT; games: Game[] }) {
 
 export function GameCard({ g, label }: { g: Game; label?: (id: string) => string | undefined }) {
   const lg = useLeague()
-  const nm = label ?? ((id: string) => lg.memberById[id]?.name)
+  const nm = (id: string) => (label ? <span>{label(id) ?? lg.memberById[id]?.name}</span> : <TeamName id={id} season={g.season} />)
   const aWin = g.aPts > g.bPts, bWin = g.bPts > g.aPts
   return (
     <div className="game">
-      <Link to={`/member/${g.a}`} className={`game-side ${aWin ? 'win' : ''}`}><Avatar id={g.a} size={20} /> <span>{nm(g.a)}</span><b>{fmt(g.aPts)}</b></Link>
-      <Link to={`/member/${g.b}`} className={`game-side ${bWin ? 'win' : ''}`}><Avatar id={g.b} size={20} /> <span>{nm(g.b)}</span><b>{fmt(g.bPts)}</b></Link>
+      <Link to={`/member/${g.a}`} className={`game-side ${aWin ? 'win' : ''}`}><Avatar id={g.a} size={22} /> {nm(g.a)}<b>{fmt(g.aPts)}</b></Link>
+      <Link to={`/member/${g.b}`} className={`game-side ${bWin ? 'win' : ''}`}><Avatar id={g.b} size={22} /> {nm(g.b)}<b>{fmt(g.bPts)}</b></Link>
     </div>
   )
 }
@@ -158,7 +157,6 @@ export function GameCard({ g, label }: { g: Game; label?: (id: string) => string
 export function WeekMatchups({ s, games }: { s: SeasonT; games: Game[] }) {
   const weeks = [...new Set(games.map((g) => g.week))].sort((a, b) => a - b)
   const [week, setWeek] = useState(weeks.at(-1) ?? 1)
-  const teamName = (id: string) => s.teamSeasons.find((t) => t.memberId === id)?.teamName
   const wk = games.filter((g) => g.week === week)
   return (
     <>
@@ -173,7 +171,7 @@ export function WeekMatchups({ s, games }: { s: SeasonT; games: Game[] }) {
         {wk.map((g) => (
           <div key={g.a + g.b}>
             {g.bracket && <div className="game-label">{g.bracket === 'winners' ? 'Playoffs' : 'Consolation'}</div>}
-            <GameCard g={g} label={teamName} />
+            <GameCard g={g} />
           </div>
         ))}
       </div>

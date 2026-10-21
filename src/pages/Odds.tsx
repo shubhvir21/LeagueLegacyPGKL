@@ -37,7 +37,7 @@ function send(lg: League, req: Omit<OddsRequest, 'id' | 'raw'>, cb: (res: OddsRu
   return id
 }
 
-function useOdds(lg: League, year: number, week: number | null, dragging: boolean) {
+export function useOdds(lg: League, year: number, week: number | null, dragging: boolean, withHistory = true) {
   const [history, setHistory] = useState<OddsRun[] | null>(null)
   const [full, setFull] = useState<OddsRun | null>(null)
   const [busy, setBusy] = useState(false)
@@ -47,8 +47,8 @@ function useOdds(lg: League, year: number, week: number | null, dragging: boolea
     setHistory(null)
     setFull(null)
     send(lg, { kind: 'odds', year }, (res) => setFull((f) => f ?? (res as OddsRun)))
-    send(lg, { kind: 'hist', year }, (res) => setHistory(res as OddsRun[]))
-  }, [lg, year])
+    if (withHistory) send(lg, { kind: 'hist', year }, (res) => setHistory(res as OddsRun[]))
+  }, [lg, year, withHistory])
   useEffect(() => {
     if (dragging || !history || week == null) return
     const w = Math.min(week, history.length - 1)
