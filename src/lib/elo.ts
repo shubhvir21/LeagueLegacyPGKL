@@ -23,9 +23,9 @@ export const BANDS = {
   championship: [200, 300],
 } as const
 export const TIERS = [
-  { name: 'Dynasty', min: 2300 },
-  { name: 'Contender', min: 1950 },
-  { name: 'Average', min: 1600 },
+  { name: 'Dynasty', min: 2200 },
+  { name: 'Contender', min: 1800 },
+  { name: 'Average', min: 1450 },
   { name: 'Rebuilding', min: 0 },
 ]
 export const tierOf = (r: number) => TIERS.find((t) => r >= t.min)!.name
