@@ -12,7 +12,6 @@ export const PALETTE = ['#7c8cff', '#3ddc97', '#f2c35b', '#ff7a8a', '#a78bfa', '
 const STANDINGS_TABS = ['All-Time', 'Playoffs', 'Advanced'] as const
 const SEASON_TABS = ['Champions', 'Chumpions'] as const
 const METRICS = {
-  Elo: { get: (t: TeamSeason) => t.eloEnd, reversed: false },
   'Season Score': { get: (t: TeamSeason) => t.seasonScore, reversed: false },
   'Points Share': { get: (t: TeamSeason) => +t.pointsShare.toFixed(2), reversed: false },
   'Final Rank': { get: (t: TeamSeason) => t.finalRank ?? t.regRank, reversed: true },
@@ -27,7 +26,7 @@ export default function History() {
   const rows = careers(lg)
   const [tab, setTab] = useState<(typeof STANDINGS_TABS)[number]>('All-Time')
   const [seasonTab, setSeasonTab] = useState<(typeof SEASON_TABS)[number]>('Champions')
-  const [metric, setMetric] = useState<Metric>('Elo')
+  const [metric, setMetric] = useState<Metric>('Season Score')
   const winPct = (w: number, l: number, t = 0) => (w + t / 2) / (w + l + t || 1)
   // All-time standings rank (win %, then wins, then points) is locked to each member: sorting by
   // another column reorders the rows but every member keeps their standings number.
@@ -83,9 +82,8 @@ export default function History() {
 
       <TeamRankings lg={lg} />
 
-      <Card title="Season by Season" sub="Champions and leaders for every season.">
-        <Tabs tabs={SEASON_TABS} value={seasonTab} onChange={setSeasonTab} />
-        <SeasonTable lg={lg} mode={seasonTab} />
+      <Card title="Elo Ratings" sub="Every franchise's Elo after every week, all-time. Dashed lines mark the tiers (Dynasty 2201+, Contender 1701–2200, Average 1200–1700, Rebuilding below 1200); each season starts after a 10% pull toward 1750." right={<Tip text={TIPS.elo} />}>
+        <EloChart lg={lg} />
       </Card>
 
       <Card
@@ -100,9 +98,11 @@ export default function History() {
         <TrendChart lg={lg} metric={metric} />
       </Card>
 
-      <Card title="Elo Ratings" sub="Every franchise's Elo after every week, all-time. Dashed lines mark the tiers (Dynasty 2201+, Contender 1701–2200, Average 1200–1700, Rebuilding below 1200); each season starts after a 10% pull toward 1750." right={<Tip text={TIPS.elo} />}>
-        <EloChart lg={lg} />
+      <Card title="Season by Season" sub="Champions and leaders for every season.">
+        <Tabs tabs={SEASON_TABS} value={seasonTab} onChange={setSeasonTab} />
+        <SeasonTable lg={lg} mode={seasonTab} />
       </Card>
+
     </div>
   )
 }
