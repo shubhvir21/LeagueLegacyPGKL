@@ -82,7 +82,7 @@ export default function History() {
 
       <TeamRankings lg={lg} />
 
-      <Card title="Elo Ratings" sub="Every franchise's Elo after every week, all-time. Dashed lines mark the tiers (Dynasty 2801+, Contender 2301–2800, Average 1700–2300, Rebuilding below 1700); each season starts after a 10% pull toward 2000." right={<Tip text={TIPS.elo} />}>
+      <Card title="Elo Ratings" sub="Every franchise's Elo after every week, all-time. Dashed lines mark the tiers (Dynasty 3000+, Contender 2000–2999, Average 1000–1999, Rebuilding below 1000); each season starts after a 10% pull toward 2000." right={<Tip text={TIPS.elo} />}>
         <EloChart lg={lg} />
       </Card>
 

@@ -20,9 +20,9 @@ import type { BracketMatch } from './sleeper'
 
 export const ELO = { start: 2000, min: 0, max: 5000, regress: 0.1, median: 10, marginCap: 60, game: [12, 35] }
 export const TIERS = [
-  { name: 'Dynasty', min: 2801 },
-  { name: 'Contender', min: 2301 },
-  { name: 'Average', min: 1700 },
+  { name: 'Dynasty', min: 3000 },
+  { name: 'Contender', min: 2000 },
+  { name: 'Average', min: 1000 },
   { name: 'Rebuilding', min: 0 },
 ]
 export const tierOf = (r: number) => TIERS.find((t) => r >= t.min)!.name
