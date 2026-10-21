@@ -42,6 +42,8 @@ export interface BracketMatch {
   w: number | null
   l: number | null
   p?: number
+  t1_from?: { w?: number; l?: number }
+  t2_from?: { w?: number; l?: number }
 }
 export interface DraftPick {
   round: number
