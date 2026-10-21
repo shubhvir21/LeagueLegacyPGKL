@@ -189,7 +189,7 @@ export function seasonRange(years: number[]) {
 
 export const signed = (n: number) => (n > 0 ? '+' : '') + fmt(n)
 
-const RANK_TIP = 'Legacy Score (0–100). Dominance 40% (PPG and avg margin incl. playoffs, all-play %) · Finish 25% (1st 100, 2nd 70, 3rd 55 … last 0) · Consistency 15% (weekly floor, median-beat rate) · Regular Season 20% (seed and win %). Everything except Finish is compared against teams from the same season, where 70 = average and about 95 = top 10%.'
+const RANK_TIP = 'Legacy Score (0–100). Dominance 40% (PPG and avg margin incl. playoffs, all-play %) · Finish 25% (1st 100, 2nd 80, 3rd 65 … last 0) · Consistency 15% (weekly floor, median-beat rate) · Regular Season 20% (seed and win %). Everything except Finish is compared against teams from the same season, where 70 = average and about 95 = top 10%.'
 
 function Meter({ v }: { v: number }) {
   return (
@@ -220,7 +220,7 @@ function TeamRankings({ lg }: { lg: League }) {
     { key: 'fin', label: 'Place', render: (r) => <RankFinish r={r} lg={lg} />, sort: (r) => -(r.t.finalRank ?? 99) },
     { key: 'rec', label: 'Record', render: (r) => record(r.t.wins, r.t.losses, r.t.ties), sort: (r) => r.t.wins - r.t.losses / 1000 },
     { key: 'ppg', label: 'PPG', render: (r) => fmt(r.ppg), sort: (r) => r.ppg, align: 'right' },
-    { key: 'fin2', label: 'Finish', render: (r) => <Meter v={Math.round(r.finish)} />, sort: (r) => r.finish, tip: '25% · Final finish: 100 / 70 / 55 / 45 / 35 / 28 / 20 / 12 / 5 / 0.' },
+    { key: 'fin2', label: 'Finish', render: (r) => <Meter v={Math.round(r.finish)} />, sort: (r) => r.finish, tip: '25% · Final finish: 100 / 80 / 65 / 52 / 42 / 33 / 24 / 15 / 7 / 0.' },
     { key: 'reg', label: 'Reg. Season', render: (r) => <Meter v={Math.round(r.regular)} />, sort: (r) => r.regular, tip: '20% · Regular-season seed and win %.' },
     { key: 'dom', label: 'Dominance', render: (r) => <Meter v={Math.round(r.dominance)} />, sort: (r) => r.dominance, tip: '40% · Points per game and average margin (playoffs included), all-play win %.' },
     { key: 'con', label: 'Consistency', render: (r) => <Meter v={Math.round(r.consistency)} />, sort: (r) => r.consistency, tip: '15% · Weekly scoring floor and median-beat rate.' },

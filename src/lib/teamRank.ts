@@ -3,7 +3,7 @@
 // Every part is a 0–100 sub-score, then blended:
 //
 //   Dominance     40%  points-per-game and average margin (playoffs included), and all-play win %
-//   Finish        25%  final finish on a title-weighted scale: 100 / 70 / 55 / 45 / 35 / 28 / 20 / 12 / 5 / 0
+//   Finish        25%  final finish on a title-weighted scale: 100 / 80 / 65 / 52 / 42 / 33 / 24 / 15 / 7 / 0
 //   Consistency   15%  weekly floor (mean − 1 SD of weekly scores) and median-beat rate
 //   Reg. Season   20%  regular-season seed and win % (incl. median games)
 //
@@ -30,7 +30,7 @@ export interface TeamRank {
 }
 
 /** Finish sub-score by place (10 teams); the title is worth a clear step over runner-up. */
-export const FINISH_SCORE = [100, 70, 55, 45, 35, 28, 20, 12, 5, 0]
+export const FINISH_SCORE = [100, 80, 65, 52, 42, 33, 24, 15, 7, 0]
 
 export const WEIGHTS = { dominance: 0.4, finish: 0.25, consistency: 0.15, regular: 0.2 }
 
@@ -86,7 +86,7 @@ export function teamRankings(lg: League): TeamRank[] {
       // Other league sizes: stretch the 10-team scale across the field.
       const finish = s.teams === FINISH_SCORE.length ? FINISH_SCORE[place - 1] : FINISH_SCORE[Math.round(((place - 1) * (FINISH_SCORE.length - 1)) / (s.teams - 1))]
       const regular = toScore(0.5 * zSeed[i] + 0.5 * zWin[i])
-      const dominance = toScore(0.4 * zPpg[i] + 0.35 * zAp[i] + 0.25 * zMargin[i])
+      const dominance = toScore(0.45 * zPpg[i] + 0.4 * zAp[i] + 0.15 * zMargin[i])
       const consistency = toScore(0.6 * zFloor[i] + 0.4 * zMed[i])
       const score =
         WEIGHTS.dominance * dominance + WEIGHTS.finish * finish +
