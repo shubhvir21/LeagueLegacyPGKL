@@ -10,8 +10,8 @@
 // After each playoff week a team holds the average payout of the places it can still finish in,
 // so by the last week everyone holds exactly their finish bonus.
 //
-// Regular-season bonuses, paid after the last regular-season week: final standings and total
-// points for each pay +100 / +75 / +50 / +25 / 0 / 0 / −25 / −50 / −75 / −100 by rank.
+// Regular-season bonuses, paid after the last regular-season week: all-play record (your record
+// had you played every team every week) and total points for each pay +100 / +75 / +50 / +25 / 0 / 0 / −25 / −50 / −75 / −100 by rank.
 //
 // Everyone starts at 2000. Before each new season ratings regress 10% toward 2000. Ratings are
 // kept within 0–5000.
@@ -45,7 +45,7 @@ const gameValue = (margin: number) => ELO.game[0] + (ELO.game[1] - ELO.game[0]) 
 export const FINISH = [400, 250, 150, 100, 50]
 export const finishBonus = (place: number, teams: number) => (place <= teams / 2 ? FINISH[place - 1] ?? 0 : -(FINISH[teams - place] ?? 0))
 
-/** Standings / points-for bonus by rank: the top four earn, the mirror places in the bottom four lose the same. */
+/** All-play / points-for bonus by rank: the top four earn, the mirror places in the bottom four lose the same. */
 export const REG_BONUS = [100, 75, 50, 25]
 export const regBonus = (rank: number, teams: number) => (rank <= teams / 2 ? REG_BONUS[rank - 1] ?? 0 : -(REG_BONUS[teams - rank] ?? 0))
 
@@ -147,11 +147,13 @@ function compute(lg: League): EloResult {
         const line = (sorted[Math.floor(ids.length / 2) - 1] + sorted[Math.floor(ids.length / 2)]) / 2
         ids.forEach((id, i) => { r[id] = clamp(r[id] + (pts[i] > line ? ELO.median : -ELO.median)) })
       }
-      // End of the regular season: standings and points-for bonuses.
+      // End of the regular season: all-play record and points-for bonuses.
       if (week === s.playoffStart - 1 && weeks.includes(week)) {
         const byPf = [...s.teamSeasons].sort((a, b) => b.pf - a.pf)
+        const apPct = (t: (typeof byPf)[number]) => (t.apW + t.apT / 2) / (t.apW + t.apL + t.apT || 1)
+        const byAp = [...s.teamSeasons].sort((a, b) => apPct(b) - apPct(a) || b.pf - a.pf)
         for (const t of s.teamSeasons) {
-          r[t.memberId] = clamp(r[t.memberId] + regBonus(t.regRank, s.teams) + regBonus(byPf.indexOf(t) + 1, s.teams))
+          r[t.memberId] = clamp(r[t.memberId] + regBonus(byAp.indexOf(t) + 1, s.teams) + regBonus(byPf.indexOf(t) + 1, s.teams))
         }
       }
       // Playoff weeks: pay out the finish as the bracket narrows each team's possible places.
