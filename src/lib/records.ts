@@ -69,7 +69,7 @@ export function buildRecords(lg: League): RecordDef[] {
   career('titles', 'Most Championships', 'League titles won.', true, (r) => r.titles, (r) => String(r.titles))
   career('playoffs', 'Most Playoff Appearances', 'Seasons reaching the winners bracket.', true, (r) => r.playoffs, (r) => String(r.playoffs))
   career('pwins', 'Most Playoff Wins', 'Winners-bracket games won.', true, (r) => r.playoffW, (r) => String(r.playoffW))
-  career('elo', 'Highest Elo', 'Current Elo rating (500–3000).', true, (r) => r.elo, (r) => String(r.elo))
+  career('elo', 'Highest Elo', 'Current Elo rating (450–5000).', true, (r) => r.elo, (r) => String(r.elo))
   career('luck', 'Luckiest All-Time', 'Total luck (actual minus expected H2H wins).', true, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)))
   career('unluck', 'Unluckiest All-Time', 'Lowest total luck.', false, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)), true)
   career('highs', 'Most Weekly High Scores', 'Weeks finishing as the top scorer.', true, (r) => careerSum(tsAll, r.member.id, (t) => t.highScores), (r) => String(careerSum(tsAll, r.member.id, (t) => t.highScores)))
@@ -121,8 +121,10 @@ export function buildRecords(lg: League): RecordDef[] {
     top(eloIds, (id) => elo.peak[id]?.rating ?? 0).map((id) => ({ memberId: id, value: elo.peak[id].rating, display: String(elo.peak[id].rating), context: when(elo.peak[id]), link: `/member/${id}` })))
   add('League', 'elo-low', 'Lowest Elo Ever', 'Worst Elo rating ever reached.', false,
     top(eloIds, (id) => elo.low[id]?.rating ?? 9999, true).map((id) => ({ memberId: id, value: elo.low[id].rating, display: String(elo.low[id].rating), context: when(elo.low[id]), link: `/member/${id}` })))
-  add('Matchup', 'elo-gain', 'Biggest Single-Game Elo Gain', 'Most Elo points won in one game.', true,
-    top(elo.games, (g) => g.pts).map((g) => ({ memberId: g.winner, value: g.pts, display: `+${Math.round(g.pts)}`, context: `${g.season} W${g.week} over ${name(g.loser)}${g.kind === 'championship' ? ' (championship)' : g.kind === 'playoff' ? ' (playoffs)' : ''}`, link: `/versus/${g.winner}/${g.loser}` })))
+  const eloWeeks = eloIds.flatMap((id) => elo.history[id].slice(1).map((p, i) => ({ id, p, d: p.rating - elo.history[id][i].rating, prev: elo.history[id][i] })).filter((x) => x.prev.season === x.p.season))
+  const finishOf = (id: string, season: number) => elo.finishes.find((f) => f.memberId === id && f.season === season)
+  add('Matchup', 'elo-gain', 'Biggest Single-Week Elo Gain', 'Most Elo gained in one week (season finales include the finish payout).', true,
+    top(eloWeeks, (x) => x.d).map((x) => { const f = finishOf(x.id, x.p.season); const fin = f && x.p.week === Math.max(...elo.history[x.id].filter((q) => q.season === x.p.season).map((q) => q.week)); return { memberId: x.id, value: x.d, display: `+${x.d}`, context: `${x.p.season} W${x.p.week}${fin ? ` · finished ${f!.place === 1 ? '1st' : f!.place === 2 ? '2nd' : f!.place === 3 ? '3rd' : `${f!.place}th`}` : ''}`, link: `/member/${x.id}` } }))
   const seasonSwing = eloIds.flatMap((id) => [...new Set(elo.history[id].map((p) => p.season))].map((y) => {
     const h = elo.history[id].filter((p) => p.season === y)
     return { id, y, d: h.at(-1)!.rating - h[0].rating }

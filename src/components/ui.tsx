@@ -168,7 +168,7 @@ export const TIPS = {
   luck: 'Actual head-to-head wins minus expected wins from all-play. Positive = lucky.',
   sos: 'Strength of schedule: average points scored by your opponents per game.',
   share: "Your share of all regular-season points scored in the league.",
-  elo: 'Elo (500–3000, everyone starts at 1750): winners take points from losers every game. Regular season 12–35, playoff win 70–150, championship 200–300 — more for bigger margins, capped at a 60-point win. Median games ±10. Toilet bowl: losing a toilet-path game costs 70–150, losing the final costs 200–300 (winners get regular-season points). 5th- and 7th-place consolation games count as regular games. Ratings regress 10% toward 1750 each offseason.',
+  elo: 'Elo (450–5000, everyone starts at 1750). Every game, playoffs included, moves 12–35 points from loser to winner by margin (capped at a 60-point win); median games ±10. At season end, final finish pays out mirrored: 1st +450 / 10th −450, 2nd +225 / 9th −225, 3rd +150 / 8th −150, 4th +113 / 7th −113, 5th +90 / 6th −90. Ratings regress 10% toward 1750 each offseason.',
   score: 'Season score (0–100): 30% win %, 30% all-play %, 20% points share, 20% final finish.',
   coach: 'Points scored ÷ max possible points from your roster (optimal lineups).',
   median: 'This league plays the median every week: beating the median is a win.',

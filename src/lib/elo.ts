@@ -1,29 +1,19 @@
 // Franchise Elo: a long-term, points-based rating that carries across seasons.
 //
-// Every game moves points from the loser to the winner. Who you beat doesn't matter (no upset
-// bonus); how much you won by does, scaling linearly up to a 60-point margin:
+// Games: every game — regular season, playoffs, toilet bowl — moves points from the loser to the
+// winner. Who you beat doesn't matter (no upset bonus); how much you won by does: 12 → 35,
+// scaling linearly up to a 60-point margin. Median games: ±10 for finishing above / below the
+// weekly median.
 //
-//   Regular season                 12 → 35
-//   Winners-bracket playoff game    70 → 150
-//   Championship                   200 → 300
-//   Median game                    ±10 for finishing above / below the weekly median
-//
-// The toilet bowl punishes the loser only: losing a toilet-path game costs as much as a
-// playoff win earns (70 → 150), losing the toilet bowl final as much as the championship
-// (200 → 300). The winner of those games gets regular-season points. Consolation games — the
-// 5th-place game and the 7th-place game between the teams that escaped the toilet — count as
-// regular games.
+// Finish: when a season ends, final placement pays out on a mirrored, zero-sum scale. With X the
+// champion's bonus, place p in the top half earns X / p and the mirror place in the bottom half
+// loses the same (10 teams: 1st +450 / 10th −450, 2nd +225 / 9th −225, 3rd +150 / 8th −150, …).
 //
 // Everyone starts at 1750. Before each new season ratings regress 10% toward 1750. Ratings are
-// kept within 500–3000.
-import type { League } from './stats'
+// kept within 450–5000.
+import type { League, Season } from './stats'
 
-export const ELO = { start: 1750, min: 500, max: 3000, regress: 0.1, median: 10, marginCap: 60 }
-export const BANDS = {
-  regular: [12, 35],
-  playoff: [70, 150],
-  championship: [200, 300],
-} as const
+export const ELO = { start: 1750, min: 450, max: 5000, regress: 0.1, median: 10, marginCap: 60, game: [12, 35], champion: 450 }
 export const TIERS = [
   { name: 'Dynasty', min: 2200 },
   { name: 'Contender', min: 1800 },
@@ -33,28 +23,50 @@ export const TIERS = [
 export const tierOf = (r: number) => TIERS.find((t) => r >= t.min)!.name
 
 export interface EloPoint { season: number; week: number; rating: number }
-export interface EloGame { season: number; week: number; winner: string; loser: string; margin: number; pts: number; lost: number; kind: keyof typeof BANDS | 'toilet' | 'toilet-final' }
+export interface EloGame { season: number; week: number; winner: string; loser: string; margin: number; pts: number; playoff: boolean }
+export interface EloFinish { season: number; memberId: string; place: number; pts: number }
 export interface EloResult {
   current: Record<string, number>
   history: Record<string, EloPoint[]>
   games: EloGame[]
+  finishes: EloFinish[]
   peak: Record<string, EloPoint>
   low: Record<string, EloPoint>
 }
 
 const clamp = (r: number) => Math.max(ELO.min, Math.min(ELO.max, r))
-const value = (kind: keyof typeof BANDS, margin: number) => {
-  const [lo, hi] = BANDS[kind]
-  return lo + (hi - lo) * Math.min(1, Math.abs(margin) / ELO.marginCap)
-}
+const gameValue = (margin: number) => ELO.game[0] + (ELO.game[1] - ELO.game[0]) * Math.min(1, Math.abs(margin) / ELO.marginCap)
+/** Mirrored finish bonus: top half earns X / place, bottom half loses X / (mirror place). */
+export const finishBonus = (place: number, teams: number) => (place <= teams / 2 ? ELO.champion / place : -ELO.champion / (teams + 1 - place))
 
-// The toilet bowl final is the last losers-bracket round, the game with the last-place team.
-const isToiletFinal = (g: { week: number }, s: { playoffStart: number }) => g.week - s.playoffStart >= 1
+/** Final placement 1..N for a finished season, from the playoff games themselves. */
+export function placements(lg: League, s: Season): Record<string, number> {
+  const out: Record<string, number> = {}
+  const gs = lg.games.filter((g) => g.season === s.year && g.playoff)
+  const wl = (g: (typeof gs)[number]) => (g.aPts >= g.bPts ? [g.a, g.b] : [g.b, g.a])
+  // Winners bracket: championship → 1/2, 3rd-place game → 3/4, 5th-place game → 5/6.
+  for (const [place, hi] of [[1, 1], [3, 3], [5, 5]] as const) {
+    const g = gs.find((x) => x.bracket === 'winners' && x.place === place)
+    if (g) { const [w, l] = wl(g); out[w] = hi; out[l] = hi + 1 }
+  }
+  // Toilet bowl (lower score advances): the final's loser is last, the other finalist next to
+  // last; the game between the teams that escaped decides the two places above that.
+  const late = gs.filter((x) => x.bracket === 'losers' && x.week > s.playoffStart)
+  for (const g of late) {
+    if (g.a === s.toiletBowlLoser || g.b === s.toiletBowlLoser) { out[s.toiletBowlLoser!] = s.teams; out[g.a === s.toiletBowlLoser ? g.b : g.a] = s.teams - 1 }
+    else { const [w, l] = wl(g); out[w] = s.teams - 3; out[l] = s.teams - 2 }
+  }
+  // Anyone the bracket didn't place keeps their regular-season rank order in the open spots.
+  const open = Array.from({ length: s.teams }, (_, i) => i + 1).filter((p) => !Object.values(out).includes(p))
+  for (const t of [...s.teamSeasons].filter((t) => out[t.memberId] == null).sort((a, b) => a.regRank - b.regRank)) out[t.memberId] = open.shift()!
+  return out
+}
 
 function compute(lg: League): EloResult {
   const r: Record<string, number> = {}
   const history: Record<string, EloPoint[]> = {}
   const games: EloGame[] = []
+  const finishes: EloFinish[] = []
   for (const s of [...lg.seasons].sort((a, b) => a.year - b.year)) {
     for (const id of Object.keys(r)) r[id] = ELO.start + (1 - ELO.regress) * (r[id] - ELO.start)
     const ids = s.teamSeasons.map((t) => t.memberId)
@@ -65,22 +77,17 @@ function compute(lg: League): EloResult {
     const raw = lg.raw.seasons.find((x) => Number(x.league.season) === s.year)
     const median = Number(raw?.league.settings.league_average_match ?? 0) === 1
     const sg = lg.games.filter((g) => g.season === s.year && (g.aPts > 0 || g.bPts > 0))
-    for (const week of [...new Set(sg.map((g) => g.week))].sort((a, b) => a - b)) {
+    const weeks = [...new Set(sg.map((g) => g.week))].sort((a, b) => a - b)
+    for (const week of weeks) {
       const wk = sg.filter((g) => g.week === week)
       for (const g of wk) {
         if (g.aPts === g.bPts) continue
         const [winner, loser] = g.aPts > g.bPts ? [g.a, g.b] : [g.b, g.a]
         const margin = Math.abs(g.aPts - g.bPts)
-        let kind: EloGame['kind'] = 'regular'
-        const toiletLate = isToiletFinal(g, s), inToiletFinal = g.a === s.toiletBowlLoser || g.b === s.toiletBowlLoser
-        // Consolation games (5th place, and 7th place between the teams that escaped the toilet) are regular games.
-        if (g.playoff && g.bracket === 'winners') kind = g.place === 1 ? 'championship' : g.place === 5 ? 'regular' : 'playoff'
-        else if (g.playoff && g.bracket === 'losers') kind = !toiletLate ? 'toilet' : inToiletFinal ? 'toilet-final' : 'regular'
-        const pts = value(kind === 'toilet' || kind === 'toilet-final' ? 'regular' : kind, margin)
-        const lost = kind === 'toilet' ? value('playoff', margin) : kind === 'toilet-final' ? value('championship', margin) : pts
+        const pts = gameValue(margin)
         r[winner] = clamp(r[winner] + pts)
-        r[loser] = clamp(r[loser] - lost)
-        games.push({ season: s.year, week, winner, loser, margin, pts, lost, kind })
+        r[loser] = clamp(r[loser] - pts)
+        games.push({ season: s.year, week, winner, loser, margin, pts, playoff: g.playoff })
       }
       // Median game: above the weekly median gains, below it loses.
       if (median && !wk.some((g) => g.playoff)) {
@@ -88,6 +95,14 @@ function compute(lg: League): EloResult {
         const sorted = [...pts].sort((a, b) => b - a)
         const line = (sorted[Math.floor(ids.length / 2) - 1] + sorted[Math.floor(ids.length / 2)]) / 2
         ids.forEach((id, i) => { r[id] = clamp(r[id] + (pts[i] > line ? ELO.median : -ELO.median)) })
+      }
+      // Season finale: pay out final placements.
+      if (s.complete && week === weeks.at(-1)) {
+        for (const [id, place] of Object.entries(placements(lg, s))) {
+          const pts = finishBonus(place, s.teams)
+          r[id] = clamp(r[id] + pts)
+          finishes.push({ season: s.year, memberId: id, place, pts })
+        }
       }
       for (const id of ids) history[id].push({ season: s.year, week, rating: Math.round(r[id]) })
     }
@@ -98,7 +113,7 @@ function compute(lg: League): EloResult {
     peak[id] = pts.reduce((a, p) => (p.rating > a.rating ? p : a), pts[0] ?? h[0])
     low[id] = pts.reduce((a, p) => (p.rating < a.rating ? p : a), pts[0] ?? h[0])
   }
-  return { current: Object.fromEntries(Object.entries(r).map(([id, v]) => [id, Math.round(v)])), history, games, peak, low }
+  return { current: Object.fromEntries(Object.entries(r).map(([id, v]) => [id, Math.round(v)])), history, games, finishes, peak, low }
 }
 
 const cache = new WeakMap<League, EloResult>()
