@@ -29,8 +29,13 @@ export default function History() {
   const [seasonTab, setSeasonTab] = useState<(typeof SEASON_TABS)[number]>('Champions')
   const [metric, setMetric] = useState<Metric>('Elo')
   const winPct = (w: number, l: number, t = 0) => (w + t / 2) / (w + l + t || 1)
+  // All-time standings rank (win %, then wins, then points) is locked to each member: sorting by
+  // another column reorders the rows but every member keeps their standings number.
+  const standing = Object.fromEntries([...rows]
+    .sort((a, b) => winPct(b.wins, b.losses, b.ties) - winPct(a.wins, a.losses, a.ties) || b.wins - a.wins || b.pf - a.pf)
+    .map((r, i) => [r.member.id, i + 1]))
   const base: Col<CareerRow>[] = [
-    { key: 'rank', label: '#', render: (_r, i) => i + 1 },
+    { key: 'rank', label: '#', render: (r) => <b>{standing[r.member.id]}</b>, sort: (r) => -standing[r.member.id], tip: 'All-time standings rank: win %, then wins, then points. It stays with each member when you sort by another column.' },
     { key: 'team', label: 'Member', render: (r) => <MemberLink id={r.member.id} />, sort: (r) => r.member.name.toLowerCase() },
   ]
   const seasonsCol: Col<CareerRow> = { key: 'seasons', label: 'Seasons', render: (r) => `${seasonRange(r.seasons)} (${r.seasons.length})`, sort: (r) => r.seasons.length }
@@ -73,7 +78,7 @@ export default function History() {
         sub="Every manager's all-time numbers. Click a column header to sort; click again to flip high/low."
       >
         <Tabs tabs={STANDINGS_TABS} value={tab} onChange={setTab} />
-        <Table key={tab} rows={rows} cols={cols[tab]} initialSort={{ 'All-Time': 'elo', Playoffs: 'apps', Advanced: 'ppg' }[tab]} rowKey={(r) => r.member.id} />
+        <Table key={tab} rows={rows} cols={cols[tab]} initialSort="rank" rowKey={(r) => r.member.id} />
       </Card>
 
       <TeamRankings lg={lg} />
