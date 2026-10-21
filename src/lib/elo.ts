@@ -13,16 +13,16 @@
 // Regular-season bonuses, paid after the last regular-season week: final standings and total
 // points for each pay +100 / +75 / +50 / +25 / 0 / 0 / −25 / −50 / −75 / −100 by rank.
 //
-// Everyone starts at 1750. Before each new season ratings regress 10% toward 1750. Ratings are
-// kept within 450–5000.
+// Everyone starts at 2000. Before each new season ratings regress 10% toward 2000. Ratings are
+// kept within 0–5000.
 import type { League, Season } from './stats'
 import type { BracketMatch } from './sleeper'
 
-export const ELO = { start: 1750, min: 450, max: 5000, regress: 0.1, median: 10, marginCap: 60, game: [12, 35] }
+export const ELO = { start: 2000, min: 0, max: 5000, regress: 0.1, median: 10, marginCap: 60, game: [12, 35] }
 export const TIERS = [
-  { name: 'Dynasty', min: 2201 },
-  { name: 'Contender', min: 1701 },
-  { name: 'Average', min: 1200 },
+  { name: 'Dynasty', min: 2801 },
+  { name: 'Contender', min: 2301 },
+  { name: 'Average', min: 1700 },
   { name: 'Rebuilding', min: 0 },
 ]
 export const tierOf = (r: number) => TIERS.find((t) => r >= t.min)!.name
