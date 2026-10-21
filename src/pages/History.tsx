@@ -95,7 +95,7 @@ export default function History() {
         <TrendChart lg={lg} metric={metric} />
       </Card>
 
-      <Card title="Elo Ratings" sub="Every franchise's Elo after every week, all-time. Dashed lines mark the tiers (Dynasty 2200, Contender 1800, Average 1450); each season starts after a 10% pull toward 1750." right={<Tip text={TIPS.elo} />}>
+      <Card title="Elo Ratings" sub="Every franchise's Elo after every week, all-time. Dashed lines mark the tiers (Dynasty 2201+, Contender 1701–2200, Average 1200–1700, Rebuilding below 1200); each season starts after a 10% pull toward 1750." right={<Tip text={TIPS.elo} />}>
         <EloChart lg={lg} />
       </Card>
     </div>

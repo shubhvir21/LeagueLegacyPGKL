@@ -14,9 +14,9 @@ import type { League, Season } from './stats'
 
 export const ELO = { start: 1750, min: 450, max: 5000, regress: 0.1, median: 10, marginCap: 60, game: [12, 35] }
 export const TIERS = [
-  { name: 'Dynasty', min: 2200 },
-  { name: 'Contender', min: 1800 },
-  { name: 'Average', min: 1450 },
+  { name: 'Dynasty', min: 2201 },
+  { name: 'Contender', min: 1701 },
+  { name: 'Average', min: 1200 },
   { name: 'Rebuilding', min: 0 },
 ]
 export const tierOf = (r: number) => TIERS.find((t) => r >= t.min)!.name
