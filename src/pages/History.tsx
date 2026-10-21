@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
 import { careers, fmt, pct, record, type CareerRow, type League, type Season, type TeamSeason } from '../lib/stats'
 import { Avatar, Card, MemberLink, Table, Tabs, Tip, Trophies, TIPS, type Col } from '../components/ui'
-import { franchiseElo, tierOf, TIERS } from '../lib/elo'
 import { teamRankings, type TeamRank } from '../lib/teamRank'
 
 export const PALETTE = ['#7c8cff', '#3ddc97', '#f2c35b', '#ff7a8a', '#a78bfa', '#5ec8f2', '#ff9f5a', '#c6e66b', '#f0abfc', '#8a93a6', '#4fd1c5', '#e8b4b8']
@@ -82,10 +81,6 @@ export default function History() {
 
       <TeamRankings lg={lg} />
 
-      <Card title="Elo Ratings" sub="Every franchise's Elo after every week, all-time. Dashed lines mark the tiers (Dynasty 3000+, Contender 2000–2999, Average 1000–1999, Rebuilding below 1000); each season starts after a 10% pull toward 2000." right={<Tip text={TIPS.elo} />}>
-        <EloChart lg={lg} />
-      </Card>
-
       <Card
         title="Trends"
         sub="How each member has trended season over season."
@@ -104,45 +99,6 @@ export default function History() {
       </Card>
 
     </div>
-  )
-}
-
-function EloChart({ lg }: { lg: League }) {
-  const e = franchiseElo(lg)
-  const ids = Object.entries(e.current).sort((a, b) => b[1] - a[1]).map(([id]) => id)
-  const keys = [...new Set(Object.values(e.history).flat().map((p) => p.season * 100 + p.week))].sort((a, b) => a - b)
-  const data = keys.map((k) => {
-    const season = Math.floor(k / 100), week = k % 100
-    const row: Record<string, number | string | null> = { key: week === 0 ? `${season}` : `${String(season).slice(2)} W${week}`, season }
-    for (const id of ids) row[id] = e.history[id]?.find((p) => p.season === season && p.week === week)?.rating ?? null
-    return row
-  })
-  const starts = data.filter((d) => !String(d.key).includes('W')).map((d) => d.key as string)
-  return (
-    <>
-      <div className="elo-chips">
-        {ids.map((id, i) => (
-          <Link key={id} to={`/member/${id}`} className="elo-chip">
-            <span className="muted">{i + 1}</span><Avatar id={id} size={18} /><span>{lg.memberById[id]?.name}</span>
-            <b>{e.current[id]}</b><span className={`tier-tag ${tierOf(e.current[id]).toLowerCase()}`}>{tierOf(e.current[id])}</span>
-          </Link>
-        ))}
-      </div>
-      <ResponsiveContainer width="100%" height={380}>
-        <LineChart data={data} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke="var(--grid)" vertical={false} />
-          <XAxis dataKey="key" stroke="var(--muted)" ticks={starts} interval={0} />
-          <YAxis stroke="var(--muted)" domain={[(m: number) => Math.floor((m - 25) / 250) * 250, (m: number) => Math.ceil((m + 25) / 250) * 250]} tickCount={8} allowDecimals={false} width={48} />
-          {starts.map((s) => <ReferenceLine key={s} x={s} stroke="var(--border-strong)" />)}
-          {TIERS.filter((t) => t.min > 0).map((t) => <ReferenceLine key={t.name} y={t.min} stroke="var(--muted)" strokeDasharray="4 4" label={{ value: t.name, position: 'insideTopLeft', fill: 'var(--muted)', fontSize: 10 }} />)}
-          <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }} itemSorter={(item) => -Number(item.value ?? 0)} />
-          <Legend />
-          {ids.map((id, i) => (
-            <Line key={id} dataKey={id} name={lg.memberById[id]?.name} stroke={PALETTE[i % PALETTE.length]} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
-    </>
   )
 }
 

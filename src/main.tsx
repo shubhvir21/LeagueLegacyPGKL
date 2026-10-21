@@ -4,6 +4,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { DataProvider } from './lib/data'
 import Layout from './components/Layout'
 import History from './pages/History'
+import Elo from './pages/Elo'
 import Season, { SeasonIndex, TeamSeason } from './pages/Season'
 import Member, { Members } from './pages/Member'
 import Versus, { VersusDetail } from './pages/Versus'
@@ -40,6 +41,7 @@ createRoot(document.getElementById('root')!).render(
           <Route element={<Layout />}>
             <Route index element={<Home />} />
             <Route path="history" element={<History />} />
+            <Route path="elo" element={<Elo />} />
             <Route path="schedule" element={<Schedule />} />
             <Route path="management" element={<Management />} />
             <Route path="rules" element={<Rules />} />

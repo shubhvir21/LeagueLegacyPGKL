@@ -802,3 +802,7 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
 .tier-tag.average { background: rgba(255, 255, 255, .06); color: var(--text-2); }
 .tier-tag.rebuilding { background: rgba(255, 122, 138, .14); color: var(--neg); }
 @media (max-width: 640px) { .elo-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); } .elo-chip { white-space: nowrap; } }
+
+.elo-rules { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--text-2); line-height: 1.5; }
+.elo-rules b { color: var(--text); }
+button.elo-chip { font: inherit; }

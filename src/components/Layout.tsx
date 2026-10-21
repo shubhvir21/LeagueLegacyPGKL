@@ -10,6 +10,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { to: '/', label: 'Home', icon: 'home', end: true },
       { to: '/history', label: 'History', icon: 'history' },
+      { to: '/elo', label: 'Elo Ratings', icon: 'trendUp' },
       { to: '/seasons', label: 'Seasons', icon: 'calendar', also: '/season/' },
       { to: '/members', label: 'Members', icon: 'users', also: '/member/' },
       { to: '/schedule', label: 'Schedule', icon: 'clock' },
