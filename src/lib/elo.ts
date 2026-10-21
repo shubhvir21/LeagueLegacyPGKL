@@ -8,9 +8,11 @@
 //   Championship                   200 → 300
 //   Median game                    ±10 for finishing above / below the weekly median
 //
-// The toilet bowl punishes the loser only: losing a losers-bracket game costs as much as a
+// The toilet bowl punishes the loser only: losing a toilet-path game costs as much as a
 // playoff win earns (70 → 150), losing the toilet bowl final as much as the championship
-// (200 → 300). The winner of those games gets regular-season points.
+// (200 → 300). The winner of those games gets regular-season points. Consolation games — the
+// 5th-place game and the 7th-place game between the teams that escaped the toilet — count as
+// regular games.
 //
 // Everyone starts at 1750. Before each new season ratings regress 10% toward 1750. Ratings are
 // kept within 500–3000.
@@ -70,8 +72,10 @@ function compute(lg: League): EloResult {
         const [winner, loser] = g.aPts > g.bPts ? [g.a, g.b] : [g.b, g.a]
         const margin = Math.abs(g.aPts - g.bPts)
         let kind: EloGame['kind'] = 'regular'
-        if (g.playoff && g.bracket === 'winners') kind = g.place === 1 ? 'championship' : 'playoff'
-        else if (g.playoff && g.bracket === 'losers') kind = isToiletFinal(g, s) && (g.a === s.toiletBowlLoser || g.b === s.toiletBowlLoser) ? 'toilet-final' : 'toilet'
+        const toiletLate = isToiletFinal(g, s), inToiletFinal = g.a === s.toiletBowlLoser || g.b === s.toiletBowlLoser
+        // Consolation games (5th place, and 7th place between the teams that escaped the toilet) are regular games.
+        if (g.playoff && g.bracket === 'winners') kind = g.place === 1 ? 'championship' : g.place === 5 ? 'regular' : 'playoff'
+        else if (g.playoff && g.bracket === 'losers') kind = !toiletLate ? 'toilet' : inToiletFinal ? 'toilet-final' : 'regular'
         const pts = value(kind === 'toilet' || kind === 'toilet-final' ? 'regular' : kind, margin)
         const lost = kind === 'toilet' ? value('playoff', margin) : kind === 'toilet-final' ? value('championship', margin) : pts
         r[winner] = clamp(r[winner] + pts)
