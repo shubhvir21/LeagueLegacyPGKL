@@ -16,6 +16,8 @@ export function FranchiseProfile({ id }: { id: string }) {
   const rank = table.findIndex((x) => x.memberId === id) + 1
   const name = lg.memberById[id]?.name ?? '?'
   const team = lg.seasons[0].teamSeasons.find((t) => t.memberId === id)?.teamName
+  const owners = ownership(lg, id)
+  const since = owners.at(-1)!
   const est = Math.min(...lg.seasons.filter((s) => s.teamSeasons.some((t) => t.memberId === id)).map((s) => s.year))
 
   return (
@@ -26,7 +28,8 @@ export function FranchiseProfile({ id }: { id: string }) {
           <Avatar id={id} size={64} />
           <div>
             <h2 className="forbes-name">{team ?? name}</h2>
-            <div className="muted">Owner: <b>{name}</b> · Est. {est}</div>
+            <div className="muted">Owner: <b>{name}</b>{owners.length > 1 && ` since ${since.from}`} · Est. {est}</div>
+            {owners.length > 1 && <div className="muted small">Previously: {owners.slice(0, -1).map((o) => `${o.name} (${o.from === o.to ? o.from : `${o.from}–${o.to}`})`).join(', ')}</div>}
           </div>
         </div>
       </div>
@@ -87,6 +90,25 @@ export function FranchiseProfile({ id }: { id: string }) {
 
 function Fact({ k, v }: { k: string; v: string }) {
   return <div className="fact"><dt>{k}</dt><dd>{v}</dd></div>
+}
+
+/** Who actually ran this franchise each season (takeovers are merged into the current owner). */
+export function ownership(lg: League, id: string) {
+  const runs: { who: string; name: string; from: number; to: number }[] = []
+  for (const s of [...lg.raw.seasons].sort((a, b) => Number(a.league.season) - Number(b.league.season))) {
+    const year = Number(s.league.season)
+    const r = s.rosters.find((x) => lg.rosterOwner[year]?.[x.roster_id] === id)
+    if (!r) continue
+    const name = r.owner_id ? s.users.find((u) => u.user_id === r.owner_id)?.display_name ?? 'unknown' : 'an absentee owner'
+    // Compare accounts, not names, so a display-name change isn't a takeover.
+    const who = r.owner_id ?? `orphan-${r.roster_id}`
+    const last = runs.at(-1)
+    if (last && last.who === who) { last.to = year; last.name = name }
+    else runs.push({ who, name, from: year, to: year })
+  }
+  // The current owner's own display name wins for their run.
+  if (runs.length) runs[runs.length - 1].name = lg.memberById[id]?.name ?? runs[runs.length - 1].name
+  return runs
 }
 
 /** A short, data-driven writeup in the voice of a sports-business column that has seen too much. */
@@ -152,6 +174,17 @@ function take(lg: League, id: string, v: Valuation, hist: Valuation[], rank: num
   if (spend <= 0.4) parts.push(`Spends just ${Math.round(spend * 100)}% of FAAB a season, presumably saving it for something. Nobody knows what. Possibly retirement.`)
   if (trades >= 20) parts.push(`${trades} trades on record; league members now let the calls go to voicemail.`)
   if (toilets.length) parts.push(`The ${toilets.join(' and ')} toilet-bowl ${toilets.length > 1 ? 'losses have' : 'loss has'} been scrubbed from the media guide, but not from anyone's memory.`)
+
+  // New management: the history (and the value) mostly belongs to someone else.
+  const owners = ownership(lg, id)
+  if (owners.length > 1) {
+    const cur = owners.at(-1)!, prev = owners.at(-2)!
+    const inherited = mine.filter((x) => x.s.year < cur.from).length
+    const own = mine.length - inherited
+    const who = prev.name === 'an absentee owner' ? 'an absentee owner, who set lineups with the enthusiasm of an unplugged toaster' : prev.name
+    if (!own) parts.push(`New management alert: ${lg.memberById[id]?.name} took over in ${cur.from} from ${who}, so every number above belongs to the previous regime. The new owner inherited the brand, the debts and the group-chat reputation, and has yet to complete a season. Expect volatility: the valuation is basically a guess with a logo.`)
+    else parts.push(`Under new management since ${cur.from}, taking over from ${who}. ${inherited} of the ${mine.length} seasons on the books predate the current owner, so the valuation is still partly a referendum on someone else's decisions${own >= inherited ? ', though the new regime now owns most of the résumé' : ''}.`)
+  }
 
   // Sign-off: best and worst pillar
   if (best.score - worst.score >= 25 && worst.score < 45 && !(worst.key === 'office' && p.office <= 35)) parts.push(`Biggest asset: ${best.label.toLowerCase()}. Biggest liability: ${worst.label.toLowerCase()}. Consultants have been hired. Consultants have quit.`)
