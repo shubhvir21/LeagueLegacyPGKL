@@ -806,3 +806,9 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
 .elo-rules { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--text-2); line-height: 1.5; }
 .elo-rules b { color: var(--text); }
 button.elo-chip { font: inherit; }
+
+.forbes-pillars { display: grid; }
+.split-row.pillar-row { grid-template-columns: 170px 1fr 36px minmax(0, 240px); }
+.pillar-row b { text-align: right; font-variant-numeric: tabular-nums; }
+.pillar-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) { .split-row.pillar-row { grid-template-columns: 120px 1fr 32px; } .pillar-detail { grid-column: 1 / -1; margin-top: -4px; } }

@@ -21,7 +21,7 @@ export function Members() {
       <div className="page-head">
         <div>
           <h1>Members</h1>
-          <p className="muted">Ranked by franchise valuation{year ? ` · as of the end of ${year}` : ''}.</p>
+          <p className="muted">Ranked by franchise value: skill, trophies, sustained success, legacy, momentum and front office{year ? ` · as of the end of ${year}` : ''}.</p>
         </div>
       </div>
       <div className="member-grid">
@@ -34,6 +34,7 @@ export function Members() {
               <Avatar id={v.memberId} size={56} />
               <div className="member-card-name">{r.member.name}</div>
               <div className="valuation">{money(v.value)}</div>
+              <div className="muted small">Index {v.index.toFixed(1)}</div>
               {v.change != null && <span className={`yoy ${v.change >= 0 ? 'up' : 'down'}`}>{v.change >= 0 ? '▲' : '▼'} {Math.abs(v.change).toFixed(1)}%</span>}
               <div className="muted small">{seasonRange(r.seasons)} · {record(r.wins, r.losses, r.ties)}</div>
               <Trophies gold={r.titles} silver={r.seconds} bronze={r.thirds} />

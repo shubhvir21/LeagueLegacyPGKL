@@ -1,128 +1,133 @@
-// Franchise Valuation — a Forbes-style "what is this team worth" model.
+// Franchise Valuation — what each franchise is worth, built from real fantasy results.
 //
-// Like real sports valuations, value = trailing revenue × a market multiple.
-// Only completed seasons count, and the valuation is recomputed after each one so
-// every franchise has a value history and a year-over-year change.
+// After every completed season each franchise gets a Franchise Index (0–100) from six pillars,
+// each scored against the other franchises active at that point (50 + 20·z, clamped 0–100):
 //
-// REVENUE (per completed season, $M)
-//   Media rights         $180M flat — every franchise gets the same TV deal
-//   Gate & local         $3.5M per win (incl. median wins)
-//   Playoff gate         $15M for qualifying + $12M per playoff win
-//   Prize & sponsorship  $60M title, $25M runner-up, $10M third
-//   Star power           (PPG − league avg) × $2.2M, plus 4% of roster value over replacement
-//   Payroll (cost)       FAAB spent as % of budget × $20M (subtracted → operating income)
-//   Trailing revenue = recency-weighted average of seasons (5 / 3 / 2 / 1 …)
+//   Skill              40%  Elo rating at the end of the season
+//   Trophy cabinet     30%  title 10 · runner-up 4 · third 2 · #1 seed 2 · points leader 2 · last −2
+//   Sustained success  10%  playoff rate, average finish, career all-play % and win %
+//   Legacy             10%  best single-season Team Rankings score, and seasons scored 85+
+//   Momentum            5%  that season's Team Rankings score and Elo change over the season
+//   Front office        5%  average Manager Score and lineup (coach) score
 //
-// MULTIPLE (×, clamped 4–14) — starts at 7.0
-//   Trophy case    +1.2 per title, +0.4 per runner-up
-//   Pedigree       +2.0 × (playoff rate − 50%)
-//   Momentum       +0.06 per point of Franchise Form above 50
-//   Front office   +0.04 per point of avg Manager Score above 50
-//   Stigma         −0.5 per last place, −0.3 per toilet-bowl loss
-//
-// VALUE = trailing revenue × multiple, smoothed: 65% this year's model + 35% last year's
-// value grown 5% (franchise values don't halve overnight). Debt/value is a joke stat.
+// The index is smoothed (70% this season, 30% last) so values don't lurch, then converted:
+//   value = ($500M + index × $40M) × 1.07^(seasons since the league began)
+import { franchiseElo } from './elo'
 import { teamRankings } from './teamRank'
 import { managementCached } from './management'
 import type { League } from './stats'
 
-export interface RevenueLine { label: string; amount: number }
+export interface Pillar { key: string; label: string; weight: number; score: number; detail: string }
 export interface Valuation {
   memberId: string
   year: number // value as of the end of this season
   value: number // $M
-  revenue: number // trailing revenue, $M
-  operatingIncome: number // $M
-  multiple: number
+  index: number // 0–100, smoothed
   change: number | null // year-over-year %, null for first valued season
-  revenueLines: RevenueLine[] // latest season breakdown
-  multipleLines: RevenueLine[]
-  debtPct: number
+  pillars: Pillar[]
+  elo: number
   titles: number
   playoffRate: number
-  rating: number
+  avgFinish: number
+  bestSeason: number
+  managerScore: number
 }
 
-const RECENCY = [5, 3, 2]
+export const PILLARS = [
+  { key: 'skill', label: 'Skill', weight: 0.4 },
+  { key: 'trophies', label: 'Trophy cabinet', weight: 0.3 },
+  { key: 'sustained', label: 'Sustained success', weight: 0.1 },
+  { key: 'legacy', label: 'Legacy', weight: 0.1 },
+  { key: 'momentum', label: 'Momentum', weight: 0.05 },
+  { key: 'office', label: 'Front office', weight: 0.05 },
+] as const
+const TROPHY = { title: 10, second: 4, third: 2, seed: 2, points: 2, last: -2 }
+const BASE = 500, PER_POINT = 40, GROWTH = 1.07, SMOOTH = 0.7
+
+const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0)
+/** Score each value against its peers: 50 is average, ±1 SD is ±20, clamped 0–100. */
+function peer(values: number[]) {
+  const mean = avg(values)
+  const sd = Math.sqrt(avg(values.map((v) => (v - mean) ** 2))) || 1
+  return values.map((v) => Math.max(0, Math.min(100, 50 + (20 * (v - mean)) / sd)))
+}
 
 export function valuations(lg: League): Record<string, Valuation[]> {
+  const elo = franchiseElo(lg)
   const ranks = teamRankings(lg)
+  const mgmt = managementCached(lg).filter((r) => !r.inProgress)
   const done = [...lg.seasons].filter((s) => s.complete).sort((a, b) => a.year - b.year)
-  const rawRoster = (year: number, rosterId: number) =>
-    lg.raw.seasons.find((s) => Number(s.league.season) === year)?.rosters.find((r) => r.roster_id === rosterId)
-  const budget = (year: number) => Number(lg.raw.seasons.find((s) => Number(s.league.season) === year)?.league.settings.waiver_budget ?? 100) || 100
-
-  // Per-season revenue lines
-  const season: Record<string, Record<number, { lines: RevenueLine[]; total: number; payroll: number }>> = {}
-  for (const s of done) {
-    const leaguePpg = s.teamSeasons.reduce((a, t) => a + t.pf / (t.games || 1), 0) / s.teamSeasons.length
-    for (const t of s.teamSeasons) {
-      const poWins = lg.games.filter((g) => g.season === s.year && g.bracket === 'winners' && g.place !== 5 &&
-        ((g.a === t.memberId && g.aPts > g.bPts) || (g.b === t.memberId && g.bPts > g.aPts))).length
-      const rank = ranks.find((r) => r.t.season === s.year && r.t.memberId === t.memberId)
-      const star = ((t.pf / (t.games || 1)) - leaguePpg) * 2.2 + 0.04 * Math.max(0, rank?.rosterValue ?? 0)
-      const prize = t.finalRank === 1 ? 60 : t.finalRank === 2 ? 25 : t.finalRank === 3 ? 10 : 0
-      const lines: RevenueLine[] = [
-        { label: 'Media rights', amount: 180 },
-        { label: 'Gate & local', amount: 3.5 * t.wins },
-        { label: 'Playoff gate', amount: t.madePlayoffs ? 15 + 12 * poWins : 0 },
-        { label: 'Prize & sponsorship', amount: prize },
-        { label: 'Star power', amount: star },
-      ]
-      const used = rawRoster(s.year, t.rosterId)?.settings.waiver_budget_used ?? 0
-      ;(season[t.memberId] ??= {})[s.year] = {
-        lines,
-        total: lines.reduce((a, l) => a + l.amount, 0),
-        payroll: (used / budget(s.year)) * 20,
-      }
-    }
-  }
-
+  const first = done[0]?.year ?? 0
+  const eloAt = (id: string, year: number) => elo.history[id]?.filter((p) => p.season <= year).at(-1)?.rating ?? null
   const out: Record<string, Valuation[]> = {}
-  for (const m of lg.members) {
-    const hist: Valuation[] = []
-    for (const s of done) {
-      const years = Object.keys(season[m.id] ?? {}).map(Number).filter((y) => y <= s.year).sort((a, b) => b - a)
-      if (!years.includes(s.year) && !years.length) continue
-      if (!years.length) continue
-      let num = 0, den = 0, pay = 0
-      years.forEach((y, i) => { const w = RECENCY[i] ?? 1; num += w * season[m.id][y].total; pay += w * season[m.id][y].payroll; den += w })
-      const revenue = num / den
-      const payroll = pay / den
 
-      const mine = done.filter((x) => x.year <= s.year).map((x) => ({ s: x, t: x.teamSeasons.find((t) => t.memberId === m.id) })).filter((x) => x.t)
-      const titles = mine.filter((x) => x.t!.finalRank === 1).length
-      const seconds = mine.filter((x) => x.t!.finalRank === 2).length
-      const playoffRate = mine.filter((x) => x.t!.madePlayoffs).length / (mine.length || 1)
-      const lasts = mine.filter((x) => x.t!.finalRank === x.s.teams).length
-      const toilets = mine.filter((x) => x.s.toiletBowlLoser === m.id).length
-      const rating = lg.formHistory.find((h) => h.season === s.year)?.ratings[m.id] ?? 50
-      const mgr = managementCached(lg).filter((r) => r.memberId === m.id && !r.inProgress && r.season <= s.year)
-      const mgrScore = mgr.length ? mgr.reduce((a, r) => a + r.managerScore, 0) / mgr.length : 50
+  for (const s of done) {
+    const upTo = done.filter((x) => x.year <= s.year)
+    const ids = lg.members.map((m) => m.id).filter((id) => upTo.some((x) => x.teamSeasons.some((t) => t.memberId === id)))
+    const raw = ids.map((id) => {
+      const mine = upTo.map((x) => ({ s: x, t: x.teamSeasons.find((t) => t.memberId === id) })).filter((x) => x.t).map((x) => ({ s: x.s, t: x.t! }))
+      const count = (f: (x: (typeof mine)[number]) => boolean) => mine.filter(f).length
+      const leader = (x: (typeof mine)[number]) => [...x.s.teamSeasons].sort((a, b) => b.pf - a.pf)[0].memberId === id
+      const titles = count((x) => x.t.finalRank === 1)
+      const trophies = TROPHY.title * titles + TROPHY.second * count((x) => x.t.finalRank === 2) + TROPHY.third * count((x) => x.t.finalRank === 3) +
+        TROPHY.seed * count((x) => x.t.regRank === 1) + TROPHY.points * count(leader) + TROPHY.last * count((x) => x.t.finalRank === x.s.teams)
+      const ap = mine.reduce((a, x) => [a[0] + x.t.apW + x.t.apT / 2, a[1] + x.t.apW + x.t.apL + x.t.apT], [0, 0])
+      const wl = mine.reduce((a, x) => [a[0] + x.t.wins + x.t.ties / 2, a[1] + x.t.wins + x.t.losses + x.t.ties], [0, 0])
+      const playoffRate = count((x) => x.t.madePlayoffs) / mine.length
+      const avgFinish = avg(mine.map((x) => x.t.finalRank ?? x.t.regRank))
+      const scores = ranks.filter((r) => r.t.memberId === id && r.t.season <= s.year).map((r) => r.score)
+      const bestSeason = Math.max(0, ...scores)
+      const thisSeason = ranks.find((r) => r.t.memberId === id && r.t.season === s.year)?.score ?? null
+      const end = eloAt(id, s.year), before = eloAt(id, s.year - 1)
+      const m = mgmt.filter((r) => r.memberId === id && r.season <= s.year)
+      return {
+        id, titles, trophies, playoffRate, avgFinish, bestSeason, thisSeason,
+        apPct: ap[1] ? ap[0] / ap[1] : 0, winPct: wl[1] ? wl[0] / wl[1] : 0,
+        greats: scores.filter((x) => x >= 85).length,
+        elo: end ?? 2000, eloChange: end != null ? end - (before ?? 2000) : 0,
+        managerScore: m.length ? avg(m.map((r) => r.managerScore)) : 50,
+        coachScore: m.length ? avg(m.map((r) => r.coachScore)) : 50,
+      }
+    })
+    const col = (f: (r: (typeof raw)[number]) => number) => peer(raw.map(f))
+    const skill = col((r) => r.elo)
+    const trophies = col((r) => r.trophies)
+    const [pr, fin, ap, win] = [col((r) => r.playoffRate), col((r) => -r.avgFinish), col((r) => r.apPct), col((r) => r.winPct)]
+    const [best, greats] = [col((r) => r.bestSeason), col((r) => r.greats)]
+    const avgScore = avg(raw.map((r) => r.thisSeason ?? 0).filter(Boolean))
+    const [form, swing] = [col((r) => r.thisSeason ?? avgScore), col((r) => r.eloChange)]
+    const [mgr, coach] = [col((r) => r.managerScore), col((r) => r.coachScore)]
 
-      const multipleLines: RevenueLine[] = [
-        { label: 'League base', amount: 7 },
-        { label: 'Trophy case', amount: 1.2 * titles + 0.4 * seconds },
-        { label: 'Playoff pedigree', amount: 2 * (playoffRate - 0.5) },
-        { label: 'Momentum', amount: 0.06 * (rating - 50) },
-        { label: 'Front office', amount: 0.04 * (mgrScore - 50) },
-        { label: 'Stigma', amount: -0.5 * lasts - 0.3 * toilets },
-      ]
-      const multiple = Math.max(4, Math.min(14, multipleLines.reduce((a, l) => a + l.amount, 0)))
+    raw.forEach((r, i) => {
+      const scores = {
+        skill: skill[i],
+        trophies: trophies[i],
+        sustained: 0.3 * pr[i] + 0.3 * fin[i] + 0.25 * ap[i] + 0.15 * win[i],
+        legacy: 0.6 * best[i] + 0.4 * greats[i],
+        momentum: 0.5 * form[i] + 0.5 * swing[i],
+        office: 0.5 * mgr[i] + 0.5 * coach[i],
+      }
+      const details: Record<string, string> = {
+        skill: `${r.elo} Elo`,
+        trophies: `${r.trophies} trophy points`,
+        sustained: `${Math.round(r.playoffRate * 100)}% playoffs · avg finish ${r.avgFinish.toFixed(1)}`,
+        legacy: `best season ${r.bestSeason.toFixed(1)}${r.greats ? ` · ${r.greats} season${r.greats > 1 ? 's' : ''} 85+` : ''}`,
+        momentum: `${r.thisSeason != null ? `${s.year} score ${r.thisSeason.toFixed(1)} · ` : ''}Elo ${r.eloChange >= 0 ? '+' : '−'}${Math.abs(Math.round(r.eloChange))}`,
+        office: `manager ${r.managerScore.toFixed(0)} · lineups ${r.coachScore.toFixed(0)}`,
+      }
+      const pillars: Pillar[] = PILLARS.map((p) => ({ ...p, score: scores[p.key], detail: details[p.key] }))
+      const fresh = pillars.reduce((a, p) => a + p.weight * p.score, 0)
+      const hist = (out[r.id] ??= [])
       const prev = hist.at(-1)
-      // Valuations are sticky: blend this year's model with last year's value grown 5%.
-      const value = prev ? 0.65 * revenue * multiple + 0.35 * prev.value * 1.05 : revenue * multiple
+      const index = prev ? SMOOTH * fresh + (1 - SMOOTH) * prev.index : fresh
+      const value = (BASE + PER_POINT * index) * GROWTH ** (s.year - first)
       hist.push({
-        memberId: m.id, year: s.year, value, revenue, multiple,
-        operatingIncome: revenue - 150 - payroll,
+        memberId: r.id, year: s.year, value, index, pillars,
         change: prev ? ((value - prev.value) / prev.value) * 100 : null,
-        revenueLines: season[m.id][years[0]].lines,
-        multipleLines,
-        debtPct: Math.min(40, 4 + 6 * lasts + 4 * toilets + 3 * mine.filter((x) => !x.t!.madePlayoffs).length),
-        titles, playoffRate, rating,
+        elo: r.elo, titles: r.titles, playoffRate: r.playoffRate, avgFinish: r.avgFinish,
+        bestSeason: r.bestSeason, managerScore: r.managerScore,
       })
-    }
-    if (hist.length) out[m.id] = hist
+    })
   }
   return out
 }
