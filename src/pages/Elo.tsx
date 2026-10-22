@@ -5,10 +5,8 @@ import { Brush, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContain
 import { useLeague } from '../lib/data'
 import { Avatar, Card, Tip, TIPS } from '../components/ui'
 import { ELO, FINISH, REG_BONUS, franchiseElo, tierOf, TIERS } from '../lib/elo'
-// Okabe-Ito colorblind-safe set plus IBM violet, white and gray. The second five are dashed, and
-// the pairs that are closest (gray vs. teal / pink) sit in different groups so the dash separates them.
+// Okabe-Ito colorblind-safe set plus IBM violet, white and gray.
 const COLORS = ['#0072B2', '#E69F00', '#009E73', '#CC79A7', '#E6E6E6', '#56B4E9', '#F0E442', '#D55E00', '#785EF0', '#8C8C8C']
-const DASH = (i: number) => (i % COLORS.length >= 5 ? '7 4' : undefined)
 
 export default function Elo() {
   const lg = useLeague()
@@ -58,7 +56,7 @@ export default function Elo() {
           {ids.map((id, i) => (
             <button key={id} type="button" onClick={() => toggle(id)} className="elo-chip" style={{ opacity: shown(id) ? 1 : 0.45, borderColor: focus.has(id) ? color(id) : undefined, cursor: 'pointer' }}>
               <span className="muted">{i + 1}</span>
-              <svg width="18" height="6" aria-hidden><line x1="0" y1="3" x2="18" y2="3" stroke={color(id)} strokeWidth="3" strokeDasharray={DASH(slot[id]) ? '5 3' : undefined} /></svg>
+              <svg width="18" height="6" aria-hidden><line x1="0" y1="3" x2="18" y2="3" stroke={color(id)} strokeWidth="3" /></svg>
               <Avatar id={id} size={18} /><span>{lg.memberById[id]?.name}</span>
               <b>{e.current[id]}</b><span className={`tier-tag ${tierOf(e.current[id]).toLowerCase()}`}>{tierOf(e.current[id])}</span>
             </button>
@@ -75,7 +73,7 @@ export default function Elo() {
             {TIERS.filter((t) => t.min > 0).map((t) => <ReferenceLine key={t.name} y={t.min} stroke="var(--muted)" strokeDasharray="4 4" label={{ value: t.name, position: 'insideTopLeft', fill: 'var(--muted)', fontSize: 10 }} />)}
             <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }} itemSorter={(item) => -Number(item.value ?? 0)} />
             {ids.map((id, i) => (
-              <Line key={id} dataKey={id} name={lg.memberById[id]?.name} stroke={color(id)} strokeDasharray={DASH(slot[id])} strokeWidth={focus.has(id) ? 3.5 : 2} strokeOpacity={shown(id) ? 1 : 0.12} dot={false} connectNulls isAnimationActive={false} />
+              <Line key={id} dataKey={id} name={lg.memberById[id]?.name} stroke={color(id)} strokeWidth={focus.has(id) ? 3.5 : 2} strokeOpacity={shown(id) ? 1 : 0.12} dot={false} connectNulls isAnimationActive={false} />
             ))}
             {data.length > 20 && <Brush dataKey="key" height={24} stroke="var(--muted)" fill="var(--panel-2)" travellerWidth={8} />}
           </LineChart>
