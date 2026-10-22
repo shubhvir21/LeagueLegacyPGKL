@@ -1,7 +1,7 @@
 // Franchise Elo: full-size rating chart, per-season view, and how the rating is calculated.
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Brush, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
 import { Avatar, Card, Tip, TIPS } from '../components/ui'
 import { ELO, FINISH, REG_BONUS, franchiseElo, tierOf, TIERS } from '../lib/elo'
@@ -13,6 +13,8 @@ export default function Elo() {
   const ids = Object.entries(e.current).sort((a, b) => b[1] - a[1]).map(([id]) => id)
   const years = [...new Set(Object.values(e.history).flat().map((p) => p.season))].sort((a, b) => b - a)
   const [season, setSeason] = useState<'all' | number>('all')
+  const [zoom, setZoom] = useState<[number, number] | null>(null)
+  const [drag, setDrag] = useState<[number, number] | null>(null) // indices into the visible data
   const [focus, setFocus] = useState<Set<string>>(new Set())
   const toggle = (id: string) => setFocus((f) => { const n = new Set(f); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
@@ -24,23 +26,39 @@ export default function Elo() {
     for (const id of ids) row[id] = e.history[id]?.find((p) => p.season === yr && p.week === week)?.rating ?? null
     return row
   })
-  const starts = season === 'all' ? data.filter((d) => !String(d.key).includes('W')).map((d) => d.key as string) : []
+  const view = zoom ? data.slice(zoom[0], zoom[1] + 1) : data
+  const starts = season === 'all' ? view.filter((d) => !String(d.key).includes('W')).map((d) => d.key as string) : []
   const playoffStart = season === 'all' ? null : lg.seasons.find((s) => s.year === season)?.playoffStart
-  const vals = data.flatMap((d) => ids.map((id) => d[id])).filter((v): v is number => typeof v === 'number')
-  const step = season === 'all' ? 500 : 250
+  // The y-axis fits whatever is on screen: the zoomed range, and only highlighted teams if any.
+  const vals = view.flatMap((d) => ids.filter((id) => !focus.size || focus.has(id)).map((id) => d[id])).filter((v): v is number => typeof v === 'number')
+  const span = Math.max(...vals) - Math.min(...vals)
+  const step = span > 2000 ? 500 : span > 800 ? 250 : span > 300 ? 100 : 50
   const lo = Math.floor((Math.min(...vals) - 25) / step) * step, hi = Math.ceil((Math.max(...vals) + 25) / step) * step
   const yTicks = Array.from({ length: (hi - lo) / step + 1 }, (_, i) => lo + i * step)
   const shown = (id: string) => !focus.size || focus.has(id)
+  const at = (st: { activeTooltipIndex?: unknown } | null | undefined) => {
+    const i = Number(st?.activeTooltipIndex)
+    return Number.isFinite(i) ? i : null
+  }
+  const endDrag = (end: number | null) => {
+    if (drag) {
+      const [a, b] = [drag[0], end ?? drag[1]].sort((x, y) => x - y)
+      const off = zoom?.[0] ?? 0
+      if (b - a >= 2) setZoom([off + a, off + b])
+    }
+    setDrag(null)
+  }
 
   return (
     <div className="page">
       <h1>Elo Ratings</h1>
       <Card
         title="Rating History"
-        sub="Click teams to highlight them; drag the handles under the chart to zoom. Dashed lines mark the tiers."
+        sub="Click teams to highlight them; drag across the chart to zoom in. Dashed lines mark the tiers."
         right={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select value={season} onChange={(ev) => setSeason(ev.target.value === 'all' ? 'all' : Number(ev.target.value))}>
+            {zoom && <button type="button" className="elo-chip" onClick={() => setZoom(null)} style={{ cursor: 'pointer' }}>Reset zoom</button>}
+            <select value={season} onChange={(ev) => { setSeason(ev.target.value === 'all' ? 'all' : Number(ev.target.value)); setZoom(null) }}>
               <option value="all">All-time</option>
               {years.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
@@ -58,9 +76,15 @@ export default function Elo() {
           {focus.size > 0 && <button type="button" className="elo-chip" onClick={() => setFocus(new Set())} style={{ cursor: 'pointer' }}>Show all</button>}
         </div>
         <ResponsiveContainer width="100%" height={620}>
-          <LineChart key={String(season)} data={data} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+          <LineChart
+            key={String(season)} data={view} margin={{ top: 10, right: 20, bottom: 0, left: 0 }} style={{ userSelect: 'none', cursor: 'crosshair' }}
+            onMouseDown={(st) => { const i = at(st); if (i != null) setDrag([i, i]) }}
+            onMouseMove={(st) => { const i = at(st); if (drag && i != null) setDrag([drag[0], i]) }}
+            onMouseUp={(st) => endDrag(at(st))}
+            onMouseLeave={() => setDrag(null)}
+          >
             <CartesianGrid stroke="var(--grid)" vertical={false} />
-            <XAxis dataKey="key" stroke="var(--muted)" ticks={season === 'all' ? starts : undefined} interval={season === 'all' ? 0 : 'preserveStartEnd'} />
+            <XAxis dataKey="key" stroke="var(--muted)" ticks={season === 'all' && starts.length > 1 ? starts : undefined} interval={season === 'all' && starts.length > 1 ? 0 : 'preserveStartEnd'} />
             <YAxis stroke="var(--muted)" domain={[lo, hi]} ticks={yTicks} allowDecimals={false} width={48} />
             {starts.map((s) => <ReferenceLine key={s} x={s} stroke="var(--border-strong)" />)}
             {playoffStart && <ReferenceLine x={`W${playoffStart}`} stroke="var(--border-strong)" label={{ value: 'Playoffs', position: 'insideTopRight', fill: 'var(--muted)', fontSize: 10 }} />}
@@ -69,7 +93,7 @@ export default function Elo() {
             {ids.map((id, i) => (
               <Line key={id} dataKey={id} name={lg.memberById[id]?.name} stroke={PALETTE[i % PALETTE.length]} strokeWidth={focus.has(id) ? 3.5 : 2} strokeOpacity={shown(id) ? 1 : 0.12} dot={false} connectNulls isAnimationActive={false} />
             ))}
-            {data.length > 20 && <Brush dataKey="key" height={24} stroke="var(--muted)" fill="var(--panel-2)" travellerWidth={8} />}
+            {drag && drag[0] !== drag[1] && <ReferenceArea x1={String(view[drag[0]]?.key)} x2={String(view[drag[1]]?.key)} fill="var(--muted)" fillOpacity={0.15} />}
           </LineChart>
         </ResponsiveContainer>
       </Card>
