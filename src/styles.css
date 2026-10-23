@@ -862,13 +862,13 @@ button.elo-chip { font: inherit; }
 .lm-who small { display: flex; align-items: center; gap: 5px; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lm-cell.right .lm-who small { justify-content: flex-end; }
 .lm-who .pos-tag { width: 26px; font-size: 9px; padding: 1px 0; }
-.lm-pts { display: grid; grid-template-columns: 100%; justify-items: end; width: 48px; flex: none; margin-right: 10px; text-align: right; font-variant-numeric: tabular-nums; }
-.lm-cell.right .lm-pts { justify-items: start; text-align: left; margin: 0 0 0 10px; }
+.lm-pts { display: grid; grid-template-columns: 100%; justify-items: end; width: 48px; flex: none; margin-right: 16px; text-align: right; font-variant-numeric: tabular-nums; }
+.lm-cell.right .lm-pts { justify-items: start; text-align: left; margin: 0 0 0 16px; }
 .lm-pts b { font-size: 15px; line-height: 1.1; }
 .lm-pts small { font-size: 10px; }
 /* Out of flow in the cell corner so it can never push names or numbers around. */
-.lm-ast { position: absolute; bottom: 4px; right: 4px; font-size: 12px; font-weight: 800; line-height: 1; color: var(--gold); cursor: help; }
-.lm-cell.right .lm-ast { right: auto; left: 4px; }
+.lm-ast { position: absolute; bottom: 4px; right: 3px; font-size: 12px; font-weight: 800; line-height: 1; color: var(--gold); cursor: help; }
+.lm-cell.right .lm-ast { right: auto; left: 3px; }
 @media (max-width: 760px) {
   .gc-title { font-size: 18px; margin: 0 0 2px; }
   .lm-head h2 { font-size: 11px; font-weight: 600; color: var(--muted); margin: 0 0 4px; text-transform: uppercase; letter-spacing: .08em; }
@@ -885,16 +885,16 @@ button.elo-chip { font: inherit; }
   .lm-h2h { padding: 1px 8px; }
   .lm-h2h small { display: none; }
   .lm-rows { gap: 5px; }
-  .lm-row { grid-template-columns: 1fr 24px 1fr; gap: 3px; }
+  .lm-row { grid-template-columns: 1fr 22px 1fr; gap: 2px; }
   .lm-slot { font-size: 8px; padding: 2px 0; border-radius: 5px; }
   .lm-cell { padding: 4px 5px 4px 4px; gap: 5px; }
   .lm-cell.right { padding: 4px 4px 4px 5px; }
   .lm-shot { width: 24px; height: 24px; box-shadow: 0 0 0 1.5px var(--pc); }
   .lm-who b { font-size: 11px; line-height: 1.1; }
   .lm-who small { display: none; }
-  .lm-pts { width: 36px; margin-right: 4px; }
-  .lm-cell.right .lm-pts { margin: 0 0 0 4px; }
-  .lm-pts b { font-size: 13px; }
+  .lm-pts { width: 33px; margin-right: 10px; }
+  .lm-cell.right .lm-pts { margin: 0 0 0 10px; }
+  .lm-pts b { font-size: 12px; }
   .lm-pts small { font-size: 9px; }
   .lm-chip { min-width: 124px; }
 }
@@ -907,8 +907,8 @@ button.elo-chip { font: inherit; }
 @media (max-width: 380px) {
   .lm-who b { font-size: 10px; }
   .lm-shot { width: 22px; height: 22px; }
-  .lm-pts { width: 34px; }
-  .lm-pts b { font-size: 12px; }
+  .lm-pts { width: 31px; }
+  .lm-pts b { font-size: 11px; }
   .lm-cell { gap: 4px; }
   .lm-name { font-size: 11px; }
 }
