@@ -210,8 +210,8 @@ function TeamNums({ s, right }: { s: Side; right?: boolean }) {
 function PlayerCell({ line, info, right }: { line?: StarterLine; info: Record<string, PlayerInfo>; right?: boolean }) {
   if (!line) return <div className="lm-cell empty" />
   const p = info[line.playerId]
-  // Flag Sleeper-sourced projections only where it matters: not defenses, and not players whose game is already over.
-  const isEstimate = (line.source === 'sleeper' || line.source === 'none') && p?.pos !== 'DEF' && line.game?.status !== 'final'
+  // Flag Sleeper-sourced projections only where it matters: not defenses, not finished games, and not byes (Sleeper projects those at 0).
+  const isEstimate = (line.source === 'sleeper' || line.source === 'none') && p?.pos !== 'DEF' && line.game?.status !== 'final' && line.projected > line.actual
   return (
     <div className={`lm-cell pos-${p?.pos ?? 'X'}${right ? ' right' : ''}`}>
       <img className="lm-shot" src={headshot(line.playerId, p)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
