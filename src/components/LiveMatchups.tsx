@@ -194,10 +194,10 @@ function PlayerCell({ line, info, right }: { line?: StarterLine; info: Record<st
         <small className="muted"><span className={`pos-tag ${p?.pos ?? ''}`}>{p?.pos}</span> {p?.team}{gameLabel(line) && ` · ${gameLabel(line)}`}</small>
       </div>
       <div className="lm-pts">
+        {isEstimate && <span className="lm-est" title="Sleeper projection (no sportsbook props)" aria-label="Sleeper projection"><Icon name="chart" size={9} /></span>}
         <b>{fmt(line.actual)}</b>
         <small className="muted">
           {fmt(line.projected)}
-          {isEstimate && <span className="lm-est"><Icon name="chart" size={10} />Sleeper</span>}
         </small>
       </div>
     </div>
