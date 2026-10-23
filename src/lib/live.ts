@@ -45,6 +45,25 @@ export const fetchLiveFeed = () => getJson<LiveFeed>(`${LIVE_API_URL}/api/live`)
 export const fetchWeek = async () => (await getJson<{ week: number }>(`${SLEEPER}/state/nfl`)).week
 export const fetchMatchups = (week: number) => getJson<SleeperMatchup[]>(`${SLEEPER}/league/${CURRENT_LEAGUE_ID}/matchups/${week}`)
 
+const PROJECTIONS = 'https://api.sleeper.app/projections/nfl'
+const PROJ_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].map((p) => `position[]=${p}`).join('&')
+
+/**
+ * Sleeper's weekly projections scored with this league's own rules. Fetched live because the nightly snapshot
+ * misses anyone picked up since (e.g. a defense added after the last sync would show 0).
+ */
+export async function fetchSleeperProjections(week: number): Promise<Record<string, number>> {
+  const league = await getJson<{ season: string; scoring_settings: Record<string, number> }>(`${SLEEPER}/league/${CURRENT_LEAGUE_ID}`)
+  const rows = await getJson<{ player_id: string; stats?: Record<string, number> }[]>(`${PROJECTIONS}/${league.season}/${week}?season_type=regular&${PROJ_POSITIONS}`)
+  const out: Record<string, number> = {}
+  for (const row of rows) {
+    let pts = 0
+    for (const [stat, value] of Object.entries(row.stats ?? {})) pts += value * (league.scoring_settings[stat] ?? 0)
+    out[row.player_id] = Math.round(pts * 100) / 100
+  }
+  return out
+}
+
 export const fetchRosters = () => getJson<SleeperRoster[]>(`${SLEEPER}/league/${CURRENT_LEAGUE_ID}/rosters`)
 
 /** Sleeper player id -> live row (a player appears in one game per week). */

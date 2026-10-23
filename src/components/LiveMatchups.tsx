@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLeague } from '../lib/data'
 import {
-  buildBenchLines, buildTeamLines, fetchLiveFeed, fetchMatchups, fetchRosters, fetchWeek, indexBySleeperId, indexGamesByTeam, normalizeTeam, pairMatchups, sum, winProbability,
+  buildBenchLines, buildTeamLines, fetchLiveFeed, fetchMatchups, fetchRosters, fetchSleeperProjections, fetchWeek, indexBySleeperId, indexGamesByTeam, normalizeTeam, pairMatchups, sum, winProbability,
   type LiveFeed, type StarterLine,
 } from '../lib/live'
 import { DEFAULT_MODEL } from '../lib/model'
@@ -61,6 +61,7 @@ export function LiveMatchups() {
   const [week, setWeek] = useState<number | null>(null)
   const [matchups, setMatchups] = useState<SleeperMatchup[]>([])
   const [rosters, setRosters] = useState<SleeperRoster[]>([])
+  const [freshProjections, setFreshProjections] = useState<Record<string, number>>({})
   const [feed, setFeed] = useState<LiveFeed | null>(null)
   const [feedError, setFeedError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -72,6 +73,7 @@ export function LiveMatchups() {
       setWeek(w)
       setMatchups(await fetchMatchups(w))
       setRosters(await fetchRosters())
+      setFreshProjections(await fetchSleeperProjections(w))
       setError(null)
     } catch (e) {
       setError(`Could not load matchups from Sleeper: ${(e as Error).message}`)
@@ -91,7 +93,9 @@ export function LiveMatchups() {
   }, [load])
 
   const live = useMemo(() => indexBySleeperId(feed), [feed])
-  const projections = week ? raw?.projections?.weeks[String(week)] : undefined
+  // Fresh Sleeper numbers win; the nightly snapshot only fills gaps if the live fetch returned nothing for a player.
+  const snapshot = week ? raw?.projections?.weeks[String(week)] : undefined
+  const projections = useMemo(() => ({ ...snapshot, ...freshProjections }), [snapshot, freshProjections])
   const teamGames = useMemo(() => indexGamesByTeam(feed), [feed])
   const posOf = (id: string) => info[id]?.pos ?? 'WR'
 
