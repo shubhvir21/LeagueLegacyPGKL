@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLeague } from '../lib/data'
 import {
-  buildTeamLines, fetchLiveFeed, fetchMatchups, fetchWeek, indexBySleeperId, indexGamesByTeam, normalizeTeam, pairMatchups, sum, winProbability,
+  buildBenchLines, buildTeamLines, fetchLiveFeed, fetchMatchups, fetchRosters, fetchWeek, indexBySleeperId, indexGamesByTeam, normalizeTeam, pairMatchups, sum, winProbability,
   type LiveFeed, type StarterLine,
 } from '../lib/live'
 import { DEFAULT_MODEL } from '../lib/model'
 import { lineupSlots } from '../lib/lineup'
 import { playersOf, type PlayerInfo } from '../lib/players'
-import type { SleeperMatchup } from '../lib/sleeper'
+import type { SleeperMatchup, SleeperRoster } from '../lib/sleeper'
 import { fmt, type Game } from '../lib/stats'
 import { Avatar, TeamName } from './ui'
 
@@ -47,7 +47,9 @@ function gameLabel(l: StarterLine) {
   return `Q${g.period} · ${g.away} ${g.awayScore}-${g.homeScore} ${g.home}`
 }
 
-interface Side { m: SleeperMatchup; memberId?: string; lines: StarterLine[] }
+interface Side { m: SleeperMatchup; memberId?: string; lines: StarterLine[]; bench: StarterLine[] }
+
+const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']
 
 export function LiveMatchups() {
   const lg = useLeague()
@@ -58,6 +60,7 @@ export function LiveMatchups() {
   const slots = lineupSlots(raw?.league.roster_positions ?? [])
   const [week, setWeek] = useState<number | null>(null)
   const [matchups, setMatchups] = useState<SleeperMatchup[]>([])
+  const [rosters, setRosters] = useState<SleeperRoster[]>([])
   const [feed, setFeed] = useState<LiveFeed | null>(null)
   const [feedError, setFeedError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -68,6 +71,7 @@ export function LiveMatchups() {
       const w = await fetchWeek()
       setWeek(w)
       setMatchups(await fetchMatchups(w))
+      setRosters(await fetchRosters())
       setError(null)
     } catch (e) {
       setError(`Could not load matchups from Sleeper: ${(e as Error).message}`)
@@ -93,13 +97,17 @@ export function LiveMatchups() {
 
   const games = useMemo(() => pairMatchups(matchups).flatMap(([a, b]) => {
     if (!b) return []
+    const ctx = { live, sleeperProjections: projections, gameOf: (id: string) => live.get(id)?.game ?? teamGames.get(normalizeTeam(info[id]?.team ?? '')) ?? null }
+    const rank = (id: string) => POS_ORDER.indexOf(info[id]?.pos ?? '')
     const side = (m: SleeperMatchup): Side => ({
-      m, lines: buildTeamLines(m, { live, sleeperProjections: projections, gameOf: (id) => live.get(id)?.game ?? teamGames.get(normalizeTeam(info[id]?.team ?? '')) ?? null }),
+      m, lines: buildTeamLines(m, ctx),
+      bench: buildBenchLines(m, rosters.find((r) => r.roster_id === m.roster_id), ctx)
+        .sort((u, v) => rank(u.playerId) - rank(v.playerId) || v.projected - u.projected),
       memberId: season?.teamSeasons.find((t) => t.rosterId === m.roster_id)?.memberId,
     })
     const [x, y] = [side(a), side(b)]
     return [{ id: a.matchup_id, x, y, p: winProbability({ lines: x.lines, pos: posOf }, { lines: y.lines, pos: posOf }, model) }]
-  }), [matchups, live, projections, teamGames, season, model]) // eslint-disable-line react-hooks/exhaustive-deps
+  }), [matchups, rosters, live, projections, teamGames, season, model]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const game = games[Math.min(selected, games.length - 1)]
   const stale = feed && minutesAgo(feed.generatedAt) > STALE_MINUTES
@@ -126,6 +134,16 @@ export function LiveMatchups() {
             <PlayerCell line={game.x.lines[i]} info={info} />
             <span className="lm-slot">{SLOT_LABEL[slots[i]] ?? slots[i] ?? ''}</span>
             <PlayerCell line={game.y.lines[i]} info={info} right />
+          </div>
+        ))}
+      </div>
+      <div className="lm-bench-title">Bench</div>
+      <div className="lm-rows lm-bench">
+        {Array.from({ length: Math.max(game.x.bench.length, game.y.bench.length) }, (_, i) => (
+          <div className="lm-row" key={i}>
+            <PlayerCell line={game.x.bench[i]} info={info} />
+            <span className="lm-slot">BN</span>
+            <PlayerCell line={game.y.bench[i]} info={info} right />
           </div>
         ))}
       </div>
