@@ -134,7 +134,8 @@ export function normCdf(z: number): number {
 
 /** Share of a starter's outcome still unknown: 0 once the game is final, 1 before kickoff. */
 export function unknownShare(l: StarterLine): number {
-  if (!l.game) return l.source === 'none' ? 0 : 1
+  // No game found: either nothing is projected (bye) or the game already dropped out of the feed (projection == points scored).
+  if (!l.game) return l.source === 'none' || l.projected <= l.actual ? 0 : 1
   if (l.game.status === 'final') return 0
   if (l.game.status === 'scheduled') return 1
   return Math.min(1, Math.max(0, (l.projected - l.actual) / Math.max(l.projected, 1)))
