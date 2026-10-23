@@ -54,24 +54,55 @@ export function indexBySleeperId(feed: LiveFeed | null): Map<string, LiveEntry> 
   return out
 }
 
+/** Share of a game still to be played, from its status and quarter (the feed has no reliable game clock yet). */
+function gameRemainingShare(game: LiveGame['game']): number {
+  if (game.status === 'final') return 0
+  if (game.status === 'scheduled') return 1
+  return Math.min(1, Math.max(0, (4 - game.period + 0.5) / 4))
+}
+
+export interface LineContext {
+  live: Map<string, LiveEntry>
+  sleeperProjections: Record<string, number> | undefined
+  /** Game for any player, including those the odds feed has no props for (kickers, defenses). */
+  gameOf: (playerId: string) => LiveGame['game'] | null
+}
+
 /**
  * Official points so far + expected remaining. Players the odds feed does not cover (K, DEF, no props)
- * fall back to Sleeper's static projection, never below what they've already scored.
+ * use Sleeper's static projection scaled by how much of their game is left, never below what they've scored.
  */
-export function buildStarterLine(playerId: string, official: number, live: Map<string, LiveEntry>, sleeperProjection: number | undefined): StarterLine {
-  const entry = live.get(playerId)
+export function buildStarterLine(playerId: string, official: number, ctx: LineContext): StarterLine {
+  const entry = ctx.live.get(playerId)
   if (entry) {
     const fromProps = Object.values(entry.row.sources).includes('live_prop') || entry.game.status === 'final'
     return { playerId, actual: official, projected: official + entry.row.remaining, source: fromProps ? 'live' : 'pregame', game: entry.game }
   }
-  if (sleeperProjection !== undefined) return { playerId, actual: official, projected: Math.max(sleeperProjection, official), source: 'sleeper', game: null }
-  return { playerId, actual: official, projected: official, source: 'none', game: null }
+  const sleeper = ctx.sleeperProjections?.[playerId]
+  const game = ctx.gameOf(playerId)
+  if (sleeper === undefined) return { playerId, actual: official, projected: official, source: 'none', game }
+  const projected = game && game.status !== 'scheduled' ? official + sleeper * gameRemainingShare(game) : Math.max(sleeper, official)
+  return { playerId, actual: official, projected, source: 'sleeper', game }
 }
 
 export const EMPTY_SLOT = '0'
 
-export function buildTeamLines(m: SleeperMatchup, live: Map<string, LiveEntry>, sleeperProjections: Record<string, number> | undefined): StarterLine[] {
-  return m.starters.flatMap((id, i) => (id === EMPTY_SLOT ? [] : [buildStarterLine(id, m.starters_points[i] ?? 0, live, sleeperProjections?.[id])]))
+export function buildTeamLines(m: SleeperMatchup, ctx: LineContext): StarterLine[] {
+  return m.starters.flatMap((id, i) => (id === EMPTY_SLOT ? [] : [buildStarterLine(id, m.starters_points[i] ?? 0, ctx)]))
+}
+
+// Sportsbook and Sleeper disagree on a few team codes (e.g. LA vs LAR).
+const TEAM_ALIASES: Record<string, string> = { LA: 'LAR', WSH: 'WAS', JAC: 'JAX', ARZ: 'ARI', LVR: 'LV', OAK: 'LV', SD: 'LAC', STL: 'LAR' }
+export const normalizeTeam = (abbr: string) => TEAM_ALIASES[abbr.toUpperCase()] ?? abbr.toUpperCase()
+
+/** Normalized NFL team -> its game this week, for players the odds feed has no props for (kickers, defenses). */
+export function indexGamesByTeam(feed: LiveFeed | null): Map<string, LiveGame['game']> {
+  const out = new Map<string, LiveGame['game']>()
+  for (const { game } of Object.values(feed?.games ?? {})) {
+    out.set(normalizeTeam(game.away), game)
+    out.set(normalizeTeam(game.home), game)
+  }
+  return out
 }
 
 export const sum = (lines: StarterLine[], key: 'actual' | 'projected') => lines.reduce((t, l) => t + l[key], 0)

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLeague } from '../lib/data'
 import {
-  buildTeamLines, fetchLiveFeed, fetchMatchups, fetchWeek, indexBySleeperId, pairMatchups, sum, winProbability,
+  buildTeamLines, fetchLiveFeed, fetchMatchups, fetchWeek, indexBySleeperId, indexGamesByTeam, normalizeTeam, pairMatchups, sum, winProbability,
   type LiveFeed, type StarterLine,
 } from '../lib/live'
 import { DEFAULT_MODEL } from '../lib/model'
@@ -88,17 +88,18 @@ export function LiveMatchups() {
 
   const live = useMemo(() => indexBySleeperId(feed), [feed])
   const projections = week ? raw?.projections?.weeks[String(week)] : undefined
+  const teamGames = useMemo(() => indexGamesByTeam(feed), [feed])
   const posOf = (id: string) => info[id]?.pos ?? 'WR'
 
   const games = useMemo(() => pairMatchups(matchups).flatMap(([a, b]) => {
     if (!b) return []
     const side = (m: SleeperMatchup): Side => ({
-      m, lines: buildTeamLines(m, live, projections),
+      m, lines: buildTeamLines(m, { live, sleeperProjections: projections, gameOf: (id) => live.get(id)?.game ?? teamGames.get(normalizeTeam(info[id]?.team ?? '')) ?? null }),
       memberId: season?.teamSeasons.find((t) => t.rosterId === m.roster_id)?.memberId,
     })
     const [x, y] = [side(a), side(b)]
     return [{ id: a.matchup_id, x, y, p: winProbability({ lines: x.lines, pos: posOf }, { lines: y.lines, pos: posOf }, model) }]
-  }), [matchups, live, projections, season, model]) // eslint-disable-line react-hooks/exhaustive-deps
+  }), [matchups, live, projections, teamGames, season, model]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const game = games[Math.min(selected, games.length - 1)]
   const stale = feed && minutesAgo(feed.generatedAt) > STALE_MINUTES
@@ -148,7 +149,7 @@ function Scoreboard({ x, y, p, year, h2h }: { x: Side; y: Side; p: number; year?
   const tied = h2h && h2h.t ? `–${h2h.t}` : ''
   return (
     <div className="lm-board">
-      <TeamBlock s={x} year={year} />
+      <TeamTop s={x} year={year} />
       <div className="lm-mid">
         {h2h && (
           <div className="lm-h2h" title="All-time head-to-head, playoffs included">
@@ -161,23 +162,29 @@ function Scoreboard({ x, y, p, year, h2h }: { x: Side; y: Side; p: number; year?
           <span className={p < 0.5 ? 'fav' : ''}>{pct(1 - p)}</span>
         </div>
       </div>
-      <TeamBlock s={y} year={year} right />
+      <TeamTop s={y} year={year} right />
+      <TeamNums s={x} />
+      <TeamNums s={y} right />
       <div className="lm-bar"><i style={{ width: pct(p) }} /></div>
     </div>
   )
 }
 
-function TeamBlock({ s, year, right }: { s: Side; year?: number; right?: boolean }) {
+// Name row and number row are separate grid cells so both teams' scores line up however long the names run.
+function TeamTop({ s, year, right }: { s: Side; year?: number; right?: boolean }) {
   return (
-    <div className={`lm-team${right ? ' right' : ''}`}>
-      <div className="lm-team-top">
-        {s.memberId && <Avatar id={s.memberId} size={40} />}
-        <div className="lm-name">{s.memberId && <TeamName id={s.memberId} season={year} />}</div>
-      </div>
-      <div className="lm-team-nums">
-        <div className="lm-score">{fmt(sum(s.lines, 'actual'))}</div>
-        <div className="lm-proj">{fmt(sum(s.lines, 'projected'))}</div>
-      </div>
+    <div className={`lm-top${right ? ' right' : ''}`}>
+      {s.memberId && <Avatar id={s.memberId} size={40} />}
+      <div className="lm-name">{s.memberId && <TeamName id={s.memberId} season={year} />}</div>
+    </div>
+  )
+}
+
+function TeamNums({ s, right }: { s: Side; right?: boolean }) {
+  return (
+    <div className={`lm-nums${right ? ' right' : ''}`}>
+      <div className="lm-score">{fmt(sum(s.lines, 'actual'))}</div>
+      <div className="lm-proj">{fmt(sum(s.lines, 'projected'))}</div>
     </div>
   )
 }
@@ -193,13 +200,11 @@ function PlayerCell({ line, info, right }: { line?: StarterLine; info: Record<st
         <b>{p?.name ?? line.playerId}</b>
         <small className="muted"><span className={`pos-tag ${p?.pos ?? ''}`}>{p?.pos}</span> {p?.team}{gameLabel(line) && ` · ${gameLabel(line)}`}</small>
       </div>
+      {isEstimate && <span className="lm-ast" title="Projection from Sleeper (no sportsbook props)" aria-label="Projection from Sleeper">*</span>}
       <div className="lm-pts">
         <b>{fmt(line.actual)}</b>
         <small className="muted">
-          <span className="lm-projnum">
-            {fmt(line.projected)}
-            {isEstimate && <span className="lm-ast" title="Projection from Sleeper (no sportsbook props)" aria-label="Projection from Sleeper">*</span>}
-          </span>
+          {fmt(line.projected)}
         </small>
       </div>
     </div>
