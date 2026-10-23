@@ -852,6 +852,8 @@ button.elo-chip { font: inherit; }
 .lm-row { display: grid; grid-template-columns: 1fr 38px 1fr; align-items: stretch; gap: 6px; }
 .lm-row .lm-slot { align-self: center; }
 .lm-slot { text-align: center; font-size: 10px; font-weight: 800; color: var(--text-2); letter-spacing: .05em; padding: 3px 0; border-radius: 7px; background: var(--panel-3); }
+.lm-bench-title { margin: 14px 2px 6px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.lm-bench .lm-cell { opacity: .72; }
 .lm-cell { --pc: var(--muted); position: relative; display: flex; align-items: center; gap: 9px; min-width: 0; padding: 5px 10px 5px 8px; border-radius: 10px; background: linear-gradient(90deg, color-mix(in srgb, var(--pc) 16%, var(--panel-2)), var(--panel-2) 70%); border-left: 3px solid var(--pc); }
 .lm-cell.right { background: linear-gradient(270deg, color-mix(in srgb, var(--pc) 16%, var(--panel-2)), var(--panel-2) 70%); border-left: 0; border-right: 3px solid var(--pc); padding: 5px 8px 5px 10px; flex-direction: row-reverse; text-align: right; }
 .lm-cell.pos-QB { --pc: #ff79b0; } .lm-cell.pos-RB { --pc: #3ddc97; } .lm-cell.pos-WR { --pc: #60a5fa; }
@@ -862,13 +864,13 @@ button.elo-chip { font: inherit; }
 .lm-who small { display: flex; align-items: center; gap: 5px; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lm-cell.right .lm-who small { justify-content: flex-end; }
 .lm-who .pos-tag { width: 26px; font-size: 9px; padding: 1px 0; }
-.lm-pts { display: grid; grid-template-columns: 100%; justify-items: end; width: 48px; flex: none; margin-right: 16px; text-align: right; font-variant-numeric: tabular-nums; }
-.lm-cell.right .lm-pts { justify-items: start; text-align: left; margin: 0 0 0 16px; }
+.lm-pts { display: grid; grid-template-columns: 100%; justify-items: end; width: 48px; flex: none; margin-right: 10px; position: relative; text-align: right; font-variant-numeric: tabular-nums; }
+.lm-cell.right .lm-pts { justify-items: start; text-align: left; margin: 0 0 0 10px; }
 .lm-pts b { font-size: 15px; line-height: 1.1; }
 .lm-pts small { font-size: 10px; }
-/* Out of flow in the cell corner so it can never push names or numbers around. */
-.lm-ast { position: absolute; bottom: 4px; right: 3px; font-size: 12px; font-weight: 800; line-height: 1; color: var(--gold); cursor: help; }
-.lm-cell.right .lm-ast { right: auto; left: 3px; }
+/* Hangs just off the projected number, out of flow so it can never push names or numbers around. */
+.lm-ast { position: absolute; left: 100%; bottom: 3px; margin-left: 2px; font-size: 12px; font-weight: 800; line-height: 1; color: var(--gold); cursor: help; }
+.lm-cell.right .lm-ast { left: auto; right: 100%; margin: 0 2px 0 0; }
 @media (max-width: 760px) {
   .gc-title { font-size: 18px; margin: 0 0 2px; }
   .lm-head h2 { font-size: 11px; font-weight: 600; color: var(--muted); margin: 0 0 4px; text-transform: uppercase; letter-spacing: .08em; }
@@ -892,8 +894,8 @@ button.elo-chip { font: inherit; }
   .lm-shot { width: 24px; height: 24px; box-shadow: 0 0 0 1.5px var(--pc); }
   .lm-who b { font-size: 11px; line-height: 1.1; }
   .lm-who small { display: none; }
-  .lm-pts { width: 33px; margin-right: 10px; }
-  .lm-cell.right .lm-pts { margin: 0 0 0 10px; }
+  .lm-pts { width: 33px; margin-right: 7px; }
+  .lm-cell.right .lm-pts { margin: 0 0 0 7px; }
   .lm-pts b { font-size: 12px; }
   .lm-pts small { font-size: 9px; }
   .lm-chip { min-width: 124px; }

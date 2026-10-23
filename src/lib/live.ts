@@ -1,7 +1,7 @@
 // Live matchup projections: Sleeper's official points so far + the live-odds Worker's expected remaining points.
 // The Worker (see liveproj) turns sportsbook player props into time-aware projections; this file only reads it.
 import { posSd, type OddsModel } from './model'
-import { CURRENT_LEAGUE_ID, type SleeperMatchup } from './sleeper'
+import { CURRENT_LEAGUE_ID, type SleeperMatchup, type SleeperRoster } from './sleeper'
 
 const SLEEPER = 'https://api.sleeper.app/v1'
 export const LIVE_API_URL = (import.meta.env.VITE_LIVE_API_URL as string | undefined) ?? 'https://liveproj.trentcharlton21.workers.dev'
@@ -44,6 +44,8 @@ async function getJson<T>(url: string): Promise<T> {
 export const fetchLiveFeed = () => getJson<LiveFeed>(`${LIVE_API_URL}/api/live`)
 export const fetchWeek = async () => (await getJson<{ week: number }>(`${SLEEPER}/state/nfl`)).week
 export const fetchMatchups = (week: number) => getJson<SleeperMatchup[]>(`${SLEEPER}/league/${CURRENT_LEAGUE_ID}/matchups/${week}`)
+
+export const fetchRosters = () => getJson<SleeperRoster[]>(`${SLEEPER}/league/${CURRENT_LEAGUE_ID}/rosters`)
 
 /** Sleeper player id -> live row (a player appears in one game per week). */
 export function indexBySleeperId(feed: LiveFeed | null): Map<string, LiveEntry> {
@@ -89,6 +91,15 @@ export const EMPTY_SLOT = '0'
 
 export function buildTeamLines(m: SleeperMatchup, ctx: LineContext): StarterLine[] {
   return m.starters.flatMap((id, i) => (id === EMPTY_SLOT ? [] : [buildStarterLine(id, m.starters_points[i] ?? 0, ctx)]))
+}
+
+/** Bench = rostered players who aren't starting, minus IR and taxi (they can't be started this week). */
+export function buildBenchLines(m: SleeperMatchup, roster: SleeperRoster | undefined, ctx: LineContext): StarterLine[] {
+  const unavailable = new Set([...(roster?.reserve ?? []), ...(roster?.taxi ?? [])])
+  const starting = new Set(m.starters)
+  return (m.players ?? [])
+    .filter((id) => !starting.has(id) && !unavailable.has(id))
+    .map((id) => buildStarterLine(id, m.players_points?.[id] ?? 0, ctx))
 }
 
 // Sportsbook and Sleeper disagree on a few team codes (e.g. LA vs LAR).

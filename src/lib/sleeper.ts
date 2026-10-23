@@ -24,6 +24,8 @@ export interface SleeperRoster {
   roster_id: number
   owner_id: string | null
   players?: string[] | null
+  reserve?: string[] | null // IR
+  taxi?: string[] | null
   settings: Record<string, number | undefined>
 }
 export interface SleeperMatchup {
@@ -32,6 +34,7 @@ export interface SleeperMatchup {
   points: number
   starters: string[]
   starters_points: number[]
+  players?: string[] | null
   players_points?: Record<string, number>
 }
 export interface BracketMatch {
