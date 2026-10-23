@@ -812,3 +812,11 @@ button.elo-chip { font: inherit; }
 .pillar-row b { text-align: right; font-variant-numeric: tabular-nums; }
 .pillar-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 640px) { .split-row.pillar-row { grid-template-columns: 120px 1fr 32px; } .pillar-detail { grid-column: 1 / -1; margin-top: -4px; } }
+
+/* Live matchups */
+.live-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.live-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.live-head b { margin-left: auto; font-size: 18px; }
+.live-margin { margin-top: 10px; }
+.error { color: #ff9b9b; }
+@media (max-width: 760px) { .live-sides { grid-template-columns: 1fr; } }
