@@ -21,7 +21,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Games',
     items: [
-      { to: '/matchups', label: 'Matchups', icon: 'football' },
+      { to: '/matchups', label: 'Matchups', icon: 'football', end: true },
+      { to: '/matchups/history', label: 'Historical Matchups', icon: 'history' },
       { to: '/playoffs', label: 'Playoffs', icon: 'trophy' },
       { to: '/power', label: 'Power Rankings', icon: 'chart' },
       { to: '/odds', label: 'Playoff Odds', icon: 'target' },
