@@ -158,7 +158,6 @@ function Scoreboard({ x, y, p, year, h2h }: { x: Side; y: Side; p: number; year?
         )}
         <div className="lm-odds">
           <span className={p >= 0.5 ? 'fav' : ''}>{pct(p)}</span>
-          <small>WIN</small>
           <span className={p < 0.5 ? 'fav' : ''}>{pct(1 - p)}</span>
         </div>
       </div>
@@ -171,9 +170,11 @@ function Scoreboard({ x, y, p, year, h2h }: { x: Side; y: Side; p: number; year?
 function TeamBlock({ s, year, right }: { s: Side; year?: number; right?: boolean }) {
   return (
     <div className={`lm-team${right ? ' right' : ''}`}>
-      {s.memberId && <Avatar id={s.memberId} size={48} />}
-      <div className="lm-team-info">
-        {s.memberId && <TeamName id={s.memberId} season={year} />}
+      <div className="lm-team-top">
+        {s.memberId && <Avatar id={s.memberId} size={40} />}
+        <div className="lm-name">{s.memberId && <TeamName id={s.memberId} season={year} />}</div>
+      </div>
+      <div className="lm-team-nums">
         <div className="lm-score">{fmt(sum(s.lines, 'actual'))}</div>
         <div className="lm-proj"><small>PROJ</small> <b>{fmt(sum(s.lines, 'projected'))}</b></div>
       </div>
@@ -195,8 +196,10 @@ function PlayerCell({ line, info, right }: { line?: StarterLine; info: Record<st
       <div className="lm-pts">
         <b>{fmt(line.actual)}</b>
         <small className="muted">
-          {fmt(line.projected)}
-          {isEstimate && <span className="lm-ast" title="Projection from Sleeper (no sportsbook props)" aria-label="Projection from Sleeper">*</span>}
+          <span className="lm-projnum">
+            {fmt(line.projected)}
+            {isEstimate && <span className="lm-ast" title="Projection from Sleeper (no sportsbook props)" aria-label="Projection from Sleeper">*</span>}
+          </span>
         </small>
       </div>
     </div>

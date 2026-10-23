@@ -8,6 +8,7 @@ import Elo from './pages/Elo'
 import Season, { SeasonIndex, TeamSeason } from './pages/Season'
 import Member, { Members } from './pages/Member'
 import Versus, { VersusDetail } from './pages/Versus'
+import HistoricalMatchups from './pages/HistoricalMatchups'
 import Matchups from './pages/Matchups'
 import Playoffs from './pages/Playoffs'
 import RecordBook from './pages/RecordBook'
@@ -58,6 +59,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="versus" element={<Versus />} />
             <Route path="versus/:a/:b" element={<VersusDetail />} />
             <Route path="matchups" element={<Matchups />} />
+            <Route path="matchups/history" element={<HistoricalMatchups />} />
             <Route path="playoffs" element={<Playoffs />} />
             <Route path="keepers" element={<Keepers />} />
             <Route path="odds" element={<Odds />} />
