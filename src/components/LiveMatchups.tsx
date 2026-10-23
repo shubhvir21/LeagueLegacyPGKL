@@ -10,7 +10,6 @@ import { playersOf, type PlayerInfo } from '../lib/players'
 import type { SleeperMatchup } from '../lib/sleeper'
 import { fmt, type Game } from '../lib/stats'
 import { Avatar, TeamName } from './ui'
-import { Icon } from './Icon'
 
 const REFRESH_MS = 60_000
 const STALE_MINUTES = 15
@@ -176,7 +175,7 @@ function TeamBlock({ s, year, right }: { s: Side; year?: number; right?: boolean
       <div className="lm-team-info">
         {s.memberId && <TeamName id={s.memberId} season={year} />}
         <div className="lm-score">{fmt(sum(s.lines, 'actual'))}</div>
-        <div className="muted lm-proj">proj {fmt(sum(s.lines, 'projected'))}</div>
+        <div className="lm-proj"><small>PROJ</small> <b>{fmt(sum(s.lines, 'projected'))}</b></div>
       </div>
     </div>
   )
@@ -194,10 +193,10 @@ function PlayerCell({ line, info, right }: { line?: StarterLine; info: Record<st
         <small className="muted"><span className={`pos-tag ${p?.pos ?? ''}`}>{p?.pos}</span> {p?.team}{gameLabel(line) && ` · ${gameLabel(line)}`}</small>
       </div>
       <div className="lm-pts">
-        {isEstimate && <span className="lm-est" title="Sleeper projection (no sportsbook props)" aria-label="Sleeper projection"><Icon name="chart" size={9} /></span>}
         <b>{fmt(line.actual)}</b>
         <small className="muted">
           {fmt(line.projected)}
+          {isEstimate && <span className="lm-ast" title="Projection from Sleeper (no sportsbook props)" aria-label="Projection from Sleeper">*</span>}
         </small>
       </div>
     </div>
