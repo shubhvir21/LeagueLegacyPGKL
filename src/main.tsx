@@ -9,7 +9,6 @@ import Season, { SeasonIndex, TeamSeason } from './pages/Season'
 import Member, { Members } from './pages/Member'
 import Versus, { VersusDetail } from './pages/Versus'
 import Matchups from './pages/Matchups'
-import Live from './pages/Live'
 import Playoffs from './pages/Playoffs'
 import RecordBook from './pages/RecordBook'
 import Management from './pages/Management'
@@ -59,7 +58,6 @@ createRoot(document.getElementById('root')!).render(
             <Route path="versus" element={<Versus />} />
             <Route path="versus/:a/:b" element={<VersusDetail />} />
             <Route path="matchups" element={<Matchups />} />
-            <Route path="live" element={<Live />} />
             <Route path="playoffs" element={<Playoffs />} />
             <Route path="keepers" element={<Keepers />} />
             <Route path="odds" element={<Odds />} />

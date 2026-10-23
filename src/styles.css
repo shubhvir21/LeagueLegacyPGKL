@@ -814,16 +814,45 @@ button.elo-chip { font: inherit; }
 @media (max-width: 640px) { .split-row.pillar-row { grid-template-columns: 120px 1fr 32px; } .pillar-detail { grid-column: 1 / -1; margin-top: -4px; } }
 
 /* Live matchups */
-.live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 640px), 1fr)); gap: 16px; }
-.live-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.live-col { min-width: 0; }
-.live-table { font-size: 13px; }
-.live-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); padding: 4px 6px; }
-.live-table th.num { text-align: right; }
-.live-table td { padding: 6px; white-space: nowrap; }
-.live-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.live-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-.live-head b { margin-left: auto; font-size: 18px; }
-.live-margin { margin-top: 10px; }
 .error { color: #ff9b9b; }
-@media (max-width: 760px) { .live-sides { grid-template-columns: 1fr; } }
+.lm-head h2 { margin: 0 0 10px; }
+.lm-chips { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 12px; scrollbar-width: thin; }
+.lm-chip { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; min-width: 150px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px; color: var(--text-2); cursor: pointer; text-align: left; }
+.lm-chip:hover { border-color: var(--border-strong); }
+.lm-chip.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent) inset; }
+.lm-chip-side { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.lm-chip-side.lead { color: var(--text); font-weight: 650; }
+.lm-chip-name { flex: 1; min-width: 0; max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lm-chip-side b { font-variant-numeric: tabular-nums; }
+.lm-board { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; padding: 16px; margin: 4px 0 14px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px; }
+.lm-team { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.lm-team.right { flex-direction: row-reverse; text-align: right; }
+.lm-team-info { flex: 1; min-width: 0; }
+.lm-score { font-size: 30px; font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.lm-proj { font-size: 12px; }
+.lm-win { font-size: 20px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lm-win.fav { color: var(--pos); }
+.lm-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--neg); overflow: hidden; opacity: .9; }
+.lm-bar i { display: block; height: 100%; background: var(--pos); }
+.lm-rows { background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px; padding: 6px 8px; }
+.lm-row { display: grid; grid-template-columns: 1fr 44px 1fr; align-items: center; gap: 8px; padding: 10px 6px; border-bottom: 1px solid var(--border); }
+.lm-row:last-child { border-bottom: 0; }
+.lm-slot { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+.lm-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lm-cell.right { flex-direction: row-reverse; text-align: right; }
+.lm-shot { width: 42px; height: 42px; flex: none; border-radius: 50%; object-fit: cover; object-position: top; background: var(--panel-3); }
+.lm-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lm-who b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lm-who small { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lm-pts { display: flex; flex-direction: column; align-items: flex-end; min-width: 48px; font-variant-numeric: tabular-nums; }
+.lm-cell.right .lm-pts { align-items: flex-start; }
+.lm-pts b { font-size: 16px; }
+.lm-pts small { font-size: 11px; display: inline-flex; align-items: center; gap: 3px; }
+.lm-src { display: inline-flex; opacity: .55; cursor: help; }
+@media (max-width: 760px) {
+  .lm-board { gap: 10px 12px; padding: 12px; }
+  .lm-score { font-size: 24px; }
+  .lm-row { grid-template-columns: 1fr 30px 1fr; gap: 4px; }
+  .lm-shot { width: 32px; height: 32px; }
+  .lm-who small { display: none; }
+}

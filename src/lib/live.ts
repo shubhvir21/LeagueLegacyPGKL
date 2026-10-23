@@ -1,5 +1,6 @@
 // Live matchup projections: Sleeper's official points so far + the live-odds Worker's expected remaining points.
 // The Worker (see liveproj) turns sportsbook player props into time-aware projections; this file only reads it.
+import { posSd, type OddsModel } from './model'
 import { CURRENT_LEAGUE_ID, type SleeperMatchup } from './sleeper'
 
 const SLEEPER = 'https://api.sleeper.app/v1'
@@ -79,4 +80,37 @@ export function pairMatchups(ms: SleeperMatchup[]): [SleeperMatchup, SleeperMatc
   const byId = new Map<number, SleeperMatchup[]>()
   for (const m of ms) if (m.matchup_id != null) byId.set(m.matchup_id, [...(byId.get(m.matchup_id) ?? []), m])
   return [...byId.values()].map(([a, b]) => [a as SleeperMatchup, b ?? null])
+}
+
+/** Standard normal CDF (Abramowitz-Stegun 7.1.26). */
+export function normCdf(z: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z))
+  const d = 0.3989423 * Math.exp((-z * z) / 2)
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))))
+  return z > 0 ? 1 - p : p
+}
+
+/** Share of a starter's outcome still unknown: 0 once the game is final, 1 before kickoff. */
+export function unknownShare(l: StarterLine): number {
+  if (!l.game) return l.source === 'none' ? 0 : 1
+  if (l.game.status === 'final') return 0
+  if (l.game.status === 'scheduled') return 1
+  return Math.min(1, Math.max(0, (l.projected - l.actual) / Math.max(l.projected, 1)))
+}
+
+/** Chance side A outscores side B: normal approximation on projected totals; variance shrinks as games finish. */
+export function winProbability(a: { lines: StarterLine[]; pos: (id: string) => string }, b: { lines: StarterLine[]; pos: (id: string) => string }, model: OddsModel): number {
+  const stats = (s: typeof a) => {
+    let v = 0, f = 0
+    for (const l of s.lines) {
+      const share = unknownShare(l)
+      v += posSd(model, s.pos(l.playerId), l.projected) ** 2 * share
+      f += share
+    }
+    return { mean: sum(s.lines, 'projected'), v: v * (1 + model.rho) + model.resid ** 2 * (f / Math.max(s.lines.length, 1)) }
+  }
+  const x = stats(a), y = stats(b)
+  const sd = Math.sqrt(x.v + y.v)
+  if (sd < 1e-6) return x.mean === y.mean ? 0.5 : x.mean > y.mean ? 1 : 0
+  return normCdf((x.mean - y.mean) / sd)
 }

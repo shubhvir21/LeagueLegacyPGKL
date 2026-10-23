@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { useLeague } from '../lib/data'
 import { fmt, type Game } from '../lib/stats'
 import { Card, MemberLink, Tabs } from '../components/ui'
+import { LiveMatchups } from '../components/LiveMatchups'
 import { WeekMatchups } from './Season'
 
 const CATS = ['Highest Scoring', 'Lowest Scoring', 'Closest', 'Blowouts', 'Playoff Games'] as const
@@ -37,6 +38,7 @@ export default function Matchups() {
   return (
     <div className="page">
       <h1>Gamecenter</h1>
+      <LiveMatchups />
       <Card title="Average Matchup Score by Season" sub="Average team score and average margin in regular-season games.">
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={chart}>
