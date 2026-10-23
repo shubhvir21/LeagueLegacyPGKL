@@ -814,7 +814,14 @@ button.elo-chip { font: inherit; }
 @media (max-width: 640px) { .split-row.pillar-row { grid-template-columns: 120px 1fr 32px; } .pillar-detail { grid-column: 1 / -1; margin-top: -4px; } }
 
 /* Live matchups */
-.live-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 640px), 1fr)); gap: 16px; }
+.live-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.live-col { min-width: 0; }
+.live-table { font-size: 13px; }
+.live-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); padding: 4px 6px; }
+.live-table th.num { text-align: right; }
+.live-table td { padding: 6px; white-space: nowrap; }
+.live-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .live-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .live-head b { margin-left: auto; font-size: 18px; }
 .live-margin { margin-top: 10px; }

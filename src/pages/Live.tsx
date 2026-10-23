@@ -65,7 +65,7 @@ export default function Live() {
       {error && <p className="error">{error}</p>}
       {feedError && <p className="error">Live odds projections unavailable ({feedError}); showing Sleeper's static projections.</p>}
       {stale && <p className="error">Odds feed last updated {minutesAgo(feed.generatedAt)} minutes ago.</p>}
-      <div className="game-grid">
+      <div className="live-grid">
         {pairMatchups(matchups).map(([a, b]) => {
           const sides = [a, b].filter((m): m is SleeperMatchup => !!m).map((m) => ({ m, lines: buildTeamLines(m, live, sleeperProjections) }))
           return (
@@ -97,7 +97,10 @@ function TeamColumn({ memberId, year, lines, nameOf }: { memberId?: string; year
         <b>{fmt(sum(lines, 'actual'))}</b>
         <span className="muted">proj {fmt(sum(lines, 'projected'))}</span>
       </div>
-      <table>
+      <table className="live-table">
+        <thead>
+          <tr><th>Starter</th><th className="num">Now</th><th className="num">Proj</th><th>Source</th></tr>
+        </thead>
         <tbody>
           {lines.map((l) => {
             const p = nameOf(l.playerId)
