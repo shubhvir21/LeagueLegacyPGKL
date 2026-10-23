@@ -176,7 +176,7 @@ function TeamBlock({ s, year, right }: { s: Side; year?: number; right?: boolean
       </div>
       <div className="lm-team-nums">
         <div className="lm-score">{fmt(sum(s.lines, 'actual'))}</div>
-        <div className="lm-proj"><small>PROJ</small> <b>{fmt(sum(s.lines, 'projected'))}</b></div>
+        <div className="lm-proj"><b>{fmt(sum(s.lines, 'projected'))}</b></div>
       </div>
     </div>
   )
