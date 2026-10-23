@@ -828,12 +828,12 @@ button.elo-chip { font: inherit; }
 .lm-team { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .lm-team-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .lm-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
-.lm-team-nums { display: flex; align-items: center; justify-content: flex-start; gap: 12px; }
+.lm-team-nums { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-bottom: 2px; }
 .lm-team.right { text-align: right; }
 .lm-team.right .lm-team-top, .lm-team.right .lm-team-nums { flex-direction: row-reverse; }
 .lm-team.right .team-name { align-items: flex-end; }
-.lm-score { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.05; }
-.lm-proj { display: inline-flex; align-items: baseline; gap: 5px; padding: 2px 9px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.lm-score { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 30px; }
+.lm-proj { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
 .lm-proj b { font-size: 16px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .lm-mid { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; align-self: stretch; }
 .lm-h2h { display: flex; align-items: baseline; gap: 6px; padding: 1px 10px; border-radius: 999px; background: var(--panel-3); border: 1px solid var(--border-strong); }
@@ -877,7 +877,8 @@ button.elo-chip { font: inherit; }
   .lm-team.right .lm-name { justify-content: flex-end; }
   .lm-team-nums { flex-direction: column; align-items: flex-start; gap: 3px; }
   .lm-team.right .lm-team-nums { flex-direction: column; align-items: flex-end; }
-  .lm-score { font-size: 22px; }
+  .lm-score { font-size: 22px; line-height: 26px; }
+  .lm-proj { height: 22px; padding: 0 8px; }
   .lm-proj b { font-size: 14px; }
   .lm-odds { font-size: 17px; gap: 8px; }
   .lm-h2h { padding: 1px 8px; }
