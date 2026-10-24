@@ -62,7 +62,7 @@ export default function Member() {
     .map((s) => ({ s, t: s.teamSeasons.find((t) => t.memberId === id) }))
     .filter((x): x is { s: (typeof lg.seasons)[number]; t: TeamSeason } => !!x.t)
   const titles = seasons.filter((x) => x.t.finalRank === 1).map((x) => x.s.year)
-  const best = [...seasons].sort((a, b) => b.t.seasonScore - a.t.seasonScore)[0]
+  const best = [...seasons].filter((x) => x.t.seasonScore != null).sort((a, b) => b.t.seasonScore! - a.t.seasonScore!)[0]
   const medalScore = row.titles * 10 + row.seconds * 6 + row.thirds * 4 + row.playoffs * 2
   const others = lg.members.filter((m) => m.id !== id)
   const rivals = others
@@ -70,7 +70,7 @@ export default function Member() {
     .filter((x) => x.h.games.length > 0)
     .sort((a, b) => b.h.games.length - a.h.games.length || b.h.w - b.h.l - (a.h.w - a.h.l))
 
-  const blurb = `${row.member.name} has played ${row.seasons.length} season${row.seasons.length > 1 ? 's' : ''} in the league, going ${record(row.wins, row.losses, row.ties)} overall with a ${record(row.apW, row.apL, row.apT)} all-play mark. They have made the playoffs ${row.playoffs} time${row.playoffs === 1 ? '' : 's'}${row.titles ? ` and won ${row.titles} championship${row.titles > 1 ? 's' : ''} (${titles.join(', ')})` : ''}, averaging ${fmt(row.pf / (row.games || 1))} points per game.${best ? ` Their best season by season score was ${best.s.year} (${best.t.seasonScore.toFixed(1)}).` : ''}`
+  const blurb = `${row.member.name} has played ${row.seasons.length} season${row.seasons.length > 1 ? 's' : ''} in the league, going ${record(row.wins, row.losses, row.ties)} overall with a ${record(row.apW, row.apL, row.apT)} all-play mark. They have made the playoffs ${row.playoffs} time${row.playoffs === 1 ? '' : 's'}${row.titles ? ` and won ${row.titles} championship${row.titles > 1 ? 's' : ''} (${titles.join(', ')})` : ''}, averaging ${fmt(row.pf / (row.games || 1))} points per game.${best ? ` Their best season by season score was ${best.s.year} (${best.t.seasonScore!.toFixed(1)}).` : ''}`
 
   const cols: Col<{ s: (typeof seasons)[number]['s']; t: TeamSeason }>[] = [
     { key: 'season', label: 'Season', render: ({ s, t }) => <Link to={`/season/${s.year}/team/${t.memberId}`}><b>{s.year}</b></Link>, sort: ({ s }) => s.year },
@@ -83,7 +83,7 @@ export default function Member() {
     { key: 'luck', label: 'Luck', render: ({ t }) => <span className={t.luck >= 0 ? 'pos' : 'neg'}>{signed(t.luck)}</span>, sort: ({ t }) => t.luck, tip: TIPS.luck, align: 'right' },
     { key: 'sos', label: 'SOS', render: ({ t }) => fmt(t.sos), sort: ({ t }) => t.sos, tip: TIPS.sos, align: 'right' },
     { key: 'coach', label: 'Coach', render: ({ t }) => (t.coachScore != null ? t.coachScore.toFixed(1) : '—'), sort: ({ t }) => t.coachScore ?? 0, tip: TIPS.coach, align: 'right' },
-    { key: 'score', label: 'Score', render: ({ t }) => t.seasonScore.toFixed(1), sort: ({ t }) => t.seasonScore, tip: TIPS.score, align: 'right' },
+    { key: 'score', label: 'Score', render: ({ t }) => (t.seasonScore != null ? t.seasonScore.toFixed(1) : '—'), sort: ({ t }) => t.seasonScore ?? -1, tip: TIPS.score, align: 'right' },
     { key: 'rank', label: 'Finish', render: ({ s, t }) => (s.complete ? <RankBadge rank={t.finalRank} n={s.teams} /> : <span className="muted">{ordinal(t.regRank)}*</span>), sort: ({ t }) => -(t.finalRank ?? t.regRank) },
   ]
 

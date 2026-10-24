@@ -169,7 +169,7 @@ export const TIPS = {
   sos: 'Strength of schedule: average points scored by your opponents per game.',
   share: "Your share of all regular-season points scored in the league.",
   elo: 'Elo (0–5000, everyone starts at 2000). Every regular-season game moves 12–35 points from loser to winner by margin (capped at a 60-point win); median games ±10. After the regular season, all-play record and points-for rank each pay +100/+75/+50/+25/0/0/−25/−50/−75/−100. Final finish pays out mirrored, credited week by week as the playoff bracket resolves: 1st +400 / 10th −400, 2nd +250 / 9th −250, 3rd +150 / 8th −150, 4th +100 / 7th −100, 5th +50 / 6th −50. Ratings regress 10% toward 2000 each offseason.',
-  score: 'Season score (0–100): 30% win %, 30% all-play %, 20% points share, 20% final finish.',
+  score: 'Season score (0–100), the same score as Team Rankings: Dominance 40% (PPG and margin incl. playoffs, all-play %), Finish 25% (1st 100, 2nd 80, 3rd 65 … last 0), Regular Season 20% (seed, win %), Consistency 15% (weekly floor, median-beat rate). Graded within each season, where 70 = average. Completed seasons only.',
   coach: 'Points scored ÷ max possible points from your roster (optimal lineups).',
   median: 'This league plays the median every week: beating the median is a win.',
 }

@@ -1,6 +1,7 @@
 // Turns raw Sleeper data into the league model every page reads from.
 import type { RawData, RawSeason, BracketMatch } from './sleeper'
 import { ELO, franchiseElo } from './elo'
+import { teamRankings } from './teamRank'
 import overrides from '../members.json'
 
 export interface Member {
@@ -43,7 +44,7 @@ export interface TeamSeason {
   regRank: number
   finalRank: number | null // null until the season is finished
   madePlayoffs: boolean
-  seasonScore: number // 0-100 composite
+  seasonScore: number | null // Team Rankings (Legacy) score, 0–100; null until the season is complete
   eloEnd: number // Elo rating at the end of this season (current rating while in progress)
 }
 
@@ -126,7 +127,7 @@ function buildSeason(raw: RawSeason, games: Game[], schedule: ScheduledGame[]) {
       h2hW: 0, h2hL: 0, h2hT: 0, medW: 0, medL: 0, wins: 0, losses: 0, ties: 0,
       pf: 0, pa: 0, games: 0, apW: 0, apL: 0, apT: 0, expectedWins: 0, luck: 0, sos: 0,
       pointsShare: 0, maxPf: max, coachScore: null, highScores: 0, regRank: 0, finalRank: null,
-      madePlayoffs: false, seasonScore: 0, eloEnd: ELO.start,
+      madePlayoffs: false, seasonScore: null, eloEnd: ELO.start,
     }
   }
 
@@ -241,14 +242,6 @@ function buildSeason(raw: RawSeason, games: Game[], schedule: ScheduledGame[]) {
     for (const t of list) t.finalRank = place[t.rosterId] ?? open.shift()!
     list.sort((a, b) => (a.finalRank ?? 99) - (b.finalRank ?? 99))
   }
-  for (const t of list) {
-    const g = t.wins + t.losses + t.ties || 1
-    const ap = t.apW + t.apL + t.apT || 1
-    const rank = t.finalRank ?? t.regRank
-    t.seasonScore = round2(
-      100 * (0.3 * (t.wins / g) + 0.3 * (t.apW / ap) + 0.2 * Math.min(1, (t.pointsShare * n) / 200) + 0.2 * ((n - rank) / (n - 1))),
-    )
-  }
   const byRank = (r: number) => list.find((t) => t.finalRank === r)?.memberId ?? null
   const season: Season = {
     year, leagueId: league.league_id, name: league.name, status: league.status, complete,
@@ -340,6 +333,8 @@ export function buildLeague(raw: RawData): League {
   const e = franchiseElo(lg)
   lg.elo = e.current
   for (const s of seasons) for (const t of s.teamSeasons) t.eloEnd = e.history[t.memberId]?.filter((p) => p.season === s.year).at(-1)?.rating ?? ELO.start
+  // Season score: the Team Rankings (Legacy) score for every completed team-season (see teamRank.ts).
+  for (const r of teamRankings(lg)) r.t.seasonScore = round2(r.score)
   return lg
 }
 
@@ -355,7 +350,8 @@ export interface CareerRow {
   playoffW: number; playoffL: number
   titles: number; seconds: number; thirds: number
   avgFinish: number | null
-  avgScore: number
+  avgScore: number // average season score over completed seasons
+  scored: number
   elo: number
 }
 
@@ -366,7 +362,7 @@ export function careers(lg: League): CareerRow[] {
       const r = (rows[t.memberId] ??= {
         member: lg.memberById[t.memberId] ?? { id: t.memberId, name: t.teamName, avatar: null },
         seasons: [], wins: 0, losses: 0, ties: 0, apW: 0, apL: 0, apT: 0, pf: 0, pa: 0, games: 0,
-        playoffs: 0, playoffW: 0, playoffL: 0, titles: 0, seconds: 0, thirds: 0, avgFinish: null, avgScore: 0,
+        playoffs: 0, playoffW: 0, playoffL: 0, titles: 0, seconds: 0, thirds: 0, avgFinish: null, avgScore: 0, scored: 0,
         elo: lg.elo[t.memberId] ?? ELO.start,
       })
       r.seasons.push(s.year)
@@ -377,7 +373,7 @@ export function careers(lg: League): CareerRow[] {
       if (t.finalRank === 1) r.titles++
       if (t.finalRank === 2) r.seconds++
       if (t.finalRank === 3) r.thirds++
-      r.avgScore += t.seasonScore
+      if (t.seasonScore != null) { r.avgScore += t.seasonScore; r.scored++ }
     }
   }
   // Playoff record excludes the 5th-place game.
@@ -389,7 +385,7 @@ export function careers(lg: League): CareerRow[] {
   for (const r of Object.values(rows)) {
     const finished = lg.seasons.flatMap((s) => s.teamSeasons).filter((t) => t.memberId === r.member.id && t.finalRank != null)
     r.avgFinish = finished.length ? finished.reduce((a, t) => a + (t.finalRank ?? 0), 0) / finished.length : null
-    r.avgScore = r.avgScore / r.seasons.length
+    r.avgScore = r.scored ? r.avgScore / r.scored : 0
     r.seasons.sort()
   }
   return Object.values(rows).sort((a, b) => b.elo - a.elo)

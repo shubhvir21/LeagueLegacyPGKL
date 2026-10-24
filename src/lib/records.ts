@@ -91,7 +91,7 @@ export function buildRecords(lg: League): RecordDef[] {
   season('s-share', 'Highest Points Share', '% of all league points.', true, tsAll, (t) => t.pointsShare, (t) => `${t.pointsShare.toFixed(2)}%`)
   season('s-coach', 'Best Coach Score', 'Points ÷ max possible points.', true, tsAll.filter((t) => t.coachScore != null), (t) => t.coachScore!, (t) => t.coachScore!.toFixed(1))
   season('s-coach-low', 'Worst Coach Score', 'Points ÷ max possible points.', false, tsAll.filter((t) => t.coachScore != null), (t) => t.coachScore!, (t) => t.coachScore!.toFixed(1), true)
-  season('s-score', 'Best Season Score', 'Composite season score.', true, tsDone, (t) => t.seasonScore, (t) => t.seasonScore.toFixed(1))
+  season('s-score', 'Best Season Score', 'Team Rankings season score.', true, tsDone, (t) => t.seasonScore ?? 0, (t) => (t.seasonScore ?? 0).toFixed(1))
   season('s-highs', 'Most High Scores in a Season', 'Weeks as top scorer.', true, tsAll, (t) => t.highScores, (t) => String(t.highScores))
 
   // ---------- Matchup ----------

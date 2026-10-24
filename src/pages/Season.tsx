@@ -116,7 +116,7 @@ function StandingsTable({ s }: { s: SeasonT }) {
     { key: 'pa', label: 'PA', render: (t) => fmt(t.pa), sort: (t) => t.pa, align: 'right' },
     { key: 'luck', label: 'Luck', render: (t) => <span className={t.luck >= 0 ? 'pos' : 'neg'}>{signed(t.luck)}</span>, sort: (t) => t.luck, tip: TIPS.luck, align: 'right' },
     { key: 'coach', label: 'Coach', render: (t) => (t.coachScore != null ? t.coachScore.toFixed(1) : '—'), sort: (t) => t.coachScore ?? 0, tip: TIPS.coach, align: 'right' },
-    { key: 'score', label: 'Score', render: (t) => <b>{t.seasonScore.toFixed(1)}</b>, sort: (t) => t.seasonScore, tip: TIPS.score, align: 'right' },
+    { key: 'score', label: 'Score', render: (t) => <b>{t.seasonScore != null ? t.seasonScore.toFixed(1) : '—'}</b>, sort: (t) => t.seasonScore ?? -1, tip: TIPS.score, align: 'right' },
   ]
   return <Table rows={s.teamSeasons} cols={cols} rowKey={(t) => t.memberId} />
 }
@@ -213,7 +213,7 @@ export function TeamSeason() {
         <Stat icon="scale" label="Luck" value={signed(t.luck)} tip={TIPS.luck} />
         <Stat icon="zap" label="Coach score" value={t.coachScore != null ? t.coachScore.toFixed(1) : '—'} tip={TIPS.coach} />
         <Stat icon="chart" label="Points share" value={`${t.pointsShare.toFixed(2)}%`} tip={TIPS.share} />
-        <Stat icon="trendUp" label="Season score" value={t.seasonScore.toFixed(1)} tip={TIPS.score} />
+        <Stat icon="trendUp" label="Season score" value={t.seasonScore != null ? t.seasonScore.toFixed(1) : '—'} tip={TIPS.score} />
         <Stat icon="flame" label="Weekly high scores" value={t.highScores} />
       </div>
       <Card title="Weekly Results">
