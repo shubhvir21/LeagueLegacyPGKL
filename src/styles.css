@@ -744,51 +744,140 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
   .recharts-legend-wrapper { font-size: 11px; }
 }
 
-/* ---------- Home: compact hero, snapshots, week recap ---------- */
-.hero.compact { padding: 22px 26px; align-items: center; gap: 16px 24px; }
-.hero.compact h1 { font-size: 28px; }
-.champ-strip { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.champ-chip {
-  display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 8px; border-radius: 99px; font-size: 12.5px;
-  background: rgba(8,9,12,.5); border: 1px solid var(--border); color: var(--text-2); transition: border-color .15s;
+/* ---------- Home gameday (scoped atmosphere) ---------- */
+.home-gameday {
+  --home-turf: #3d9b6e;
+  --home-turf-soft: rgba(61, 155, 110, 0.14);
+  --home-turf-glow: rgba(61, 155, 110, 0.2);
+  --home-gold-glow: rgba(242, 195, 91, 0.18);
 }
-.champ-chip:hover { border-color: var(--border-strong); color: var(--text); }
-.champ-chip .champ-year { width: auto; font-size: 11.5px; }
-.champ-chip .champ-name { font-weight: 600; }
-.champ-chip.latest { color: var(--text); border-color: rgba(242,195,91,.5); background: linear-gradient(100deg, rgba(242,195,91,.2), rgba(242,195,91,.05)), rgba(8,9,12,.5); }
-.champ-chip.latest .icon, .champ-chip.latest .champ-year { color: var(--gold); }
+.home-gameday .eyebrow { color: var(--home-turf); }
+.home-gameday .card-head a,
+.home-gameday .story-strip-head a { color: #7ec9a3; }
+.home-gameday .card-head a:hover,
+.home-gameday .story-strip-head a:hover { color: #a6dfc0; }
 
-.snap-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.snap { display: flex; flex-direction: column; gap: 8px; color: var(--text); transition: border-color .15s, transform .15s; }
-.snap:hover { border-color: var(--border-strong); transform: translateY(-1px); color: var(--text); }
-.snap-value { font-family: var(--display); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; min-width: 0; }
-.snap.pos .snap-value b { color: var(--pos); }
-.snap-detail { font-size: 12px; }
+.home-hero {
+  position: relative; overflow: hidden;
+  display: flex; justify-content: space-between; align-items: center; gap: 20px 28px; flex-wrap: wrap;
+  padding: 26px 28px; border-radius: 18px; border: 1px solid var(--border-strong);
+  background:
+    linear-gradient(180deg, transparent 0%, transparent 48%, rgba(255,255,255,.015) 49%, transparent 51%, transparent 100%),
+    radial-gradient(700px 320px at 0% 0%, var(--home-turf-glow), transparent 58%),
+    radial-gradient(520px 280px at 100% 100%, var(--home-gold-glow), transparent 55%),
+    var(--panel);
+}
+.home-hero::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .045;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0, transparent 47px, rgba(255,255,255,.7) 47px, rgba(255,255,255,.7) 48px),
+    repeating-linear-gradient(0deg, transparent 0, transparent 23px, rgba(255,255,255,.35) 23px, rgba(255,255,255,.35) 24px);
+}
+.home-hero-main { position: relative; min-width: 0; }
+.home-hero h1 { font-size: 32px; letter-spacing: -0.03em; }
+
+.home-champ {
+  position: relative; display: flex; align-items: center; gap: 14px;
+  padding: 12px 16px 12px 12px; border-radius: 14px; min-width: 0;
+  color: var(--text); background: rgba(8, 9, 12, .45); border: 1px solid rgba(242, 195, 91, .35);
+  transition: border-color .15s, transform .15s;
+}
+.home-champ:hover { border-color: rgba(242, 195, 91, .55); color: var(--text); transform: translateY(-1px); }
+.home-champ-badge {
+  position: absolute; top: -7px; right: 12px;
+  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: linear-gradient(140deg, #f2c35b, #d4a017); color: #1a1408;
+  box-shadow: 0 4px 12px -4px rgba(242, 195, 91, .7);
+}
+.home-champ-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.home-champ-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--gold);
+}
+.home-champ-meta b {
+  font-family: var(--display); font-size: 17px; font-weight: 700; letter-spacing: -0.02em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.home-champ-history {
+  list-style: none; margin: -8px 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.home-champ-history-chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px 4px 8px; border-radius: 99px; font-size: 12px;
+  background: var(--panel); border: 1px solid var(--border); color: var(--text-2); transition: border-color .15s, color .15s;
+}
+.home-champ-history-chip:hover { border-color: var(--border-strong); color: var(--text); }
+.home-champ-history-chip .champ-year { font-size: 11px; color: var(--muted); }
+.home-champ-history-chip .champ-name { font-weight: 600; }
+
+.story-strip {
+  padding: 16px 18px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,.018), transparent 50%), var(--panel);
+  box-shadow: var(--shadow);
+}
+.story-strip-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.story-strip-head h2 {
+  font-family: var(--display); font-size: 13px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--home-turf);
+}
+.story-beats {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px;
+}
+.story-beat { min-width: 0; }
+.story-beat-link {
+  display: flex; align-items: flex-start; gap: 10px; height: 100%;
+  padding: 10px 12px; border-radius: 11px; color: var(--text);
+  background: var(--panel-2); border: 1px solid var(--border); transition: border-color .15s, transform .15s;
+}
+a.story-beat-link:hover { border-color: var(--border-strong); color: var(--text); transform: translateY(-1px); }
+.story-beat-icon {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; flex: none;
+  background: var(--home-turf-soft); color: var(--home-turf);
+}
+.story-beat-icon.pos { background: rgba(61, 220, 151, .12); color: var(--pos); }
+.story-beat-icon.neg { background: rgba(255, 107, 122, .12); color: var(--neg); }
+.story-beat-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.story-beat-label {
+  font-size: 10.5px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.story-beat-who {
+  font-family: var(--display); font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.story-beat-who .team-name { display: block !important; }
+.story-beat-who .team-name small { display: none; }
+.story-beat-detail { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.home-gameday .slate-title { display: inline-flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.home-gameday .slate-week {
+  font-variant-numeric: tabular-nums; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--home-turf); font-size: 12px; font-weight: 750;
+  padding: 3px 8px; border-radius: 6px; background: var(--home-turf-soft); border: 1px solid rgba(61, 155, 110, .28);
+}
 
 /* Team name with the username underneath */
 .team-name { display: inline-flex !important; flex-direction: column; min-width: 0; line-height: 1.2; overflow: hidden; -webkit-line-clamp: unset !important; white-space: normal !important; }
 .team-name b { font-weight: inherit; color: inherit; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .team-name small { font-size: 11px; font-weight: 500; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
-.snap-value .team-name small { font-family: var(--font); font-size: 11.5px; letter-spacing: 0; }
 .game-side .team-name { flex: 1; }
 .game-side .rec { flex: none !important; }
 .member-link .team-name { flex: 1 1 auto; }
 
-.week-recap { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: -4px 0 14px; font-size: 13px; color: var(--text-2); }
-.week-recap > span { display: inline; }
-.week-recap .icon { color: var(--accent); vertical-align: -2px; margin-right: 5px; }
-
-@media (max-width: 1100px) { .snap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
-  .hero.compact { padding: 18px 16px; }
-  .hero.compact h1 { font-size: 23px; }
-  .champ-strip { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; width: 100%; -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); }
-  .champ-strip::-webkit-scrollbar { display: none; }
-  .champ-chip { white-space: nowrap; }
-  .snap-grid { gap: 10px; }
-  .snap { padding: 12px; }
-  .snap-value { font-size: 15px; }
-  .week-recap { flex-direction: column; gap: 6px; font-size: 12.5px; }
+  .home-hero { padding: 20px 16px; }
+  .home-hero h1 { font-size: 24px; }
+  .home-champ { width: 100%; }
+  .home-champ-history {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, #000 88%, transparent);
+    mask-image: linear-gradient(to right, #000 88%, transparent);
+  }
+  .home-champ-history::-webkit-scrollbar { display: none; }
+  .home-champ-history-chip { white-space: nowrap; }
+  .story-beats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Elo */

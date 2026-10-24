@@ -38,7 +38,7 @@ export function TeamName({ id, season }: { id: string; season?: number }) {
   )
 }
 
-export function Card({ title, sub, children, right }: { title: string; sub?: string; children: ReactNode; right?: ReactNode }) {
+export function Card({ title, sub, children, right }: { title: ReactNode; sub?: string; children: ReactNode; right?: ReactNode }) {
   return (
     <section className="card">
       <header className="card-head">
