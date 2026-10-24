@@ -83,13 +83,13 @@ export function valuations(lg: League): Record<string, Valuation[]> {
       return {
         id, titles, trophies, playoffRate, avgFinish, bestSeason, thisSeason,
         apPct: ap[1] ? ap[0] / ap[1] : 0, winPct: wl[1] ? wl[0] / wl[1] : 0,
-        greats: scores.filter((x) => x >= 85).length,
+        greats: scores.filter((x) => x >= 85).length, //valution of greats
         elo: end ?? 2000, eloChange: end != null ? end - (before ?? 2000) : 0,
         managerScore: m.length ? avg(m.map((r) => r.managerScore)) : 50,
         coachScore: m.length ? avg(m.map((r) => r.coachScore)) : 50,
       }
     })
-    const col = (f: (r: (typeof raw)[number]) => number) => peer(raw.map(f))
+    const col = (f: (r: (typeof raw)[number]) => number) => peer(raw.map(f)) //valuation of each pillar
     const skill = col((r) => r.elo)
     const trophies = col((r) => r.trophies)
     const [pr, fin, ap, win] = [col((r) => r.playoffRate), col((r) => -r.avgFinish), col((r) => r.apPct), col((r) => r.winPct)]

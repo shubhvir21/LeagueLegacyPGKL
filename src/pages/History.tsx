@@ -27,16 +27,24 @@ export default function History() {
   const [seasonTab, setSeasonTab] = useState<(typeof SEASON_TABS)[number]>('Champions')
   const [metric, setMetric] = useState<Metric>('Season Score')
   const winPct = (w: number, l: number, t = 0) => (w + t / 2) / (w + l + t || 1)
-  // All-time standings rank (win %, then wins, then points) is locked to each member: sorting by
-  // another column reorders the rows but every member keeps their standings number.
-  const standing = Object.fromEntries([...rows]
-    .sort((a, b) => winPct(b.wins, b.losses, b.ties) - winPct(a.wins, a.losses, a.ties) || b.wins - a.wins || b.pf - a.pf)
-    .map((r, i) => [r.member.id, i + 1]))
+  // Each tab has its own standings order, locked to each member: sorting by another column
+  // reorders the rows but every member keeps their standings number.
+  const ORDER: Record<typeof tab, { sort: (a: CareerRow, b: CareerRow) => number; tip: string }> = {
+    'All-Time': {
+      sort: (a, b) => winPct(b.wins, b.losses, b.ties) - winPct(a.wins, a.losses, a.ties) || b.wins - a.wins || b.pf - a.pf,
+      tip: 'All-time standings rank: win %, then wins, then points.',
+    },
+    Playoffs: {
+      sort: (a, b) => winPct(b.playoffW, b.playoffL) - winPct(a.playoffW, a.playoffL) || (b.playoffW + b.playoffL) - (a.playoffW + a.playoffL) || b.titles - a.titles,
+      tip: 'Playoff rank: playoff win %, then most playoff games played, then titles.',
+    },
+    Advanced: { sort: (a, b) => b.avgScore - a.avgScore, tip: 'Advanced rank: average season score.' },
+  }
+  const standing = Object.fromEntries([...rows].sort(ORDER[tab].sort).map((r, i) => [r.member.id, i + 1]))
   const base: Col<CareerRow>[] = [
-    { key: 'rank', label: '#', render: (r) => <b>{standing[r.member.id]}</b>, sort: (r) => -standing[r.member.id], tip: 'All-time standings rank: win %, then wins, then points. It stays with each member when you sort by another column.' },
+    { key: 'rank', label: '#', render: (r) => <b>{standing[r.member.id]}</b>, sort: (r) => -standing[r.member.id], tip: `${ORDER[tab].tip} It stays with each member when you sort by another column.` },
     { key: 'team', label: 'Member', render: (r) => <MemberLink id={r.member.id} />, sort: (r) => r.member.name.toLowerCase() },
   ]
-  const seasonsCol: Col<CareerRow> = { key: 'seasons', label: 'Seasons', render: (r) => `${seasonRange(r.seasons)} (${r.seasons.length})`, sort: (r) => r.seasons.length }
   const cols: Record<typeof tab, Col<CareerRow>[]> = {
     'All-Time': [
       ...base,
@@ -58,7 +66,6 @@ export default function History() {
     ],
     Advanced: [
       ...base,
-      seasonsCol,
       { key: 'pf', label: 'Points For', render: (r) => fmt(r.pf), sort: (r) => r.pf, align: 'right' },
       { key: 'ppg', label: 'PPG', render: (r) => fmt(r.pf / (r.games || 1)), sort: (r) => r.pf / (r.games || 1), align: 'right' },
       { key: 'pa', label: 'Points Against', render: (r) => fmt(r.pa), sort: (r) => r.pa, align: 'right' },
