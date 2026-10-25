@@ -66,11 +66,17 @@ export async function fetchSleeperProjections(week: number): Promise<Record<stri
 
 export const fetchRosters = () => getJson<SleeperRoster[]>(`${SLEEPER}/league/${CURRENT_LEAGUE_ID}/rosters`)
 
+/** The feed also carries later weeks' games, so a team or player can appear twice; the current week's game starts first. */
+const isEarlier = (a: LiveGame['game'], b: LiveGame['game']) => new Date(a.startsAt) <= new Date(b.startsAt)
+
 /** Sleeper player id -> live row (a player appears in one game per week). */
 export function indexBySleeperId(feed: LiveFeed | null): Map<string, LiveEntry> {
   const out = new Map<string, LiveEntry>()
   for (const g of Object.values(feed?.games ?? {})) {
-    for (const row of g.players) if (row.sleeperId) out.set(row.sleeperId, { row, game: g.game })
+    for (const row of g.players) {
+      const existing = row.sleeperId ? out.get(row.sleeperId) : undefined
+      if (row.sleeperId && !(existing && isEarlier(existing.game, g.game))) out.set(row.sleeperId, { row, game: g.game })
+    }
   }
   return out
 }
@@ -129,8 +135,10 @@ export const normalizeTeam = (abbr: string) => TEAM_ALIASES[abbr.toUpperCase()] 
 export function indexGamesByTeam(feed: LiveFeed | null): Map<string, LiveGame['game']> {
   const out = new Map<string, LiveGame['game']>()
   for (const { game } of Object.values(feed?.games ?? {})) {
-    out.set(normalizeTeam(game.away), game)
-    out.set(normalizeTeam(game.home), game)
+    for (const team of [game.away, game.home].map(normalizeTeam)) {
+      const existing = out.get(team)
+      if (!(existing && isEarlier(existing, game))) out.set(team, game)
+    }
   }
   return out
 }
