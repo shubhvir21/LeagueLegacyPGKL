@@ -920,3 +920,20 @@ button.elo-chip { font: inherit; }
 @media (max-width: 340px) {
   .lm-top .avatar { display: none; }
 }
+
+.lm-live { color: var(--text); font-weight: 600; }
+.lm-live.redzone { color: #ff5d5d; }
+.lm-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #3ddc97; animation: lm-pulse 1.4s ease-in-out infinite; }
+.lm-live.redzone .lm-dot { background: #ff5d5d; }
+.lm-cell.playing { box-shadow: 0 0 0 1px color-mix(in srgb, #3ddc97 45%, transparent); }
+.lm-shot-wrap { position: relative; flex: none; display: inline-flex; }
+.lm-badge { position: absolute; top: -1px; left: -1px; box-shadow: 0 0 0 2px var(--panel-2); }
+.lm-ball { position: absolute; right: -4px; bottom: -4px; font-size: 11px; line-height: 1; }
+.lm-ticker { display: flex; gap: 8px; overflow-x: auto; margin: 10px 0; scrollbar-width: none; }
+.lm-tick { flex: none; display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border-radius: 10px; background: var(--panel-2); border: 1px solid color-mix(in srgb, #3ddc97 35%, transparent); font-size: 12px; }
+.lm-tick.redzone { border-color: color-mix(in srgb, #ff5d5d 60%, transparent); }
+.lm-tick-teams { display: flex; gap: 6px; align-items: baseline; font-weight: 600; }
+.lm-tick-teams em { font-style: normal; color: var(--muted); font-weight: 400; }
+.lm-tick small { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+@keyframes lm-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+@media (prefers-reduced-motion: reduce) { .lm-dot { animation: none; } }

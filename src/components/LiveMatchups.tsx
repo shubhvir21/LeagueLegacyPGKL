@@ -2,16 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLeague } from '../lib/data'
 import {
   buildBenchLines, buildTeamLines, fetchLiveFeed, fetchMatchups, fetchRosters, fetchSleeperProjections, fetchWeek, indexBySleeperId, indexGamesByTeam, normalizeTeam, pairMatchups, sum, winProbability,
-  type LiveFeed, type StarterLine,
+  type LiveFeed, type LiveGame, type StarterLine,
 } from '../lib/live'
 import { DEFAULT_MODEL } from '../lib/model'
 import { lineupSlots } from '../lib/lineup'
 import { playersOf, type PlayerInfo } from '../lib/players'
+import { fetchSituations, type GameSituation } from '../lib/situation'
 import type { SleeperMatchup, SleeperRoster } from '../lib/sleeper'
 import { fmt, type Game } from '../lib/stats'
 import { Avatar, TeamName } from './ui'
 
 const REFRESH_MS = 60_000
+const SITUATION_REFRESH_MS = 15_000
 const STALE_MINUTES = 15
 const SLOT_LABEL: Record<string, string> = { SUPER_FLEX: 'SF', FLEX: 'FLX', REC_FLEX: 'FLX', WRRB_FLEX: 'FLX' }
 
@@ -66,6 +68,7 @@ export function LiveMatchups() {
   const [feedError, setFeedError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState(0)
+  const [situations, setSituations] = useState<Map<string, GameSituation>>(new Map())
 
   const load = useCallback(async () => {
     try {
@@ -91,6 +94,13 @@ export function LiveMatchups() {
     const id = setInterval(() => { if (!document.hidden) load() }, REFRESH_MS)
     return () => clearInterval(id)
   }, [load])
+
+  useEffect(() => {
+    const poll = () => { if (!document.hidden) fetchSituations().then(setSituations).catch(() => setSituations(new Map())) } // display-only extra: on failure the cell just shows the score line
+    poll()
+    const id = setInterval(poll, SITUATION_REFRESH_MS)
+    return () => clearInterval(id)
+  }, [])
 
   const live = useMemo(() => indexBySleeperId(feed), [feed])
   // Fresh Sleeper numbers win; the nightly snapshot only fills gaps if the live fetch returned nothing for a player.
@@ -132,12 +142,13 @@ export function LiveMatchups() {
         ))}
       </div>
       <Scoreboard x={game.x} y={game.y} p={game.p} year={season?.year} h2h={headToHead(lg.games, game.x.memberId, game.y.memberId)} />
+      <LiveTicker lines={[...game.x.lines, ...game.y.lines]} situations={situations} />
       <div className="lm-rows">
         {Array.from({ length: Math.max(game.x.lines.length, game.y.lines.length) }, (_, i) => (
           <div className="lm-row" key={i}>
-            <PlayerCell line={game.x.lines[i]} info={info} />
+            <PlayerCell line={game.x.lines[i]} info={info} situations={situations} />
             <span className="lm-slot">{SLOT_LABEL[slots[i]] ?? slots[i] ?? ''}</span>
-            <PlayerCell line={game.y.lines[i]} info={info} right />
+            <PlayerCell line={game.y.lines[i]} info={info} situations={situations} right />
           </div>
         ))}
       </div>
@@ -145,9 +156,9 @@ export function LiveMatchups() {
       <div className="lm-rows lm-bench">
         {Array.from({ length: Math.max(game.x.bench.length, game.y.bench.length) }, (_, i) => (
           <div className="lm-row" key={i}>
-            <PlayerCell line={game.x.bench[i]} info={info} />
+            <PlayerCell line={game.x.bench[i]} info={info} situations={situations} />
             <span className="lm-slot">BN</span>
-            <PlayerCell line={game.y.bench[i]} info={info} right />
+            <PlayerCell line={game.y.bench[i]} info={info} situations={situations} right />
           </div>
         ))}
       </div>
@@ -211,17 +222,55 @@ function TeamNums({ s, right }: { s: Side; right?: boolean }) {
   )
 }
 
-function PlayerCell({ line, info, right }: { line?: StarterLine; info: Record<string, PlayerInfo>; right?: boolean }) {
+/** One Sleeper-style strip per live NFL game that has a starter in this matchup. */
+function LiveTicker({ lines, situations }: { lines: StarterLine[]; situations: Map<string, GameSituation> }) {
+  const games = new Map<string, LiveGame['game']>()
+  for (const l of lines) if (l.game?.status === 'live') games.set(l.game.eventId, l.game)
+  if (games.size === 0) return null
+  return (
+    <div className="lm-ticker">
+      {[...games.values()].map((g) => {
+        const sit = situations.get(normalizeTeam(g.home))
+        const ball = sit?.possessionTeam
+        const side = (team: string, score: number) => <span className={ball === normalizeTeam(team) ? 'ball' : ''}>{ball === normalizeTeam(team) ? '🏈 ' : ''}{team} <b>{score}</b></span>
+        return (
+          <div key={g.eventId} className={`lm-tick${sit?.isRedZone ? ' redzone' : ''}`}>
+            <span className="lm-tick-teams">{side(g.away, g.awayScore)}<em>@</em>{side(g.home, g.homeScore)}</span>
+            <small><i className="lm-dot" aria-label="Game in progress" />{sit?.isHalftime ? 'Halftime' : `${sit?.clock ?? ''} Q${g.period}`}{sit?.downDistance && ` · ${sit.downDistance}`}</small>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function SituationLine({ situation, hasBall }: { situation: GameSituation; hasBall: boolean }) {
+  const detail = situation.isHalftime ? 'Halftime' : `${situation.clock} Q${situation.period}${hasBall && situation.downDistance ? ` · 🏈 ${situation.downDistance}` : ''}`
+  return (
+    <small className={`lm-live${situation.isRedZone && hasBall ? ' redzone' : ''}`}>
+      <i className="lm-dot" aria-label="Game in progress" />{detail}
+    </small>
+  )
+}
+
+function PlayerCell({ line, info, situations, right }: { line?: StarterLine; info: Record<string, PlayerInfo>; situations: Map<string, GameSituation>; right?: boolean }) {
   if (!line) return <div className="lm-cell empty" />
   const p = info[line.playerId]
+  const situation = line.game?.status === 'live' && p?.team ? situations.get(normalizeTeam(p.team)) : undefined
+  const hasBall = !!situation && situation.possessionTeam === normalizeTeam(p?.team ?? '')
   // Flag Sleeper-sourced projections only where it matters: not defenses, not finished games, and not byes (Sleeper projects those at 0).
   const isEstimate = (line.source === 'sleeper' || line.source === 'none') && p?.pos !== 'DEF' && line.game?.status !== 'final' && line.projected > line.actual
   return (
-    <div className={`lm-cell pos-${p?.pos ?? 'X'}${right ? ' right' : ''}`}>
-      <img className="lm-shot" src={headshot(line.playerId, p)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
+    <div className={`lm-cell pos-${p?.pos ?? 'X'}${right ? ' right' : ''}${situation ? ' playing' : ''}${hasBall ? ' has-ball' : ''}`}>
+      <span className="lm-shot-wrap">
+        <img className="lm-shot" src={headshot(line.playerId, p)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
+        {situation && <i className="lm-dot lm-badge" aria-label="Game in progress" />}
+        {hasBall && <span className="lm-ball" aria-label="Team has the ball">🏈</span>}
+      </span>
       <div className="lm-who">
         <b>{p?.name ?? line.playerId}</b>
         <small className="muted"><span className={`pos-tag ${p?.pos ?? ''}`}>{p?.pos}</span> {p?.team}{gameLabel(line) && ` · ${gameLabel(line)}`}</small>
+        {situation && <SituationLine situation={situation} hasBall={hasBall} />}
       </div>
       <div className="lm-pts">
         <b>{fmt(line.actual)}</b>
