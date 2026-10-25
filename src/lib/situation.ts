@@ -1,6 +1,6 @@
 // Live game situation (clock, possession, down & distance) from ESPN's public scoreboard, which allows browser CORS.
 // The odds Worker only knows score and quarter, so this is a separate, display-only feed keyed by NFL team.
-import { normalizeTeam } from './live'
+import { normalizeTeam, type LiveFeed } from './live'
 
 const SCOREBOARD_URL = 'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard'
 
@@ -22,6 +22,11 @@ interface EspnEvent {
   }[]
 }
 
+export function parseFinishedTeams(events: EspnEvent[]): Set<string> {
+  const teams = events.filter((e) => e.status.type.state === 'post').flatMap((e) => e.competitions[0].competitors.map((c) => normalizeTeam(c.team.abbreviation)))
+  return new Set(teams)
+}
+
 export function parseSituations(events: EspnEvent[]): Map<string, GameSituation> {
   const out = new Map<string, GameSituation>()
   for (const event of events) {
@@ -41,9 +46,24 @@ export function parseSituations(events: EspnEvent[]): Map<string, GameSituation>
   return out
 }
 
-export async function fetchSituations(): Promise<Map<string, GameSituation>> {
+/**
+ * The odds feed can lag minutes behind a final whistle, leaving its last in-game "remaining" points on finished players.
+ * ESPN is the authority on a game being over, so those games are closed out here: status final, nothing remaining.
+ */
+export function applyFinals(feed: LiveFeed | null, finishedTeams: Set<string>): LiveFeed | null {
+  if (!feed || finishedTeams.size === 0) return feed
+  const games = Object.fromEntries(Object.entries(feed.games).map(([id, lg]) => {
+    const isOver = lg.game.status === 'live' && finishedTeams.has(normalizeTeam(lg.game.home)) && finishedTeams.has(normalizeTeam(lg.game.away))
+    return [id, isOver ? { game: { ...lg.game, status: 'final' as const }, players: lg.players.map((r) => ({ ...r, remaining: 0, projected: r.actual })) } : lg]
+  }))
+  return { ...feed, games }
+}
+
+export interface EspnSnapshot { situations: Map<string, GameSituation>; finishedTeams: Set<string> }
+
+export async function fetchEspnSnapshot(): Promise<EspnSnapshot> {
   const res = await fetch(SCOREBOARD_URL)
   if (!res.ok) throw new Error(`ESPN scoreboard returned ${res.status}, expected 200`)
   const body = (await res.json()) as { events: EspnEvent[] }
-  return parseSituations(body.events)
+  return { situations: parseSituations(body.events), finishedTeams: parseFinishedTeams(body.events) }
 }

@@ -7,13 +7,14 @@ import {
 import { DEFAULT_MODEL } from '../lib/model'
 import { lineupSlots } from '../lib/lineup'
 import { playersOf, type PlayerInfo } from '../lib/players'
-import { fetchSituations, type GameSituation } from '../lib/situation'
+import { applyFinals, fetchEspnSnapshot, type EspnSnapshot, type GameSituation } from '../lib/situation'
 import type { SleeperMatchup, SleeperRoster } from '../lib/sleeper'
 import { fmt, type Game } from '../lib/stats'
 import { Avatar, TeamName } from './ui'
 
 const REFRESH_MS = 60_000
 const SITUATION_REFRESH_MS = 15_000
+const EMPTY_ESPN: EspnSnapshot = { situations: new Map(), finishedTeams: new Set() }
 const STALE_MINUTES = 15
 const SLOT_LABEL: Record<string, string> = { SUPER_FLEX: 'SF', FLEX: 'FLX', REC_FLEX: 'FLX', WRRB_FLEX: 'FLX' }
 
@@ -64,11 +65,11 @@ export function LiveMatchups() {
   const [matchups, setMatchups] = useState<SleeperMatchup[]>([])
   const [rosters, setRosters] = useState<SleeperRoster[]>([])
   const [freshProjections, setFreshProjections] = useState<Record<string, number>>({})
-  const [feed, setFeed] = useState<LiveFeed | null>(null)
+  const [rawFeed, setFeed] = useState<LiveFeed | null>(null)
   const [feedError, setFeedError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState(0)
-  const [situations, setSituations] = useState<Map<string, GameSituation>>(new Map())
+  const [espn, setEspn] = useState<EspnSnapshot>(EMPTY_ESPN)
 
   const load = useCallback(async () => {
     try {
@@ -96,12 +97,14 @@ export function LiveMatchups() {
   }, [load])
 
   useEffect(() => {
-    const poll = () => { if (!document.hidden) fetchSituations().then(setSituations).catch(() => setSituations(new Map())) } // display-only extra: on failure the cell just shows the score line
+    const poll = () => { if (!document.hidden) fetchEspnSnapshot().then(setEspn).catch(() => setEspn(EMPTY_ESPN)) } // display-only extra: on failure the cell just shows the score line
     poll()
     const id = setInterval(poll, SITUATION_REFRESH_MS)
     return () => clearInterval(id)
   }, [])
 
+  const { situations, finishedTeams } = espn
+  const feed = useMemo(() => applyFinals(rawFeed, finishedTeams), [rawFeed, finishedTeams])
   const live = useMemo(() => indexBySleeperId(feed), [feed])
   // Fresh Sleeper numbers win; the nightly snapshot only fills gaps if the live fetch returned nothing for a player.
   const snapshot = week ? raw?.projections?.weeks[String(week)] : undefined
