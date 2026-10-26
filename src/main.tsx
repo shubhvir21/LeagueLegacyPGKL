@@ -15,15 +15,12 @@ import Management from './pages/Management'
 import Rules from './pages/Rules'
 import Transactions from './pages/Transactions'
 import Players, { Player } from './pages/Players'
-import Achievements from './pages/Achievements'
 import Home from './pages/Home'
 import Keepers from './pages/Keepers'
-import TradeTree from './pages/TradeTree'
 import Power from './pages/Power'
 import { RecapRedirect } from './pages/Recap'
-import Dynasty from './pages/Dynasty'
 import AllTime from './pages/AllTime'
-import WhatIf from './pages/WhatIf'
+import Butterfly from './pages/Butterfly'
 import './styles.css'
 
 // Installable app + offline support (production only, so dev hot reload isn't cached).
@@ -47,7 +44,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="transactions" element={<Transactions />} />
             <Route path="players" element={<Players />} />
             <Route path="player/:id" element={<Player />} />
-            <Route path="achievements" element={<Achievements />} />
+            <Route path="achievements" element={<Navigate to="/" replace />} />
             <Route path="seasons" element={<SeasonIndex />} />
             <Route path="season/:year" element={<Season />} />
             <Route path="season/:year/team/:member" element={<TeamSeason />} />
@@ -60,14 +57,15 @@ createRoot(document.getElementById('root')!).render(
             <Route path="playoffs" element={<Playoffs />} />
             <Route path="keepers" element={<Keepers />} />
             <Route path="odds" element={<Navigate to="/playoffs" replace />} />
-            <Route path="trades" element={<TradeTree />} />
+            <Route path="trades" element={<Navigate to="/butterfly" replace />} />
             <Route path="power" element={<Power />} />
             <Route path="recap" element={<RecapRedirect />} />
             <Route path="recap/:year" element={<RecapRedirect />} />
-            <Route path="dynasty" element={<Dynasty />} />
+            <Route path="dynasty" element={<Navigate to="/members" replace />} />
             <Route path="rivalries" element={<Navigate to="/versus" replace />} />
             <Route path="alltime" element={<AllTime />} />
-            <Route path="whatif" element={<WhatIf />} />
+            <Route path="butterfly" element={<Butterfly />} />
+            <Route path="whatif" element={<Navigate to="/butterfly" replace />} />
             <Route path="records" element={<RecordBook />} />
           </Route>
         </Routes>

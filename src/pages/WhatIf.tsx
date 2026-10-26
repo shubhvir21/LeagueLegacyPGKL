@@ -9,7 +9,7 @@ import { signed } from './History'
 const FINISH = { 1: 'Champion', 2: 'Runner-up', 3: 'Semifinal', 5: 'Quarterfinal' } as Record<number, string>
 const fin = (f: number | null) => (f == null ? '—' : FINISH[f] ?? `${f}`)
 
-export default function WhatIf() {
+export function WhatIfSection() {
   const lg = useLeague()
   const pm = playersOf(lg)
   const years = lg.seasons.map((s) => s.year)
@@ -49,10 +49,10 @@ export default function WhatIf() {
   ]
 
   return (
-    <div className="page">
+    <>
       <div className="page-head">
         <div>
-          <h1>What-If Machine</h1>
+          <h2>What-If Machine</h2>
           <p className="muted">Change the past and replay the standings and the bracket.</p>
         </div>
         <select value={year} onChange={(e) => reset(Number(e.target.value))}>
@@ -125,6 +125,6 @@ export default function WhatIf() {
           </div>
         </Card>
       )}
-    </div>
+    </>
   )
 }

@@ -47,7 +47,7 @@ function Branch({ n }: { n: TradeNode }) {
   )
 }
 
-export default function TradeTree() {
+export function TradeTreeSection() {
   const lg = useLeague()
   const { pm, tree } = treesOf(lg)
   const trades = useMemo(() => pm.trades
@@ -58,7 +58,7 @@ export default function TradeTree() {
     })
     .sort((a, b) => b.t.created - a.t.created), [pm, tree])
   const [sel, setSel] = useState(0)
-  if (!trades.length) return <div className="page"><h1>Trade Trees</h1><p className="muted">No trades yet.</p></div>
+  if (!trades.length) return <><h2>Trade Trees</h2><p className="muted">No trades yet.</p></>
   const cur = trades[Math.min(sel, trades.length - 1)]
   const deepest = [...trades].sort((a, b) => Math.max(...b.sides.map((x) => x.tot.depth)) - Math.max(...a.sides.map((x) => x.tot.depth)))[0]
   const lopsided = [...trades].sort((a, b) => b.margin - a.margin)[0]
@@ -66,10 +66,10 @@ export default function TradeTree() {
   const summary = (x: (typeof trades)[number]) => x.sides.map((s) => `${lg.memberById[s.s.memberId]?.name ?? '?'}`).join(' ⇄ ')
 
   return (
-    <div className="page">
+    <>
       <div className="page-head">
         <div>
-          <h1>Trade Trees</h1>
+          <h2>Trade Trees</h2>
           <p className="muted">Every trade, followed to the end: what each side got, what it was flipped into, and the points it produced.</p>
         </div>
       </div>
@@ -103,6 +103,6 @@ export default function TradeTree() {
           ))}
         </div>
       </div>
-    </div>
+    </>
   )
 }
