@@ -2,6 +2,7 @@
 import { careers, fmt, pct, record, type Game, type League, type TeamSeason } from './stats'
 import { gameOdds, UPSET_LINE, type GameOdds } from './upsets'
 import { franchiseElo } from './elo'
+import { managementCached, managementCareer } from './management'
 
 const UPSET_TIP = 'pre-game chance from projected lineups and form'
 
@@ -58,21 +59,48 @@ export function buildRecords(lg: League): RecordDef[] {
   // ---------- League (career) ----------
   const career = (id: string, title: string, desc: string, positive: boolean, f: (r: (typeof cr)[number]) => number, show: (r: (typeof cr)[number]) => string, asc = false) =>
     add('League', id, title, desc, positive, top(cr, f, asc).map((r) => ({ memberId: r.member.id, value: f(r), display: show(r), context: `${r.seasons.length} seasons`, link: `/member/${r.member.id}` })))
-  career('wins', 'Most Total Wins', 'All-time regular-season wins (incl. median).', true, (r) => r.wins, (r) => String(r.wins))
-  career('losses', 'Most Total Losses', 'All-time regular-season losses (incl. median).', false, (r) => r.losses, (r) => String(r.losses))
-  career('winpct', 'Best Win Percentage', 'All-time regular-season win %.', true, (r) => r.wins / (r.wins + r.losses + r.ties || 1), (r) => pct(r.wins, r.losses, r.ties))
-  career('appct', 'Best All-Play Percentage', 'All-time all-play win %.', true, (r) => r.apW / (r.apW + r.apL + r.apT || 1), (r) => pct(r.apW, r.apL, r.apT))
-  career('apwins', 'Most All-Play Wins', 'All-time all-play wins.', true, (r) => r.apW, (r) => String(r.apW))
-  career('pf', 'Most Total Points', 'All-time regular-season points scored.', true, (r) => r.pf, (r) => fmt(r.pf))
-  career('ppg', 'Best Points Per Game', 'All-time regular-season points per game.', true, (r) => r.pf / (r.games || 1), (r) => fmt(r.pf / (r.games || 1)))
-  career('pa', 'Most Points Against', 'All-time regular-season points allowed.', false, (r) => r.pa, (r) => fmt(r.pa))
+  // Rates need a real sample: one completed season for the regular season, three playoff games for the playoffs.
+  const crFull = cr.filter((r) => r.seasons.some((y) => lg.seasons.find((s) => s.year === y)?.complete))
+  const crPo = cr.filter((r) => r.playoffW + r.playoffL >= 3)
+  const careerOf = (pool: typeof cr, id: string, title: string, desc: string, positive: boolean, f: (r: (typeof cr)[number]) => number, show: (r: (typeof cr)[number]) => string, asc = false) =>
+    add('League', id, title, desc, positive, top(pool, f, asc).map((r) => ({ memberId: r.member.id, value: f(r), display: show(r), context: `${r.seasons.length} seasons`, link: `/member/${r.member.id}` })))
+  const winPct = (r: (typeof cr)[number]) => r.wins / (r.wins + r.losses + r.ties || 1)
+  const apPct = (r: (typeof cr)[number]) => r.apW / (r.apW + r.apL + r.apT || 1)
+  const ppg = (r: (typeof cr)[number]) => r.pf / (r.games || 1)
+  const poPct = (r: (typeof cr)[number]) => r.playoffW / (r.playoffW + r.playoffL || 1)
+  const done = lg.seasons.filter((s) => s.complete)
+  const podiums = (id: string) => done.filter((s) => [s.champion, s.runnerUp, s.third].includes(id)).length
+  const coachOf = (id: string) => { const ts = tsAll.filter((t) => t.memberId === id && t.maxPf); const max = ts.reduce((a, t) => a + t.maxPf!, 0); return max ? (ts.reduce((a, t) => a + t.pf, 0) / max) * 100 : 0 }
+  const mgr = Object.fromEntries(managementCareer(managementCached(lg).filter((r) => !r.inProgress)).map((r) => [r.memberId, r.managerScore]))
+  const crMgr = cr.filter((r) => mgr[r.member.id] != null)
+  // Weekly low score: the bottom regular-season score of the week.
+  const weekLow: Record<string, number> = {}
+  for (const t of regTw.filter((t) => t.pts > 0)) { const k = `${t.season}|${t.week}`; weekLow[k] = Math.min(weekLow[k] ?? Infinity, t.pts) }
+  const lows = (id: string) => regTw.filter((t) => t.memberId === id && t.pts > 0 && t.pts === weekLow[`${t.season}|${t.week}`]).length
+  // Toilet bowl: the lower score advances, so every losers-bracket game you scored less in counts.
+  const toiletLosses = (id: string) => tw.filter((t) => t.memberId === id && t.bracket === 'losers' && t.pts > 0 && t.pts < t.oppPts).length
+
+  careerOf(crFull, 'winpct', 'Best Win Percentage', 'All-time regular-season win % (incl. median). Needs a completed season.', true, winPct, (r) => pct(r.wins, r.losses, r.ties))
+  careerOf(crFull, 'appct', 'Best All-Play Percentage', 'All-time all-play win %. Needs a completed season.', true, apPct, (r) => pct(r.apW, r.apL, r.apT))
+  careerOf(crFull, 'ppg', 'Best Points Per Game', 'All-time regular-season points per game. Needs a completed season.', true, ppg, (r) => fmt(ppg(r)))
   career('titles', 'Most Championships', 'League titles won.', true, (r) => r.titles, (r) => String(r.titles))
+  career('podiums', 'Most Podium Finishes', 'Seasons finishing 1st, 2nd or 3rd.', true, (r) => podiums(r.member.id), (r) => String(podiums(r.member.id)))
   career('playoffs', 'Most Playoff Appearances', 'Seasons reaching the winners bracket.', true, (r) => r.playoffs, (r) => String(r.playoffs))
   career('pwins', 'Most Playoff Wins', 'Winners-bracket games won.', true, (r) => r.playoffW, (r) => String(r.playoffW))
-  career('elo', 'Highest Elo', 'Current Elo rating (0–5000).', true, (r) => r.elo, (r) => String(r.elo))
+  careerOf(cr.filter((r) => r.avgFinish != null), 'avgfinish', 'Best Average Finish', 'Average final place across completed seasons.', true, (r) => r.avgFinish!, (r) => r.avgFinish!.toFixed(1), true)
+  career('coach', 'Best Career Coach Score', 'All-time points ÷ max possible points from your rosters.', true, (r) => coachOf(r.member.id), (r) => coachOf(r.member.id).toFixed(1))
   career('luck', 'Luckiest All-Time', 'Total luck (actual minus expected H2H wins).', true, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)))
-  career('unluck', 'Unluckiest All-Time', 'Lowest total luck.', false, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)), true)
   career('highs', 'Most Weekly High Scores', 'Weeks finishing as the top scorer.', true, (r) => careerSum(tsAll, r.member.id, (t) => t.highScores), (r) => String(careerSum(tsAll, r.member.id, (t) => t.highScores)))
+
+  careerOf(crFull, 'winpct-low', 'Worst Win Percentage', 'All-time regular-season win % (incl. median). Needs a completed season.', false, winPct, (r) => pct(r.wins, r.losses, r.ties), true)
+  careerOf(crFull, 'appct-low', 'Worst All-Play Percentage', 'All-time all-play win %. Needs a completed season.', false, apPct, (r) => pct(r.apW, r.apL, r.apT), true)
+  careerOf(crFull, 'ppg-low', 'Worst Points Per Game', 'All-time regular-season points per game. Needs a completed season.', false, ppg, (r) => fmt(ppg(r)), true)
+  careerOf(crFull, 'papg', 'Most Points Against Per Game', 'All-time regular-season points allowed per game. The schedule hated you.', false, (r) => r.pa / (r.games || 1), (r) => fmt(r.pa / (r.games || 1)))
+  careerOf(crPo, 'popct-low', 'Worst Playoff Win Percentage', 'Winners-bracket record. Needs 3+ playoff games.', false, poPct, (r) => record(r.playoffW, r.playoffL), true)
+  career('toilet', 'Most Toilet Bowl Losses', 'Toilet bowl games where you scored less, semifinals and finals.', false, (r) => toiletLosses(r.member.id), (r) => String(toiletLosses(r.member.id)))
+  career('lows', 'Most Weekly Low Scores', 'Weeks finishing as the bottom scorer.', false, (r) => lows(r.member.id), (r) => String(lows(r.member.id)))
+  careerOf(crMgr, 'mgr-low', 'Worst Manager Score', 'Career average Manager Score (lineups, waivers and trades, 0–100).', false, (r) => mgr[r.member.id], (r) => mgr[r.member.id].toFixed(0), true)
+  career('unluck', 'Unluckiest All-Time', 'Lowest total luck.', false, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)), true)
 
   // ---------- Season ----------
   const ctx = (t: TeamSeason) => `${t.season} · ${t.teamName}`
@@ -197,14 +225,17 @@ export function buildRecords(lg: League): RecordDef[] {
   add('Streaks & Droughts', 'st-nopo', 'Playoff Drought', 'Consecutive seasons missing the playoffs.', false, top(seasonRuns((t) => !t.madePlayoffs), (r) => r.value))
 
   // ---------- Milestones ----------
-  const milestone = (id: string, title: string, step: number, f: (r: (typeof cr)[number]) => number, unit: string) =>
-    add('Milestones', id, title, `Next milestone every ${step.toLocaleString()} ${unit}.`, true, top(cr, f).map((r) => {
+  const milestone = (id: string, title: string, step: number, f: (r: (typeof cr)[number]) => number, unit: string, positive = true) =>
+    add('Milestones', id, title, `Next milestone every ${step.toLocaleString()} ${unit}.`, positive, top(cr, f).map((r) => {
       const v = f(r), next = (Math.floor(v / step) + 1) * step
       return { memberId: r.member.id, value: v, display: Math.round(v).toLocaleString(), context: `${Math.ceil(next - v).toLocaleString()} away from ${next.toLocaleString()}`, link: `/member/${r.member.id}` }
     }))
   milestone('ms-wins', 'Total Wins', 25, (r) => r.wins, 'wins')
   milestone('ms-ap', 'All-Play Wins', 100, (r) => r.apW, 'all-play wins')
   milestone('ms-pts', 'Total Points', 1000, (r) => r.pf, 'points')
+  milestone('ms-losses', 'Total Losses', 25, (r) => r.losses, 'losses', false)
+  milestone('ms-aplosses', 'All-Play Losses', 100, (r) => r.apL, 'all-play losses', false)
+  milestone('ms-pa', 'Total Points Against', 1000, (r) => r.pa, 'points allowed', false)
 
   return defs
 }

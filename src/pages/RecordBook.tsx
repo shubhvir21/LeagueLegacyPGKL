@@ -13,19 +13,19 @@ export default function RecordBook() {
   const defs = useMemo(() => buildRecords(lg), [lg])
   const [view, setView] = useState<(typeof VIEWS)[number]>('Overview')
   const holders = recordHolders(defs)
-  const counts = Object.fromEntries(CATEGORIES.map((c) => [c, defs.filter((d) => d.category === c).length]))
+  const count = (c: string, positive: boolean) => defs.filter((d) => d.category === c && d.positive === positive).length
 
   const holderRows = careers(lg).map((r) => ({ id: r.member.id, ...(holders[r.member.id] ?? { pos: 0, neg: 0, posTop: 0, negTop: 0 }) }))
   const cols: Col<(typeof holderRows)[number]>[] = [
     { key: 'm', label: 'Member', render: (r) => <MemberLink id={r.id} /> },
     { key: 'pos', label: 'Records Held', render: (r) => <span className="pos"><b>{r.pos}</b></span>, sort: (r) => r.pos, tip: 'Positive records where this member holds #1 (ties count).' },
     { key: 'posTop', label: 'Top 25s', render: (r) => r.posTop, sort: (r) => r.posTop },
-    { key: 'neg', label: 'Blunders Held', render: (r) => <span className="neg"><b>{r.neg}</b></span>, sort: (r) => r.neg, tip: 'Negative records where this member holds #1.' },
-    { key: 'negTop', label: 'Blunder Top 25s', render: (r) => r.negTop, sort: (r) => r.negTop },
+    { key: 'neg', label: 'Chud-cords Held', render: (r) => <span className="neg"><b>{r.neg}</b></span>, sort: (r) => r.neg, tip: 'Chud-cords (bad records) where this member holds #1.' },
+    { key: 'negTop', label: 'Chud-cord Top 25s', render: (r) => r.negTop, sort: (r) => r.negTop },
     { key: 'tot', label: 'Total Held', render: (r) => <b>{r.pos + r.neg}</b>, sort: (r) => r.pos + r.neg },
   ]
   const milestoneWatch = defs
-    .filter((d) => d.category === 'Milestones')
+    .filter((d) => d.category === 'Milestones' && d.positive)
     .flatMap((d) => d.rows.map((r) => ({ d, r, away: Number(r.context.split(' ')[0].replace(/,/g, '')) })))
     .sort((a, b) => a.away / stepOf(a.d) - b.away / stepOf(b.d))
     .slice(0, 8)
@@ -39,8 +39,9 @@ export default function RecordBook() {
           <div className="cat-grid">
             {CATEGORIES.map((c) => (
               <button key={c} className="cat-card" onClick={() => setView(c)}>
-                <span className="cat-count">{counts[c]}</span>
+                <span className="cat-count">{count(c, true) + count(c, false)}</span>
                 <span>{c}</span>
+                <span className="muted small"><span className="pos">{count(c, true)} records</span> · <span className="neg">{count(c, false)} chud-cords</span></span>
               </button>
             ))}
           </div>
@@ -63,11 +64,27 @@ export default function RecordBook() {
           </Card>
         </>
       ) : (
-        <div className="record-grid">
-          {defs.filter((d) => d.category === view).map((d) => <RecordCard key={d.id} d={d} />)}
-        </div>
+        <>
+          <RecordSection title="Records" sub="The good stuff." defs={defs.filter((d) => d.category === view && d.positive)} />
+          <RecordSection title="Chud-cords" sub="The stuff nobody wants their name on." bad defs={defs.filter((d) => d.category === view && !d.positive)} />
+        </>
       )}
     </div>
+  )
+}
+
+function RecordSection({ title, sub, defs, bad = false }: { title: string; sub: string; defs: RecordDef[]; bad?: boolean }) {
+  if (!defs.length) return null
+  return (
+    <section className={`record-section ${bad ? 'bad' : 'good'}`}>
+      <div className="record-section-head">
+        <h2>{title}</h2>
+        <span className="muted">{sub}</span>
+      </div>
+      <div className="record-grid">
+        {defs.map((d) => <RecordCard key={d.id} d={d} />)}
+      </div>
+    </section>
   )
 }
 
