@@ -233,8 +233,8 @@ export function buildRecords(lg: League): RecordDef[] {
     const best = pts.sort((a, b) => b.r! - a.r!)[0]
     if (best) weeksAtTop[best.id] = (weeksAtTop[best.id] ?? 0) + 1
   }
-  add('Streaks & Droughts', 'elo-top', 'Most Weeks as No. 1 in Elo', 'Weeks holding the league\'s top Elo rating.', true,
-    top(Object.keys(weeksAtTop), (id) => weeksAtTop[id]).map((id) => ({ memberId: id, value: weeksAtTop[id], display: String(weeksAtTop[id]), context: 'weeks', link: `/member/${id}` })))
+  add('League', 'elo-top', 'Most Weeks as No. 1 in Elo', 'Weeks holding the league\'s top Elo rating.', true,
+    top(Object.keys(weeksAtTop), (id) => weeksAtTop[id]).map((id) => ({ memberId: id, value: weeksAtTop[id], display: String(weeksAtTop[id]), context: `${weeksAtTop[id]} of ${allKeys.length} weeks`, link: `/member/${id}` })))
 
   // ---------- Upsets ----------
   const odds = gameOdds(lg).filter((o) => o.winner)
@@ -267,6 +267,15 @@ export function buildRecords(lg: League): RecordDef[] {
     medianOf[key] = (pts[Math.floor((pts.length - 1) / 2)] + pts[Math.ceil((pts.length - 1) / 2)]) / 2
   }
   const aboveMed = (t: TeamWeek) => t.pts > medianOf[`${t.season}-${t.week}`]
+  const allOrdered = [...tw].filter((t) => t.pts > 0).sort((a, b) => a.season - b.season || a.week - b.week)
+  const vsRows = members.flatMap((id) => members.filter((o) => o !== id).flatMap((o) =>
+    runs(allOrdered.filter((t) => t.memberId === id && t.oppId === o), (t) => t.pts > t.oppPts).map((r) => ({ memberId: id, value: r.len, display: String(r.len), context: `vs ${name(o)} · ${r.from} → ${r.to}${r.active ? ' (active)' : ''}`, link: `/versus/${id}/${o}` }))))
+  add('Streaks & Droughts', 'st-vs', 'Longest Win Streak vs One Opponent', 'Consecutive wins over the same team, playoffs included.', true, top(vsRows, (r) => r.value))
+  const playoffOrdered = allOrdered.filter((t) => t.bracket === 'winners')
+  add('Streaks & Droughts', 'st-pwin', 'Longest Playoff Win Streak', 'Consecutive winners-bracket wins, across seasons.', true, top(streakRows((t) => t.pts > t.oppPts, playoffOrdered), (r) => r.value))
+  add('Streaks & Droughts', 'st-135', 'Longest Streak Scoring 135+', 'Consecutive regular-season weeks with 135 or more points.', true, top(streakRows((t) => t.pts >= 135, ordered.filter((t) => t.pts > 0)), (r) => r.value))
+  add('Streaks & Droughts', 'st-ploss', 'Longest Playoff Losing Streak', 'Consecutive winners-bracket losses, across seasons.', false, top(streakRows((t) => t.pts < t.oppPts, playoffOrdered), (r) => r.value))
+  add('Streaks & Droughts', 'st-110', 'Longest Streak Under 110', 'Consecutive regular-season weeks scoring under 110.', false, top(streakRows((t) => t.pts < 110, ordered.filter((t) => t.pts > 0)), (r) => r.value))
   add('Streaks & Droughts', 'st-med', 'Longest Streak Beating the Median', 'Consecutive weeks above the league median.', true, top(streakRows(aboveMed, ordered), (r) => r.value))
   add('Streaks & Droughts', 'st-med-low', 'Longest Streak Below the Median', 'Consecutive weeks at or below the median.', false, top(streakRows((t) => !aboveMed(t), ordered), (r) => r.value))
   const seasonRuns = (pred: (t: TeamSeason) => boolean) =>
