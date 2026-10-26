@@ -4,12 +4,11 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { useLeague } from '../lib/data'
 import { teamRankings } from '../lib/teamRank'
 import { money, valuationsOf } from '../lib/valuation'
-import { fmt, ordinal, type TeamSeason } from '../lib/stats'
-import { Card, MemberLink, Stat, Table, Tabs, type Col } from '../components/ui'
+import { ordinal, type TeamSeason } from '../lib/stats'
+import { Card, MemberLink, Tabs } from '../components/ui'
 import { PALETTE } from './History'
 
-// Dynasty points: title 5, runner-up 3, third 2, any other playoff trip 1.
-const DYN_TIP = 'Dynasty points: 5 per title, 3 per runner-up, 2 per third place, 1 per other playoff trip.'
+// Rows are ordered by dynasty points: title 5, runner-up 3, third 2, any other playoff trip 1.
 const METRICS = ['Franchise Value', 'Legacy Score', 'Elo', 'Finish'] as const
 type Metric = (typeof METRICS)[number]
 
@@ -22,7 +21,8 @@ function cellTone(t: TeamSeason, s: { champion: string | null; runnerUp: string 
   return t.madePlayoffs ? 'playoff' : 'miss'
 }
 
-export default function Dynasty() {
+/** Franchise timeline and over-time chart, shown at the bottom of the Members page. */
+export function DynastySection() {
   const lg = useLeague()
   const [metric, setMetric] = useState<Metric>('Franchise Value')
   const seasons = [...lg.seasons].sort((a, b) => a.year - b.year)
@@ -33,29 +33,13 @@ export default function Dynasty() {
     const ts = seasons.map((s) => ({ s, t: s.teamSeasons.find((t) => t.memberId === m.id) }))
     const done = ts.filter((x) => x.t && x.s.complete)
     const pts = done.reduce((a, { s, t }) => a + (s.champion === m.id ? 5 : s.runnerUp === m.id ? 3 : s.third === m.id ? 2 : t!.madePlayoffs ? 1 : 0), 0)
-    let streak = 0, best = 0
-    for (const { t } of done) { streak = t!.madePlayoffs ? streak + 1 : 0; best = Math.max(best, streak) }
-    const v = vals[m.id] ?? []
     return {
       id: m.id, ts, pts,
-      titles: done.filter(({ s }) => s.champion === m.id).length,
-      finals: done.filter(({ s }) => s.champion === m.id || s.runnerUp === m.id).length,
-      playoffs: done.filter(({ t }) => t!.madePlayoffs).length,
-      seasons: done.length,
-      avgFinish: done.reduce((a, { t }) => a + (t!.finalRank ?? t!.regRank), 0) / (done.length || 1),
-      streak: best,
-      value: v.at(-1)?.value ?? 0,
-      growth: v.length > 1 ? (v.at(-1)!.value / v[0].value - 1) * 100 : null,
       avgLegacy: done.reduce((a, { s }) => a + (legacy[`${s.year}|${m.id}`] ?? 0), 0) / (done.length || 1),
     }
   }).filter((r) => r.ts.some((x) => x.t)).sort((a, b) => b.pts - a.pts || b.avgLegacy - a.avgLegacy)
 
   const name = (id: string) => lg.memberById[id]?.name ?? id
-  const top = rows[0]
-  const richest = [...rows].sort((a, b) => b.value - a.value)[0]
-  const grower = [...rows].filter((r) => r.growth != null).sort((a, b) => b.growth! - a.growth!)[0]
-  const streaky = [...rows].sort((a, b) => b.streak - a.streak)[0]
-
   const getter: Record<Metric, (id: string, year: number) => number | null> = {
     'Franchise Value': (id, y) => vals[id]?.find((v) => v.year === y)?.value ?? null,
     'Legacy Score': (id, y) => (legacy[`${y}|${id}`] != null ? +legacy[`${y}|${id}`].toFixed(1) : null),
@@ -65,34 +49,8 @@ export default function Dynasty() {
   const chartYears = seasons.filter((s) => metric === 'Elo' || s.complete)
   const chart = chartYears.map((s) => ({ season: String(s.year), ...Object.fromEntries(rows.map((r) => [r.id, getter[metric](r.id, s.year)])) }))
 
-  const cols: Col<(typeof rows)[number]>[] = [
-    { key: 'm', label: 'Franchise', render: (r) => <MemberLink id={r.id} /> },
-    { key: 'p', label: 'Dynasty Pts', render: (r) => <b>{r.pts}</b>, sort: (r) => r.pts, align: 'right', tip: DYN_TIP },
-    { key: 't', label: 'Titles', render: (r) => r.titles || '—', sort: (r) => r.titles, align: 'right' },
-    { key: 'f', label: 'Finals', render: (r) => r.finals || '—', sort: (r) => r.finals, align: 'right' },
-    { key: 'po', label: 'Playoffs', render: (r) => `${r.playoffs}/${r.seasons}`, sort: (r) => r.playoffs / (r.seasons || 1), align: 'right' },
-    { key: 'st', label: 'Best Streak', render: (r) => (r.streak ? `${r.streak} yr` : '—'), sort: (r) => r.streak, align: 'right' },
-    { key: 'af', label: 'Avg Finish', render: (r) => fmt(r.avgFinish, 1), sort: (r) => -r.avgFinish, align: 'right' },
-    { key: 'l', label: 'Avg Legacy', render: (r) => fmt(r.avgLegacy, 1), sort: (r) => r.avgLegacy, align: 'right' },
-    { key: 'v', label: 'Value', render: (r) => money(r.value), sort: (r) => r.value, align: 'right' },
-    { key: 'g', label: 'Value Growth', render: (r) => (r.growth == null ? '—' : <span className={r.growth >= 0 ? 'pos' : 'neg'}>{r.growth >= 0 ? '+' : ''}{fmt(r.growth, 0)}%</span>), sort: (r) => r.growth ?? -999, align: 'right' },
-  ]
-
   return (
-    <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>Dynasty Timeline</h1>
-          <p className="muted">Every franchise, every season: who built something and who’s still rebuilding.</p>
-        </div>
-      </div>
-      <div className="stat-grid">
-        <Stat icon="crown" label={`Top dynasty · ${top.pts} pts`} value={name(top.id)} tip={DYN_TIP} />
-        <Stat icon="dollar" label={`Most valuable · ${money(richest.value)}`} value={name(richest.id)} />
-        {grower && <Stat icon="rocket" label={`Fastest riser · +${fmt(grower.growth!, 0)}% value`} value={name(grower.id)} tone="pos" />}
-        <Stat icon="repeat" label={`Longest playoff streak · ${streaky.streak} yr`} value={name(streaky.id)} />
-      </div>
-
+    <>
       <Card title="Timeline" sub="Finish each season. Gold/silver/bronze = podium, green = playoffs, red = last place.">
         <div className="table-wrap">
           <table className="timeline">
@@ -133,10 +91,6 @@ export default function Dynasty() {
           </LineChart>
         </ResponsiveContainer>
       </Card>
-
-      <Card title="Dynasty Standings">
-        <Table rows={rows} cols={cols} initialSort="p" rowKey={(r) => r.id} />
-      </Card>
-    </div>
+    </>
   )
 }

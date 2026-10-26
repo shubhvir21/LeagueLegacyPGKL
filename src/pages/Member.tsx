@@ -9,6 +9,7 @@ import { valuationTable } from '../lib/valuation'
 import { money } from '../lib/valuation'
 import { FranchiseProfile } from '../components/FranchiseProfile'
 import { TrophyRoom } from '../components/TrophyRoom'
+import { DynastySection } from './Dynasty'
 
 export function Members() {
   const lg = useLeague()
@@ -50,6 +51,7 @@ export function Members() {
           </Link>
         ))}
       </div>
+      <DynastySection />
     </div>
   )
 }
