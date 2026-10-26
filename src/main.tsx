@@ -16,12 +16,12 @@ import Rules from './pages/Rules'
 import Transactions from './pages/Transactions'
 import Players, { Player } from './pages/Players'
 import Achievements from './pages/Achievements'
-import Home, { Schedule } from './pages/Home'
+import Home from './pages/Home'
 import Keepers from './pages/Keepers'
 import Odds from './pages/Odds'
 import TradeTree from './pages/TradeTree'
 import Power from './pages/Power'
-import Recap, { RecapIndex } from './pages/Recap'
+import { RecapRedirect } from './pages/Recap'
 import Dynasty from './pages/Dynasty'
 import AllTime from './pages/AllTime'
 import WhatIf from './pages/WhatIf'
@@ -41,7 +41,7 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<Home />} />
             <Route path="history" element={<History />} />
             <Route path="elo" element={<Elo />} />
-            <Route path="schedule" element={<Schedule />} />
+            <Route path="schedule" element={<SeasonIndex />} />
             <Route path="management" element={<Management />} />
             <Route path="rules" element={<Rules />} />
             <Route path="draft" element={<Navigate to="/management" replace />} />
@@ -63,8 +63,8 @@ createRoot(document.getElementById('root')!).render(
             <Route path="odds" element={<Odds />} />
             <Route path="trades" element={<TradeTree />} />
             <Route path="power" element={<Power />} />
-            <Route path="recap" element={<RecapIndex />} />
-            <Route path="recap/:year" element={<Recap />} />
+            <Route path="recap" element={<RecapRedirect />} />
+            <Route path="recap/:year" element={<RecapRedirect />} />
             <Route path="dynasty" element={<Dynasty />} />
             <Route path="rivalries" element={<Navigate to="/versus" replace />} />
             <Route path="alltime" element={<AllTime />} />

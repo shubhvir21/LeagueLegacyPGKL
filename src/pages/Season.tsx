@@ -4,6 +4,8 @@ import { useLeague } from '../lib/data'
 import { fmt, ordinal, pct, record, type Game, type Season as SeasonT, type TeamSeason } from '../lib/stats'
 import { Avatar, Card, MemberLink, RankBadge, Stat, Table, TeamName, TIPS, type Col } from '../components/ui'
 import { signed } from './History'
+import { UpcomingSchedule } from './Home'
+import { RecapSection } from './Recap'
 
 export function SeasonIndex() {
   const lg = useLeague()
@@ -33,7 +35,6 @@ export default function Season() {
   const apChamp = top((t) => t.apW)
   const last = [...ts].sort((a, b) => (b.finalRank ?? b.regRank) - (a.finalRank ?? a.regRank))[0]
   const lowest = bottom((t) => t.pf)
-  const worstAp = bottom((t) => t.apW)
   const name = (t?: TeamSeason | null) => (t ? lg.memberById[t.memberId]?.name : '—')
   const podium = [2, 1, 3].map((r) => ts.find((t) => t.finalRank === r))
 
@@ -82,7 +83,6 @@ export default function Season() {
           <Stat icon="crown" label={`All-play champ · ${record(apChamp.apW, apChamp.apL, apChamp.apT)}`} value={name(apChamp)} />
           <Stat icon="trendDown" label={s.complete ? 'Last place' : 'Currently last'} value={name(last)} />
           <Stat icon="trendDown" label={`Lowest scorer · ${fmt(lowest.pf)}`} value={name(lowest)} />
-          <Stat icon="trendDown" label={`Worst all-play · ${record(worstAp.apW, worstAp.apL, worstAp.apT)}`} value={name(worstAp)} />
         </div>
       </Card>
 
@@ -99,6 +99,9 @@ export default function Season() {
       <Card title="Weekly Matchups">
         <WeekMatchups s={s} games={lg.games.filter((g) => g.season === year)} />
       </Card>
+
+      {s.complete && <RecapSection year={year} />}
+      {year === lg.seasons[0].year && <UpcomingSchedule year={year} />}
     </div>
   )
 }

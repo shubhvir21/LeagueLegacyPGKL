@@ -77,7 +77,7 @@ export default function Home() {
         <Card
           title={<span className="slate-title"><span className="slate-week">Week {nextWeek}</span> Matchups</span>}
           sub={nextWeek === lg.nflWeek ? 'This week · in progress' : 'Up next'}
-          right={<Link to="/schedule">Schedule →</Link>}
+          right={<Link to={`/season/${current.year}`}>Schedule →</Link>}
         >
           <div className="game-grid">{upcoming.map((g) => <Preview key={g.a} g={g} />)}</div>
         </Card>
@@ -86,7 +86,7 @@ export default function Home() {
       {lastGames.length > 0 && (
         <Card
           title={<span className="slate-title"><span className="slate-week">Week {lastWeek}</span> Results</span>}
-          right={<Link to={`/recap/${current.year}`}>Season recap →</Link>}
+          right={<Link to={`/season/${current.year}`}>Season page →</Link>}
         >
           <div className="game-grid">{lastGames.map((g) => <GameCard key={g.a} g={g} />)}</div>
         </Card>
@@ -167,27 +167,19 @@ export function Preview({ g }: { g: ScheduledGame }) {
   )
 }
 
-export function Schedule() {
+/** Upcoming weeks for the current season, shown on its season page. */
+export function UpcomingSchedule({ year }: { year: number }) {
   const lg = useLeague()
-  const year = lg.seasons[0].year
   const weeks = [...new Set(lg.schedule.filter((g) => g.season === year).map((g) => g.week))].sort((a, b) => a - b)
-  const done = [...new Set(lg.games.filter((g) => g.season === year).map((g) => g.week))].sort((a, b) => b - a)
   return (
-    <div className="page">
-      <h1>{year} Schedule</h1>
-      {weeks.length === 0 && <p className="muted">No upcoming matchups.</p>}
+    <>
+      {weeks.length > 0 && <h2>Upcoming Schedule</h2>}
       {weeks.map((w, i) => (
-        <Card key={w} title={`Week ${w}`} sub={i === 0 && w === lg.nflWeek ? 'This week · in progress' : i === 0 ? 'Up next' : undefined}>
+        <Card key={w} title={`Week ${w}`} sub={i === 0 && w === lg.nflWeek ? 'This week · in progress' : i === 0 ? 'Up next' : 'Upcoming'}>
           <div className="game-grid">{lg.schedule.filter((g) => g.season === year && g.week === w).map((g) => <Preview key={g.a} g={g} />)}</div>
         </Card>
       ))}
-      <h2>Completed</h2>
-      {done.map((w) => (
-        <Card key={w} title={`Week ${w}`}>
-          <div className="game-grid">{lg.games.filter((g) => g.season === year && g.week === w).map((g) => <GameCard key={g.a} g={g} />)}</div>
-        </Card>
-      ))}
-    </div>
+    </>
   )
 }
 
@@ -266,7 +258,7 @@ function WeeklyStoryStrip({ year, week, games }: { year: number; week: number; g
   return (
     <StoryStrip
       title={`Week ${week} story`}
-      right={<Link to={`/recap/${year}`}>Full recap →</Link>}
+      right={<Link to={`/season/${year}`}>Full recap →</Link>}
       beats={beats.slice(0, 6)}
     />
   )
@@ -347,7 +339,7 @@ function SeasonStoryStrip({ year }: { year: number }) {
   return (
     <StoryStrip
       title={`${year} season recap`}
-      right={<Link to={`/recap/${year}`}>All awards →</Link>}
+      right={<Link to={`/season/${year}`}>All awards →</Link>}
       beats={beats.slice(0, 6)}
     />
   )

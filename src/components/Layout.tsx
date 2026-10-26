@@ -13,8 +13,6 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/elo', label: 'Elo Ratings', icon: 'trendUp' },
       { to: '/seasons', label: 'Seasons', icon: 'calendar', also: '/season/' },
       { to: '/members', label: 'Members', icon: 'users', also: '/member/' },
-      { to: '/schedule', label: 'Schedule', icon: 'clock' },
-      { to: '/recap', label: 'Season Recap', icon: 'star', also: '/recap/' },
       { to: '/rules', label: 'Rules', icon: 'scale' },
     ],
   },

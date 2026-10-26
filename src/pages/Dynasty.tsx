@@ -96,7 +96,7 @@ export default function Dynasty() {
       <Card title="Timeline" sub="Finish each season. Gold/silver/bronze = podium, green = playoffs, red = last place.">
         <div className="table-wrap">
           <table className="timeline">
-            <thead><tr><th>Franchise</th>{seasons.map((s) => <th key={s.year} className="center"><Link to={`/recap/${s.year}`}>{s.year}</Link></th>)}</tr></thead>
+            <thead><tr><th>Franchise</th>{seasons.map((s) => <th key={s.year} className="center"><Link to={`/season/${s.year}`}>{s.year}</Link></th>)}</tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>

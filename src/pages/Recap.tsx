@@ -1,28 +1,28 @@
 import type { ReactNode } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { useLeague } from '../lib/data'
 import { playersOf } from '../lib/players'
 import { managementCached } from '../lib/management'
 import { powerRankings, scheduleLuck } from '../lib/weekly'
 import { fmt, record } from '../lib/stats'
-import { Avatar, Card, MemberLink } from '../components/ui'
+import { Card, MemberLink } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PlayerLink } from '../components/PlayerLink'
-import { SeasonPicker } from './Season'
 import { signed } from './History'
 
 interface Award { icon: string; title: string; who: ReactNode; detail: ReactNode; tone?: 'pos' | 'neg' }
 
-export function RecapIndex() {
+/** Old /recap URLs now land on the season page, where the recap lives. */
+export function RecapRedirect() {
   const lg = useLeague()
-  return <Navigate to={`/recap/${lg.seasons[0].year}`} replace />
+  const year = useParams().year ?? lg.seasons[0].year
+  return <Navigate to={`/season/${year}`} replace />
 }
 
-export default function Recap() {
+export function RecapSection({ year }: { year: number }) {
   const lg = useLeague()
-  const year = Number(useParams().year)
   const s = lg.seasons.find((x) => x.year === year)
-  if (!s) return <p>No season {year}.</p>
+  if (!s) return null
   const pm = playersOf(lg)
   const name = (id?: string | null) => (id ? lg.memberById[id]?.name ?? id : '—')
   const M = (id?: string | null) => <MemberLink id={id ?? null} />
@@ -116,27 +116,8 @@ export default function Recap() {
   ]
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>{year} Season Recap</h1>
-          <p className="muted">{s.complete ? 'The year in awards.' : `In progress — awards so far through week ${s.weeksPlayed}.`} <Link to={`/season/${year}`}>Full standings →</Link></p>
-        </div>
-        <SeasonPicker year={year} path={(y) => `/recap/${y}`} />
-      </div>
-
-      {s.champion && (
-        <div className="podium">
-          {[s.runnerUp, s.champion, s.third].map((id, i) => id && (
-            <div key={id} className={`podium-step p${i}`}>
-              <Avatar id={id} size={i === 1 ? 64 : 48} />
-              <div className="podium-name">{name(id)}</div>
-              <div className="muted">{['Runner-up', 'Champion', 'Third'][i]}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
+    <>
+      <h2>Season Recap</h2>
       {awards.map((grp) => (
         <Card key={grp.group} title={grp.group}>
           <div className="award-grid">
@@ -150,6 +131,6 @@ export default function Recap() {
           </div>
         </Card>
       ))}
-    </div>
+    </>
   )
 }
