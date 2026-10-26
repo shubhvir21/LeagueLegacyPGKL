@@ -65,21 +65,20 @@ export default function RecordBook() {
         </>
       ) : (
         <>
-          <RecordSection title="Records" sub="The good stuff." defs={defs.filter((d) => d.category === view && d.positive)} />
-          <RecordSection title="Chud-cords" sub="The stuff nobody wants their name on." bad defs={defs.filter((d) => d.category === view && !d.positive)} />
+          <RecordSection title="Records" defs={defs.filter((d) => d.category === view && d.positive)} />
+          <RecordSection title="Chud-cords" bad defs={defs.filter((d) => d.category === view && !d.positive)} />
         </>
       )}
     </div>
   )
 }
 
-function RecordSection({ title, sub, defs, bad = false }: { title: string; sub: string; defs: RecordDef[]; bad?: boolean }) {
+function RecordSection({ title, defs, bad = false }: { title: string; defs: RecordDef[]; bad?: boolean }) {
   if (!defs.length) return null
   return (
     <section className={`record-section ${bad ? 'bad' : 'good'}`}>
       <div className="record-section-head">
         <h2>{title}</h2>
-        <span className="muted">{sub}</span>
       </div>
       <div className="record-grid">
         {defs.map((d) => <RecordCard key={d.id} d={d} />)}
