@@ -8,6 +8,7 @@ import { seasonRange, signed } from './History'
 import { valuationTable } from '../lib/valuation'
 import { money } from '../lib/valuation'
 import { FranchiseProfile } from '../components/FranchiseProfile'
+import { TrophyRoom } from '../components/TrophyRoom'
 
 export function Members() {
   const lg = useLeague()
@@ -119,6 +120,8 @@ export default function Member() {
           ))}
         </div>
       </Card>
+
+      <TrophyRoom id={id} />
 
       <Card title="Season History">
         <Table rows={seasons} cols={cols} rowKey={({ s }) => String(s.year)} />
