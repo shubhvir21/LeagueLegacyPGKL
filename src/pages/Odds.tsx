@@ -1,11 +1,11 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, ReferenceLine, Scatter, ScatterChart, ZAxis, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Legend, Line, ReferenceLine, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
 import type { OddsRun, TeamOdds } from '../lib/odds'
 import type { League } from '../lib/stats'
 import type { OddsRequest } from '../lib/odds.worker'
 import { fmt, record } from '../lib/stats'
-import { Card, MemberLink, Stat, Table, Tabs, type Col } from '../components/ui'
+import { Card, MemberLink, Table, Tabs, type Col } from '../components/ui'
 import { PALETTE } from './History'
 
 const METRICS = { Playoffs: 'playoff', Bye: 'bye', Title: 'title' } as const
@@ -59,7 +59,8 @@ export function useOdds(lg: League, year: number, week: number | null, dragging:
   return { history, full, busy }
 }
 
-export default function Odds() {
+/** Playoff odds simulation, shown at the top of the Playoffs page. */
+export function OddsSection() {
   const lg = useLeague()
   const years = lg.seasons.map((s) => s.year)
   const [year, setYear] = useState(years[0])
@@ -72,15 +73,9 @@ export default function Odds() {
   const last = history ? history.length - 1 : full?.afterWeek ?? 0
   const week = weekSel == null || weekSel > last ? last : weekSel
   const run = (full && full.afterWeek === week && full.season === year ? full : null) ?? history?.[week]
-  if (!run) return <div className="page"><h1>Playoff Odds</h1><p className="muted">Simulating the season…</p></div>
-  const name = (id?: string) => (id ? lg.memberById[id]?.name ?? id : '—')
+  if (!run) return <Card title="Simulation"><p className="muted">Simulating the season…</p></Card>
 
   const P = season.playoffTeams
-  const favorite = [...run.teams].sort((a, b) => b.title - a.title)[0]
-  const bubble = [...run.teams].sort((a, b) => Math.abs(a.playoff - 0.5) - Math.abs(b.playoff - 0.5))[0]
-  const swing = [...run.teams].filter((t) => t.ifWin != null && t.ifLoss != null).sort((a, b) => (b.ifWin! - b.ifLoss!) - (a.ifWin! - a.ifLoss!))[0]
-  const riser = history && history.length > 1 ? [...run.teams].map((t) => ({ t, d: t.playoff - (history[Math.max(0, week - 1)].teams.find((x) => x.memberId === t.memberId)?.playoff ?? 0) })).sort((a, b) => b.d - a.d)[0] : null
-
   const cols: Col<TeamOdds>[] = [
     { key: 'm', label: 'Team', render: (t) => <MemberLink id={t.memberId} /> },
     { key: 'r', label: 'Record', render: (t) => record(t.wins, t.losses), sort: (t) => t.wins - t.losses / 100, align: 'right' },
@@ -101,29 +96,16 @@ export default function Odds() {
   ]
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>Playoff Odds</h1>
-          <p className="muted">{busy ? 'Refining… ' : ''}{run.sims.toLocaleString()} simulated seasons as of {week === 0 ? 'the preseason' : `week ${week}`}. Top {P} make the playoffs{P === 6 ? ', top 2 get byes' : ''}.</p>
-        </div>
-        <select value={year} onChange={(e) => { setYear(Number(e.target.value)); setWeekSel(null) }}>
-          {years.map((y) => <option key={y}>{y}</option>)}
-        </select>
-      </div>
-      {!season.complete && <div className="banner">{run.rosterAware
-        ? `Roster-aware: every starter is simulated from his projection, using ${week === last ? 'current rosters and injuries' : `rosters as of week ${week}`}, byes and waiver fill-ins, assuming everyone starts their best lineup.`
-        : 'No projections for this week — scoring only.'}</div>}
-      {season.complete && <div className="banner">{year} is finished — this replays what the odds said at the time. Champion: {name(season.champion ?? undefined)}.</div>}
-
-      <div className="stat-grid">
-        <Stat icon="crown" label={`Title favorite · ${p(favorite.title)}`} value={name(favorite.memberId)} tip={T.model} />
-        <Stat icon="target" label={`On the bubble · ${p(bubble.playoff)}`} value={name(bubble.memberId)} />
-        {swing && <Stat icon="zap" label={`Biggest W${run.nextWeek} swing · ${((swing.ifWin! - swing.ifLoss!) * 100).toFixed(0)} pts`} value={name(swing.memberId)} tip={T.swing} />}
-        {riser && week > 0 && <Stat icon="rocket" label={`Week ${week} riser · +${(riser.d * 100).toFixed(0)} pts`} value={name(riser.t.memberId)} tone="pos" />}
-      </div>
-
-      <Card title="Simulation" sub="Drag to rewind the odds to any week" right={<span className="muted">{week === 0 ? 'Preseason' : `After week ${week}`}</span>}>
+    <>
+      <Card
+        title="Simulation"
+        sub={`${busy ? 'Refining… ' : ''}${run.sims.toLocaleString()} simulated seasons as of ${week === 0 ? 'the preseason' : `week ${week}`}. Top ${P} make the playoffs${P === 6 ? ', top 2 get byes' : ''}. Drag to rewind the odds to any week.`}
+        right={
+          <select value={year} onChange={(e) => { setYear(Number(e.target.value)); setWeekSel(null) }}>
+            {years.map((y) => <option key={y}>{y}</option>)}
+          </select>
+        }
+      >
         <input type="range" min={0} max={last} value={week} className="odds-range" disabled={!history}
           onPointerDown={() => setDragging(true)} onPointerUp={() => setDragging(false)} onKeyUp={() => setDragging(false)} onBlur={() => setDragging(false)}
           onChange={(e) => setWeekSel(Number(e.target.value))} />
@@ -133,8 +115,6 @@ export default function Odds() {
       <Card title="Odds Over Time" sub="Re-simulated after every week" right={<Tabs tabs={Object.keys(METRICS) as Metric[]} value={metric} onChange={setMetric} />}>
         {history ? <OddsChart history={history} metric={metric} marker={dragging ? null : week} /> : <p className="muted">Simulating every week…</p>}
       </Card>
-
-      <ModelCard />
 
       <Card title="Seed Distribution" sub="Chance of finishing the regular season in each spot">
         <div className="table-wrap">
@@ -155,7 +135,7 @@ export default function Odds() {
           </table>
         </div>
       </Card>
-    </div>
+    </>
   )
 }
 
@@ -182,70 +162,3 @@ const OddsChart = memo(function OddsChart({ history, metric, marker }: { history
     </ResponsiveContainer>
   )
 })
-
-function ModelCard() {
-  const lg = useLeague()
-  const m = lg.raw.model
-  const bt = m?.backtest
-  if (!m || !bt) return null
-  const scoring = bt.variants.find((v) => v.weight == null)
-  const chosen = bt.variants.find((v) => v.weight === m.rosterWeight)
-  const skill = (b: number) => Math.round((1 - b / bt.baseline) * 100)
-  const tip = { background: 'var(--panel-2)', border: '1px solid var(--border)' }
-  return (
-    <Card title="Model Accuracy" sub={`Backtested on ${bt.seasons.join(', ')}: replayed from every week and scored against who actually made the playoffs`}>
-      <div className="stat-grid">
-        <Stat icon="target" label={`Brier score · lower is better (guessing = ${bt.baseline})`} value={chosen?.brier ?? '—'} tip="Average squared gap between the predicted playoff chance and what happened (1 or 0)." />
-        <Stat icon="chart" label="Better than guessing" value={`${skill(chosen?.brier ?? bt.baseline)}%`} tone="pos" />
-        <Stat icon="zap" label="Gain from rosters vs scoring only" value={scoring && chosen ? `${Math.round((1 - chosen.brier / scoring.brier) * 100)}%` : '—'} tone="pos" />
-        <Stat icon="scale" label="Roster weight chosen" value={`${Math.round(m.rosterWeight * 100)}%`} tip="Share of each team’s weekly expectation from its roster projection; the rest comes from its actual scoring. Picked by lowest backtest error." />
-      </div>
-      <div className="grid-2">
-        <div>
-          <h3 className="sub-head">Variants</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={bt.variants} layout="vertical" margin={{ left: 20 }}>
-              <CartesianGrid stroke="var(--grid)" />
-              <XAxis type="number" stroke="var(--muted)" domain={[0, 'auto']} />
-              <YAxis type="category" dataKey="name" stroke="var(--muted)" width={100} />
-              <Tooltip contentStyle={tip} />
-              <Bar dataKey="brier" name="Brier" isAnimationActive={false}>
-                {bt.variants.map((v) => <Cell key={v.name} fill={v.weight === m.rosterWeight ? 'var(--accent)' : 'var(--panel-3)'} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div>
-          <h3 className="sub-head">Calibration · predicted vs actual playoff rate</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <ScatterChart margin={{ right: 10 }}>
-              <CartesianGrid stroke="var(--grid)" />
-              <XAxis type="number" dataKey="predicted" stroke="var(--muted)" domain={[0, 1]} tickFormatter={(x) => `${Math.round(x * 100)}%`} name="Predicted" />
-              <YAxis type="number" dataKey="actual" stroke="var(--muted)" domain={[0, 1]} tickFormatter={(x) => `${Math.round(x * 100)}%`} name="Actual" />
-              <ZAxis type="number" dataKey="n" range={[40, 260]} name="Team-weeks" />
-              <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke="var(--muted)" strokeDasharray="4 4" />
-              <Tooltip contentStyle={tip} formatter={(v, k) => (k === "Team-weeks" ? String(v) : `${Math.round(Number(v) * 100)}%`)} />
-              <Scatter data={bt.calibration} fill="var(--accent)" isAnimationActive={false} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      <h3 className="sub-head">Error by week · the roster model is sharpest early, when scores alone say little</h3>
-      <ResponsiveContainer width="100%" height={200}>
-        <LineChart data={bt.byWeek.map((b) => ({ ...b, week: `W${b.week}` }))}>
-          <CartesianGrid stroke="var(--grid)" />
-          <XAxis dataKey="week" stroke="var(--muted)" />
-          <YAxis stroke="var(--muted)" />
-          <Tooltip contentStyle={tip} />
-          <Legend />
-          <Line dataKey="scoring" name="Scoring only" stroke="var(--muted)" strokeWidth={2} dot={false} isAnimationActive={false} />
-          <Line dataKey="model" name="Roster model" stroke="var(--accent)" strokeWidth={2} dot={false} isAnimationActive={false} />
-        </LineChart>
-      </ResponsiveContainer>
-      <p className="muted" style={{ fontSize: 12.5 }}>
-        Fitted from {m.samples.toLocaleString()} player-weeks: spread per position {Object.entries(m.pos).filter(([p]) => p !== 'K').map(([p, x]) => `${p} ±${fmt(x.sd0 + x.sd1 * 12, 1)}`).join(' · ')} (at a 12-pt projection);
-        same-NFL-team correlation {m.rho}; team-level noise ±{m.resid}. Refit on every sync.
-      </p>
-    </Card>
-  )
-}

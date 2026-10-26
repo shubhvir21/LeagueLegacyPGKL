@@ -22,7 +22,6 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/matchups', label: 'Matchups', icon: 'football', end: true },
       { to: '/playoffs', label: 'Playoffs', icon: 'trophy' },
       { to: '/power', label: 'Power Rankings', icon: 'chart' },
-      { to: '/odds', label: 'Playoff Odds', icon: 'target' },
       { to: '/versus', label: 'Versus', icon: 'swords' },
       { to: '/whatif', label: 'What-If Machine', icon: 'zap' },
     ],

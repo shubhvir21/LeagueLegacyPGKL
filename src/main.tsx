@@ -18,7 +18,6 @@ import Players, { Player } from './pages/Players'
 import Achievements from './pages/Achievements'
 import Home from './pages/Home'
 import Keepers from './pages/Keepers'
-import Odds from './pages/Odds'
 import TradeTree from './pages/TradeTree'
 import Power from './pages/Power'
 import { RecapRedirect } from './pages/Recap'
@@ -60,7 +59,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="matchups/history" element={<Navigate to="/versus" replace />} />
             <Route path="playoffs" element={<Playoffs />} />
             <Route path="keepers" element={<Keepers />} />
-            <Route path="odds" element={<Odds />} />
+            <Route path="odds" element={<Navigate to="/playoffs" replace />} />
             <Route path="trades" element={<TradeTree />} />
             <Route path="power" element={<Power />} />
             <Route path="recap" element={<RecapRedirect />} />

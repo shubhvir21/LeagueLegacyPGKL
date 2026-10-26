@@ -5,6 +5,7 @@ import { careers, ordinal, type Season, type TeamSeason } from '../lib/stats'
 import { buildRecords } from '../lib/records'
 import { Card, MemberLink, Tabs } from '../components/ui'
 import { Bracket } from './Season'
+import { OddsSection } from './Odds'
 
 const PREDICTORS = ['Retention', 'Reg. Season #1', 'Most Points', 'All-Play #1', 'Coach Score #1', 'Defending Champ', 'Elo #1'] as const
 type Predictor = (typeof PREDICTORS)[number]
@@ -20,11 +21,12 @@ export default function Playoffs() {
   const streaks = records.find((r) => r.id === 'st-po')!
   const droughts = records.find((r) => r.id === 'st-nopo')!
 
-  if (!done.length) return <div className="page"><h1>Playoffs</h1><p className="muted">No completed seasons yet.</p></div>
+  if (!done.length) return <div className="page"><h1>Playoffs</h1><OddsSection /></div>
 
   return (
     <div className="page">
       <h1>Playoffs</h1>
+      <OddsSection />
       <Card title="Playoff Participation" sub="Every completed season at a glance: who made it, who won, and who missed out.">
         <div className="table-wrap">
           <table className="grid-table">
