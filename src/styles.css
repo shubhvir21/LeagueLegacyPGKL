@@ -1058,3 +1058,10 @@ button.elo-chip { font: inherit; }
 .record-section.good .record-section-head h2 { color: var(--pos); }
 .record-section.bad .record-section-head h2 { color: var(--neg); }
 .record-pair { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Draft board */
+.draft-board th { width: 36px; color: var(--muted); }
+.draft-board td { min-width: 112px; padding: 6px 8px; border: 1px solid var(--border); vertical-align: top; }
+.draft-slot { font-size: 11px; }
+.draft-player { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+.draft-meta { font-size: 11px; white-space: nowrap; }

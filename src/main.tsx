@@ -17,6 +17,7 @@ import Transactions from './pages/Transactions'
 import Players, { Player } from './pages/Players'
 import Home from './pages/Home'
 import Keepers from './pages/Keepers'
+import Draft from './pages/Draft'
 import Power from './pages/Power'
 import { RecapRedirect } from './pages/Recap'
 import AllTime from './pages/AllTime'
@@ -40,7 +41,6 @@ createRoot(document.getElementById('root')!).render(
             <Route path="schedule" element={<SeasonIndex />} />
             <Route path="management" element={<Management />} />
             <Route path="rules" element={<Rules />} />
-            <Route path="draft" element={<Navigate to="/management" replace />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="players" element={<Players />} />
             <Route path="player/:id" element={<Player />} />
@@ -56,6 +56,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="matchups/history" element={<Navigate to="/versus" replace />} />
             <Route path="playoffs" element={<Playoffs />} />
             <Route path="keepers" element={<Keepers />} />
+            <Route path="draft" element={<Draft />} />
             <Route path="odds" element={<Navigate to="/playoffs" replace />} />
             <Route path="trades" element={<Navigate to="/butterfly" replace />} />
             <Route path="power" element={<Power />} />

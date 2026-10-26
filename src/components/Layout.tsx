@@ -32,6 +32,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: '/management', label: 'Management', icon: 'list' },
       { to: '/transactions', label: 'Transactions', icon: 'swap' },
       { to: '/keepers', label: 'Keepers', icon: 'lock' },
+      { to: '/draft', label: 'Draft History', icon: 'list' },
       { to: '/players', label: 'Players', icon: 'user', also: '/player/' },
     ],
   },
