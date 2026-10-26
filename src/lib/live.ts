@@ -103,7 +103,9 @@ export function buildStarterLine(playerId: string, official: number, ctx: LineCo
   const entry = ctx.live.get(playerId)
   if (entry) {
     const fromProps = Object.values(entry.row.sources).includes('live_prop') || entry.game.status === 'final'
-    return { playerId, actual: official, projected: official + entry.row.remaining, source: fromProps ? 'live' : 'pregame', game: entry.game }
+    // A finished game has nothing left to score, whatever the feed's last in-game "remaining" still says.
+    const remaining = entry.game.status === 'final' ? 0 : entry.row.remaining
+    return { playerId, actual: official, projected: official + remaining, source: fromProps ? 'live' : 'pregame', game: entry.game }
   }
   const sleeper = ctx.sleeperProjections?.[playerId]
   const game = ctx.gameOf(playerId)
