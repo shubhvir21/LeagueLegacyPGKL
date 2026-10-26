@@ -37,11 +37,12 @@ export interface TeamWeek {
   oppPts: number
   playoff: boolean
   bracket: Game['bracket']
+  place?: number
 }
 export function teamWeeks(lg: League): TeamWeek[] {
   return lg.games.flatMap((g) => [
-    { season: g.season, week: g.week, memberId: g.a, oppId: g.b, pts: g.aPts, oppPts: g.bPts, playoff: g.playoff, bracket: g.bracket },
-    { season: g.season, week: g.week, memberId: g.b, oppId: g.a, pts: g.bPts, oppPts: g.aPts, playoff: g.playoff, bracket: g.bracket },
+    { season: g.season, week: g.week, memberId: g.a, oppId: g.b, pts: g.aPts, oppPts: g.bPts, playoff: g.playoff, bracket: g.bracket, place: g.place },
+    { season: g.season, week: g.week, memberId: g.b, oppId: g.a, pts: g.bPts, oppPts: g.aPts, playoff: g.playoff, bracket: g.bracket, place: g.place },
   ])
 }
 
@@ -287,7 +288,8 @@ export function buildRecords(lg: League): RecordDef[] {
   const vsRows = members.flatMap((id) => members.filter((o) => o !== id).flatMap((o) =>
     runs(allOrdered.filter((t) => t.memberId === id && t.oppId === o), (t) => t.pts > t.oppPts).map((r) => ({ memberId: id, value: r.len, display: String(r.len), context: `vs ${name(o)} · ${r.from} → ${r.to}${r.active ? ' (active)' : ''}`, link: `/versus/${id}/${o}` }))))
   add('Streaks & Droughts', 'st-vs', 'Longest Win Streak vs One Opponent', 'Consecutive wins over the same team, playoffs included.', true, top(vsRows, (r) => r.value))
-  const playoffOrdered = allOrdered.filter((t) => t.bracket === 'winners')
+  // Like the career playoff record, the 5th-place game doesn't count.
+  const playoffOrdered = allOrdered.filter((t) => t.bracket === 'winners' && t.place !== 5)
   add('Streaks & Droughts', 'st-pwin', 'Longest Playoff Win Streak', 'Consecutive winners-bracket wins, across seasons.', true, top(streakRows((t) => t.pts > t.oppPts, playoffOrdered), (r) => r.value))
   add('Streaks & Droughts', 'st-135', 'Longest Streak Scoring 135+', 'Consecutive regular-season weeks with 135 or more points.', true, top(streakRows((t) => t.pts >= 135, ordered.filter((t) => t.pts > 0)), (r) => r.value))
   add('Streaks & Droughts', 'st-ploss', 'Longest Playoff Losing Streak', 'Consecutive winners-bracket losses, across seasons.', false, top(streakRows((t) => t.pts < t.oppPts, playoffOrdered), (r) => r.value))
