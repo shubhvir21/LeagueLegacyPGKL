@@ -8,7 +8,6 @@ import Elo from './pages/Elo'
 import Season, { SeasonIndex, TeamSeason } from './pages/Season'
 import Member, { Members } from './pages/Member'
 import Versus, { VersusDetail } from './pages/Versus'
-import HistoricalMatchups from './pages/HistoricalMatchups'
 import Matchups from './pages/Matchups'
 import Playoffs from './pages/Playoffs'
 import RecordBook from './pages/RecordBook'
@@ -24,7 +23,6 @@ import TradeTree from './pages/TradeTree'
 import Power from './pages/Power'
 import Recap, { RecapIndex } from './pages/Recap'
 import Dynasty from './pages/Dynasty'
-import Rivalries from './pages/Rivalries'
 import AllTime from './pages/AllTime'
 import WhatIf from './pages/WhatIf'
 import './styles.css'
@@ -59,7 +57,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="versus" element={<Versus />} />
             <Route path="versus/:a/:b" element={<VersusDetail />} />
             <Route path="matchups" element={<Matchups />} />
-            <Route path="matchups/history" element={<HistoricalMatchups />} />
+            <Route path="matchups/history" element={<Navigate to="/versus" replace />} />
             <Route path="playoffs" element={<Playoffs />} />
             <Route path="keepers" element={<Keepers />} />
             <Route path="odds" element={<Odds />} />
@@ -68,7 +66,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="recap" element={<RecapIndex />} />
             <Route path="recap/:year" element={<Recap />} />
             <Route path="dynasty" element={<Dynasty />} />
-            <Route path="rivalries" element={<Rivalries />} />
+            <Route path="rivalries" element={<Navigate to="/versus" replace />} />
             <Route path="alltime" element={<AllTime />} />
             <Route path="whatif" element={<WhatIf />} />
             <Route path="records" element={<RecordBook />} />

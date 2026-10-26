@@ -24,7 +24,7 @@ export function RivalryMeter({ r }: { r: Rivalry }) {
 
 const when = (g: Game | null) => (g ? `${g.season} ${g.playoff ? 'playoffs' : `W${g.week}`}` : '')
 
-export default function Rivalries() {
+export function RivalriesSection() {
   const lg = useLeague()
   const all = useMemo(() => rivalries(lg), [lg])
   const name = (id: string | null) => (id ? lg.memberById[id]?.name ?? id : '—')
@@ -43,13 +43,8 @@ export default function Rivalries() {
     { key: 'tags', label: '', render: (r) => r.tags.slice(0, 2).map((t) => <span key={t} className="pill">{t}</span>) },
   ]
   return (
-    <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>Rivalries</h1>
-          <p className="muted">Every pairing, ranked by how heated it is. Click one for the full series.</p>
-        </div>
-      </div>
+    <>
+      <Card title="Top Rivalries" sub="Every pairing, ranked by how heated it is. Click one for the full series.">
       <div className="riv-grid">
         {top.map((r, i) => (
           <Link key={r.a + r.b} to={`/versus/${r.a}/${r.b}`} className="riv-card">
@@ -69,9 +64,10 @@ export default function Rivalries() {
           </Link>
         ))}
       </div>
+      </Card>
       <Card title="All Rivalries" sub={`${all.length} pairings`}>
         <Table rows={all} cols={cols} initialSort="s" rowKey={(r) => r.a + r.b} />
       </Card>
-    </div>
+    </>
   )
 }

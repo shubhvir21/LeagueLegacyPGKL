@@ -7,7 +7,7 @@ import { WeekMatchups } from './Season'
 
 const CATS = ['Highest Scoring', 'Lowest Scoring', 'Closest', 'Blowouts', 'Playoff Games'] as const
 
-export default function HistoricalMatchups() {
+export function HistoricalMatchupsSection() {
   const lg = useLeague()
   const [year, setYear] = useState(lg.seasons[0].year)
   const [cat, setCat] = useState<(typeof CATS)[number]>('Highest Scoring')
@@ -35,8 +35,7 @@ export default function HistoricalMatchups() {
   const list = sorters[cat](played).slice(0, 20)
 
   return (
-    <div className="page">
-      <h1>Historical Matchups</h1>
+    <>
       <Card title="Average Matchup Score by Season" sub="Average team score and average margin in regular-season games.">
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={chart}>
@@ -89,6 +88,6 @@ export default function HistoricalMatchups() {
           </table>
         </div>
       </Card>
-    </div>
+    </>
   )
 }

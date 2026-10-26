@@ -1,7 +1,8 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLeague } from '../lib/data'
 import { rivalries } from '../lib/rivalry'
-import { RivalryMeter } from './Rivalries'
+import { RivalriesSection, RivalryMeter } from './Rivalries'
+import { HistoricalMatchupsSection } from './HistoricalMatchups'
 import { careers, fmt, headToHead, pct, record, type Game } from '../lib/stats'
 import { Avatar, Card, MemberLink, Stat } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -75,6 +76,9 @@ export default function Versus() {
           </table>
         </div>
       </Card>
+
+      <RivalriesSection />
+      <HistoricalMatchupsSection />
     </div>
   )
 }
