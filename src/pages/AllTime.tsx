@@ -15,7 +15,7 @@ type Mode = 'Career' | 'Best Season'
 interface Entry { pid: string; pos: string; pts: number; memberId: string; seasons: number[]; starts: number }
 
 const SLOTS = ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'FLEX', 'DEF']
-const TEAMS = ['First Team', 'Second Team', 'Third Team']
+const TEAMS = ['First Team', 'Second Team', 'Third Team'] as const
 
 function buildTeam(slots: string[], pool: Entry[], used = new Set<string>()) {
   const sorted = [...pool].sort((a, b) => b.pts - a.pts)
@@ -42,6 +42,7 @@ export default function AllTime() {
   const pm = playersOf(lg)
   const [member, setMember] = useState('ALL')
   const [mode, setMode] = useState<Mode>('Career')
+  const [tier, setTier] = useState<(typeof TEAMS)[number]>('First Team')
 
   const entries = useMemo(() => {
     const career: Record<string, Entry> = {}, season: Record<string, Entry> = {}
@@ -85,15 +86,20 @@ export default function AllTime() {
         {mvp && <Stat icon="crown" label={`Headliner · ${fmt(mvp.pts, 0)} pts`} value={pm.info[mvp.pid]?.name ?? mvp.pid} />}
         {mine ? <Stat icon="medal" label="All-time team rank" value={`${mine} of ${ranking.length}`} /> : ranking[0] && <Stat icon="medal" label={`Best franchise team · ${fmt(ranking[0].total, 0)}`} value={name(ranking[0].id)} />}
       </div>
-      {teams.map((t, i) => t.picks.length > 0 && (
-        <Card key={TEAMS[i]} title={`${member === 'ALL' ? 'All-League' : 'All-Franchise'} ${TEAMS[i]}`}
-          sub={i === 0 ? (mode === 'Career' ? 'Total starting-lineup points with the franchise' : 'Best single season of starting points') : undefined}
-          right={<b>{fmt(t.total, 0)}</b>}>
-          <div className="at-lineup">
-            {t.picks.map(({ slot, e }, j) => <Row key={slot + j + e.pid} slot={slot} e={e} showTeam={member === 'ALL'} />)}
-          </div>
-        </Card>
-      ))}
+      {(() => {
+        const i = TEAMS.indexOf(tier)
+        const t = teams[i]
+        return (
+          <Card title={`${member === 'ALL' ? 'All-League' : 'All-Franchise'} Teams`}
+            sub={mode === 'Career' ? 'Total starting-lineup points with the franchise' : 'Best single season of starting points'}
+            right={<b>{fmt(t.total, 0)}</b>}>
+            <Tabs tabs={TEAMS} value={tier} onChange={setTier} />
+            <div className="at-lineup">
+              {t.picks.map(({ slot, e }, j) => <Row key={slot + j + e.pid} slot={slot} e={e} showTeam={member === 'ALL'} />)}
+            </div>
+          </Card>
+        )
+      })()}
       <Card title="All-Time Team Rankings" sub="Each franchise's First Team total, same mode">
         <div className="at-rank">
           {ranking.map((r, i) => (
