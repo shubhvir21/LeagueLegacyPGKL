@@ -17,6 +17,7 @@ export interface ManagerSeason {
   benchPts: number // points left on the bench
   perfectWeeks: number
   lineupLosses: number // H2H losses the optimal lineup would have won
+  worstBench: { week: number; pts: number } | null // most points left on the bench in one week
   adds: number
   waiverValue: number // started points from waiver/FA pickups
   faabPct: number // share of FAAB budget spent
@@ -63,10 +64,10 @@ export function managementOf(lg: League): ManagerSeason[] {
         r.actual += m.points
         r.optimal += opt
         if (m.points >= opt - 0.01) r.perfectWeeks++
+        if (!r.worstBench || opt - m.points > r.worstBench.pts) r.worstBench = { week, pts: opt - m.points }
         const opp = byMatch[m.matchup_id ?? -1]?.find((x) => x.roster_id !== m.roster_id)
         if (opp && m.points < opp.points && opt > opp.points) r.lineupLosses++
         m.starters.forEach((pid, i) => { (started[id] ??= {})[pid] = (started[id][pid] ?? 0) + (m.starters_points[i] ?? 0) })
-        void week
       }
     })
 
@@ -113,7 +114,7 @@ function weeksOf(raw: RawSeason, playoffStart: number) {
 
 function blank(season: number, memberId: string, inProgress: boolean): ManagerSeason {
   return {
-    season, memberId, inProgress, weeks: 0, actual: 0, optimal: 0, efficiency: 0, benchPts: 0, perfectWeeks: 0, lineupLosses: 0,
+    season, memberId, inProgress, weeks: 0, actual: 0, optimal: 0, efficiency: 0, benchPts: 0, perfectWeeks: 0, lineupLosses: 0, worstBench: null,
     adds: 0, waiverValue: 0, faabPct: 0, valuePerFaab: 0, trades: 0, tradeValue: 0, pickupShare: 0, top3Share: 0, coachScore: 50, managerScore: 50,
   }
 }

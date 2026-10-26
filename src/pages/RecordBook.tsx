@@ -106,7 +106,7 @@ function RecordCard({ d }: { d: RecordDef }) {
           {rows.map((r, i) => (
             <tr key={i} className={r.value === best ? 'holder' : ''}>
               <td className="muted">{i + 1}</td>
-              <td><MemberLink id={r.memberId} /></td>
+              <td>{r.memberId2 ? <span className="record-pair"><MemberLink id={r.memberId} /><span className="muted">&amp;</span><MemberLink id={r.memberId2} /></span> : <MemberLink id={r.memberId} />}</td>
               <td className="right"><b>{r.display}</b></td>
               <td className="muted small">{r.link ? <Link to={r.link}>{r.context}</Link> : r.context}</td>
             </tr>

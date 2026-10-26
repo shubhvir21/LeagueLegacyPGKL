@@ -3,11 +3,13 @@ import { careers, fmt, ordinal, pct, record, type Game, type League, type TeamSe
 import { gameOdds, UPSET_LINE, type GameOdds } from './upsets'
 import { franchiseElo } from './elo'
 import { managementCached, managementCareer } from './management'
+import { playerName, playerPos, playersOf } from './players'
 
 const UPSET_TIP = 'pre-game chance from projected lineups and form'
 
 export interface RecordRow {
   memberId: string
+  memberId2?: string // second holder, for records both teams share
   value: number
   display: string
   context: string // season / week / opponent
@@ -180,14 +182,33 @@ export function buildRecords(lg: League): RecordDef[] {
   weekly('m-blowout', 'Biggest Blowout', 'Margin of victory.', true, realTw.filter((t) => t.pts > t.oppPts), (t) => t.pts - t.oppPts)
   weekly('m-close', 'Closest Win', 'Smallest margin of victory.', true, realTw.filter((t) => t.pts > t.oppPts), (t) => t.pts - t.oppPts, true)
   weekly('m-hiloss', 'Highest Score in a Loss', 'Most points while losing.', false, realTw.filter((t) => t.pts < t.oppPts), (t) => t.pts)
-  weekly('m-lowin', 'Lowest Score in a Win', 'Fewest points while winning.', true, realTw.filter((t) => t.pts > t.oppPts), (t) => t.pts, true)
+  weekly('m-lowin', 'Lowest Score in a Win', 'Fewest points while winning.', false, realTw.filter((t) => t.pts > t.oppPts), (t) => t.pts, true)
   const games = lg.games.filter((g) => g.aPts > 0 && g.bPts > 0)
   const gameRow = (g: Game, v: number): RecordRow => {
     const [w, l] = g.aPts >= g.bPts ? [g.a, g.b] : [g.b, g.a]
-    return { memberId: w, value: v, display: fmt(v), context: `${g.season} W${g.week} · ${name(w)} vs ${name(l)}`, link: `/versus/${w}/${l}` }
+    return { memberId: w, memberId2: l, value: v, display: fmt(v), context: `${g.season} W${g.week} · ${fmt(Math.max(g.aPts, g.bPts))}–${fmt(Math.min(g.aPts, g.bPts))}`, link: `/versus/${w}/${l}` }
   }
   add('Matchup', 'm-combined', 'Highest Combined Score', 'Both teams together.', true, top(games, (g) => g.aPts + g.bPts).map((g) => gameRow(g, g.aPts + g.bPts)))
   add('Matchup', 'm-combined-low', 'Lowest Combined Score', 'Both teams together.', false, top(games, (g) => g.aPts + g.bPts, true).map((g) => gameRow(g, g.aPts + g.bPts)))
+  // Every started player's score, from the raw Sleeper matchups.
+  const pm = playersOf(lg)
+  const starts = lg.raw.seasons.flatMap((raw) => {
+    const year = Number(raw.league.season), owner = lg.rosterOwner[year]
+    return raw.matchups.slice(0, raw.lastScored).flatMap((wk, i) => wk.filter((m) => m.points > 0).flatMap((m) =>
+      m.starters.map((pid, k) => ({ season: year, week: i + 1, memberId: owner[m.roster_id], pid, pts: m.starters_points[k] ?? 0 })).filter((x) => x.pid && x.pid !== '0')))
+  })
+  const startRow = (x: (typeof starts)[number]): RecordRow => ({ memberId: x.memberId, value: x.pts, display: fmt(x.pts), context: `${playerName(pm, x.pid)} · ${x.season} W${x.week}`, link: `/player/${x.pid}` })
+  add('Matchup', 'm-player', 'Best Single-Player Week', 'Most points by one starter in a week.', true, top(starts, (x) => x.pts).map(startRow))
+  add('Matchup', 'm-player-low', 'Worst Starter', 'Fewest points by a player you started (team defenses excluded).', false, top(starts.filter((x) => playerPos(pm, x.pid) !== 'DEF'), (x) => x.pts, true).map(startRow))
+  const projSides = gameOdds(lg).flatMap((o) => [
+    { o, id: o.g.a, opp: o.g.b, pts: o.g.aPts, exp: o.expA },
+    { o, id: o.g.b, opp: o.g.a, pts: o.g.bPts, exp: o.expB },
+  ]).filter((x) => x.pts > 0)
+  add('Matchup', 'm-overproj', 'Biggest Over-Projection', 'Most points above the pre-game projection.', true,
+    top(projSides, (x) => x.pts - x.exp).map((x) => ({ memberId: x.id, value: x.pts - x.exp, display: `+${fmt(x.pts - x.exp)}`, context: `${x.o.g.season} W${x.o.g.week} vs ${name(x.opp)} · ${fmt(x.pts)} vs proj ${fmt(x.exp, 1)}`, link: `/versus/${x.id}/${x.opp}` })))
+  const benchWeeks = managementCached(lg).filter((m) => m.worstBench)
+  add('Matchup', 'm-bench', 'Most Points Left on the Bench', 'Optimal lineup points minus actual points in one week.', false,
+    top(benchWeeks, (m) => m.worstBench!.pts).map((m) => ({ memberId: m.memberId, value: m.worstBench!.pts, display: fmt(m.worstBench!.pts), context: `${m.season} W${m.worstBench!.week}`, link: `/season/${m.season}/team/${m.memberId}` })))
 
   // ---------- Elo ----------
   const elo = franchiseElo(lg)
@@ -197,10 +218,6 @@ export function buildRecords(lg: League): RecordDef[] {
     top(eloIds, (id) => elo.peak[id]?.rating ?? 0).map((id) => ({ memberId: id, value: elo.peak[id].rating, display: String(elo.peak[id].rating), context: when(elo.peak[id]), link: `/member/${id}` })))
   add('League', 'elo-low', 'Lowest Elo Ever', 'Worst Elo rating ever reached.', false,
     top(eloIds, (id) => elo.low[id]?.rating ?? 9999, true).map((id) => ({ memberId: id, value: elo.low[id].rating, display: String(elo.low[id].rating), context: when(elo.low[id]), link: `/member/${id}` })))
-  const eloWeeks = eloIds.flatMap((id) => elo.history[id].slice(1).map((p, i) => ({ id, p, d: p.rating - elo.history[id][i].rating, prev: elo.history[id][i] })).filter((x) => x.prev.season === x.p.season))
-  const finishOf = (id: string, season: number) => elo.finishes.find((f) => f.memberId === id && f.season === season)
-  add('Matchup', 'elo-gain', 'Biggest Single-Week Elo Gain', 'Most Elo gained in one week (season finales include the finish payout).', true,
-    top(eloWeeks, (x) => x.d).map((x) => { const f = finishOf(x.id, x.p.season); const fin = f && x.p.week === Math.max(...elo.history[x.id].filter((q) => q.season === x.p.season).map((q) => q.week)); return { memberId: x.id, value: x.d, display: `+${x.d}`, context: `${x.p.season} W${x.p.week}${fin ? ` · finished ${f!.place === 1 ? '1st' : f!.place === 2 ? '2nd' : f!.place === 3 ? '3rd' : `${f!.place}th`}` : ''}`, link: `/member/${x.id}` } }))
   const seasonSwing = eloIds.flatMap((id) => [...new Set(elo.history[id].map((p) => p.season))].map((y) => {
     const h = elo.history[id].filter((p) => p.season === y)
     return { id, y, d: h.at(-1)!.rating - h[0].rating }
@@ -312,9 +329,12 @@ export function recordHolders(defs: RecordDef[]) {
     if (d.category === 'Milestones') continue
     const best = d.rows[0]?.value
     d.rows.forEach((r, i) => {
-      const x = (t[r.memberId] ??= { pos: 0, neg: 0, posTop: 0, negTop: 0 })
-      if (i < 3) { if (d.positive) x.posTop++; else x.negTop++ }
-      if (r.value === best) { if (d.positive) x.pos++; else x.neg++ }
+      for (const id of [r.memberId, r.memberId2]) {
+        if (!id) continue
+        const x = (t[id] ??= { pos: 0, neg: 0, posTop: 0, negTop: 0 })
+        if (i < 3) { if (d.positive) x.posTop++; else x.negTop++ }
+        if (r.value === best) { if (d.positive) x.pos++; else x.neg++ }
+      }
     })
   }
   return t
