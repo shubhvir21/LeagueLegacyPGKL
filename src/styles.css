@@ -381,6 +381,11 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
 .meter { display: inline-flex; align-items: center; gap: 8px; }
 .meter-track { display: block; width: 56px; height: 5px; border-radius: 3px; background: var(--panel-3); overflow: hidden; }
 .meter-bar { display: block; height: 100%; border-radius: 3px; }
+.team-rankings th, .team-rankings td { padding-left: 7px; padding-right: 7px; }
+.team-rankings .meter { gap: 6px; }
+.team-rankings .meter-track { width: 40px; }
+.rank-team { display: flex; flex-direction: column; line-height: 1.25; max-width: 220px; }
+.rank-team > span { overflow: hidden; text-overflow: ellipsis; }
 .meter-num { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; width: 20px; }
 .legacy-score { font-family: var(--display); font-size: 16px; font-weight: 750; color: var(--text); letter-spacing: -0.01em; }
 

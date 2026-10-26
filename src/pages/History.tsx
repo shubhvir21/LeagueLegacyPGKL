@@ -117,7 +117,7 @@ function SeasonTable({ lg, mode }: { lg: League; mode: 'Champions' | 'Chumpions'
     { label: 'Champion', get: awards((ts) => ts.find((t) => t.finalRank === 1)) },
     { label: 'Runner-up', get: awards((ts) => ts.find((t) => t.finalRank === 2)) },
     { label: 'Third', get: awards((ts) => ts.find((t) => t.finalRank === 3)) },
-    { label: 'Reg. Season', get: awards((ts) => ts.find((t) => t.regRank === 1)) },
+    { label: 'Reg.', get: awards((ts) => ts.find((t) => t.regRank === 1)) },
     { label: 'Points Leader', get: awards(maxBy((t) => t.pf)) },
     { label: 'All-Play Leader', get: awards(maxBy((t) => t.apW)) },
   ]
@@ -219,7 +219,7 @@ function TeamRankings({ lg }: { lg: League }) {
       render: (r) => (
         <Link to={`/season/${r.t.season}/team/${r.t.memberId}`} className="member-link">
           <Avatar id={r.t.memberId} />
-          <span>{r.t.teamName}<span className="muted small"> · {lg.memberById[r.t.memberId]?.name}</span></span>
+          <span className="rank-team">{r.t.teamName}<span className="muted small">{lg.memberById[r.t.memberId]?.name}</span></span>
         </Link>
       ),
     },
@@ -228,15 +228,17 @@ function TeamRankings({ lg }: { lg: League }) {
     { key: 'rec', label: 'Record', render: (r) => record(r.t.wins, r.t.losses, r.t.ties), sort: (r) => r.t.wins - r.t.losses / 1000 },
     { key: 'ppg', label: 'PPG', render: (r) => fmt(r.ppg), sort: (r) => r.ppg, align: 'right' },
     { key: 'fin2', label: 'Finish', render: (r) => <Meter v={Math.round(r.finish)} />, sort: (r) => r.finish, tip: '25% · Final finish: 100 / 80 / 65 / 52 / 42 / 33 / 24 / 15 / 7 / 0.' },
-    { key: 'reg', label: 'Reg. Season', render: (r) => <Meter v={Math.round(r.regular)} />, sort: (r) => r.regular, tip: '20% · Regular-season seed and win %.' },
-    { key: 'dom', label: 'Dominance', render: (r) => <Meter v={Math.round(r.dominance)} />, sort: (r) => r.dominance, tip: '40% · Points per game and average margin (playoffs included), all-play win %.' },
-    { key: 'con', label: 'Consistency', render: (r) => <Meter v={Math.round(r.consistency)} />, sort: (r) => r.consistency, tip: '15% · Weekly scoring floor and median-beat rate.' },
-    { key: 'score', label: 'Legacy Score', render: (r) => <span className="legacy-score">{r.score.toFixed(1)}</span>, sort: (r) => r.score, align: 'right', tip: RANK_TIP },
+    { key: 'reg', label: 'Reg.', render: (r) => <Meter v={Math.round(r.regular)} />, sort: (r) => r.regular, tip: 'Regular Season · 20% · Regular-season seed and win %.' },
+    { key: 'dom', label: 'Dom.', render: (r) => <Meter v={Math.round(r.dominance)} />, sort: (r) => r.dominance, tip: 'Dominance · 40% · Points per game and average margin (playoffs included), all-play win %.' },
+    { key: 'con', label: 'Cons.', render: (r) => <Meter v={Math.round(r.consistency)} />, sort: (r) => r.consistency, tip: 'Consistency · 15% · Weekly scoring floor and median-beat rate.' },
+    { key: 'score', label: 'Score', render: (r) => <span className="legacy-score">{r.score.toFixed(1)}</span>, sort: (r) => r.score, align: 'right', tip: RANK_TIP },
   ]
   return (
     <Card title="Team Rankings" sub={`The best and worst single-season teams in league history (${all.length} completed team-seasons). Click a column to sort.`}>
       <Tabs tabs={['Best 15', 'Worst 15'] as const} value={view} onChange={setView} />
-      <Table key={view} rows={rows} cols={cols} initialSort="score" initialAsc={view === 'Worst 15'} rowKey={(r) => `${r.t.season}-${r.t.memberId}`} />
+      <div className="team-rankings">
+        <Table key={view} rows={rows} cols={cols} initialSort="score" initialAsc={view === 'Worst 15'} rowKey={(r) => `${r.t.season}-${r.t.memberId}`} />
+      </div>
       {all.length < 30 && <p className="muted small" style={{ marginTop: 12 }}>With {all.length} completed team-seasons so far, the two lists overlap. They’ll separate as more seasons finish.</p>}
     </Card>
   )
