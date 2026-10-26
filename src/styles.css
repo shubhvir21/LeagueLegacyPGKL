@@ -1065,3 +1065,12 @@ button.elo-chip { font: inherit; }
 .draft-slot { font-size: 11px; }
 .draft-player { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
 .draft-meta { font-size: 11px; white-space: nowrap; }
+@media (max-width: 640px) {
+  /* Draft board: each round becomes a two-up grid of picks instead of a 1,500px-wide row. */
+  .table-wrap:has(.draft-board) { background: none; margin: 0; overflow: visible; }
+  .draft-board, .draft-board tbody { display: block; }
+  .draft-board tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 14px; }
+  .draft-board tr > th { grid-column: 1 / -1; position: static; box-shadow: none; text-align: left; padding: 0 !important; width: auto; font-size: 11px; letter-spacing: .08em; }
+  .draft-board tr > td { position: static; box-shadow: none; min-width: 0; padding: 7px 8px !important; border-radius: 8px; font-size: 12px; }
+  .draft-player { max-width: none; }
+}

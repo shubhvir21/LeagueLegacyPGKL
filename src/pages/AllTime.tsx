@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLeague } from '../lib/data'
 import { playersOf } from '../lib/players'
-import { FLEX, lineupSlots } from '../lib/lineup'
+import { FLEX } from '../lib/lineup'
 import { fmt } from '../lib/stats'
 import { Card, MemberLink, Stat, Tabs } from '../components/ui'
 import { PlayerLink } from '../components/PlayerLink'
@@ -9,13 +9,16 @@ import { PlayerLink } from '../components/PlayerLink'
 // Each franchise's best possible lineup from players who started for it.
 //   Career       a player's total starting-lineup points across all his seasons with the franchise
 //   Best Season  a player's single best season of starting points for the franchise
-// Slots come from the current league's lineup; flex slots are filled after the fixed ones.
+// All-League format: 1st, 2nd and 3rd teams of QB RB RB WR WR TE FLX FLX DEF. Each player makes
+// one team at most; flex slots are filled after the fixed ones.
 type Mode = 'Career' | 'Best Season'
 interface Entry { pid: string; pos: string; pts: number; memberId: string; seasons: number[]; starts: number }
 
-function buildTeam(slots: string[], pool: Entry[]) {
+const SLOTS = ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'FLEX', 'DEF']
+const TEAMS = ['First Team', 'Second Team', 'Third Team']
+
+function buildTeam(slots: string[], pool: Entry[], used = new Set<string>()) {
   const sorted = [...pool].sort((a, b) => b.pts - a.pts)
-  const used = new Set<string>()
   const key = (e: Entry) => e.pid // one appearance per player, even in best-season mode
   const picks: { slot: string; e: Entry }[] = []
   const take = (slot: string, ok: (pos: string) => boolean) => {
@@ -24,8 +27,14 @@ function buildTeam(slots: string[], pool: Entry[]) {
   }
   for (const s of slots.filter((x) => !FLEX[x])) take(s, (p) => p === s)
   for (const s of slots.filter((x) => FLEX[x]).sort((a, b) => FLEX[a].length - FLEX[b].length)) take(s, (p) => FLEX[s].includes(p))
-  const bench = sorted.filter((x) => !used.has(key(x)) && (used.add(key(x)), true)).slice(0, 6)
-  return { picks, bench, total: picks.reduce((a, p) => a + p.e.pts, 0) }
+  // Keep slot order (QB, RB, RB, ...) rather than fill order.
+  picks.sort((a, b) => slots.indexOf(a.slot) - slots.indexOf(b.slot))
+  return { picks, total: picks.reduce((a, p) => a + p.e.pts, 0) }
+}
+
+function buildTeams(pool: Entry[]) {
+  const used = new Set<string>()
+  return TEAMS.map(() => buildTeam(SLOTS, pool, used))
 }
 
 export default function AllTime() {
@@ -33,7 +42,6 @@ export default function AllTime() {
   const pm = playersOf(lg)
   const [member, setMember] = useState('ALL')
   const [mode, setMode] = useState<Mode>('Career')
-  const slots = lineupSlots(lg.raw.seasons.at(-1)!.league.roster_positions)
 
   const entries = useMemo(() => {
     const career: Record<string, Entry> = {}, season: Record<string, Entry> = {}
@@ -50,10 +58,11 @@ export default function AllTime() {
   }, [pm])
 
   const pool = entries[mode].filter((e) => member === 'ALL' || e.memberId === member)
-  const team = buildTeam(slots, pool)
+  const teams = buildTeams(pool)
+  const team = teams[0]
   const name = (id: string) => lg.memberById[id]?.name ?? id
   // Franchise totals for comparison (same mode).
-  const ranking = lg.members.map((m) => ({ id: m.id, total: buildTeam(slots, entries[mode].filter((e) => e.memberId === m.id)).total }))
+  const ranking = lg.members.map((m) => ({ id: m.id, total: buildTeam(SLOTS, entries[mode].filter((e) => e.memberId === m.id)).total }))
     .filter((r) => r.total > 0).sort((a, b) => b.total - a.total)
   const mine = member === 'ALL' ? null : ranking.findIndex((r) => r.id === member) + 1
   const mvp = team.picks.length ? [...team.picks].sort((a, b) => b.e.pts - a.e.pts)[0].e : null
@@ -62,8 +71,8 @@ export default function AllTime() {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>All-Time Team</h1>
-          <p className="muted">{member === 'ALL' ? 'The All-League team: the best starters in league history, any franchise.' : `The best lineup ${name(member)} has ever started.`}</p>
+          <h1>All-Time Teams</h1>
+          <p className="muted">{member === 'ALL' ? 'All-League teams: the best starters in league history, any franchise.' : `The best players ${name(member)} has ever started.`}</p>
         </div>
         <select value={member} onChange={(e) => setMember(e.target.value)}>
           <option value="ALL">All-League</option>
@@ -72,23 +81,20 @@ export default function AllTime() {
       </div>
       <Tabs tabs={['Career', 'Best Season'] as const} value={mode} onChange={setMode} />
       <div className="stat-grid">
-        <Stat icon="star" label={`Lineup total · ${mode === 'Career' ? 'career' : 'single-season'} starting pts`} value={fmt(team.total, 0)} />
+        <Stat icon="star" label={`First Team total · ${mode === 'Career' ? 'career' : 'single-season'} starting pts`} value={fmt(team.total, 0)} />
         {mvp && <Stat icon="crown" label={`Headliner · ${fmt(mvp.pts, 0)} pts`} value={pm.info[mvp.pid]?.name ?? mvp.pid} />}
         {mine ? <Stat icon="medal" label="All-time team rank" value={`${mine} of ${ranking.length}`} /> : ranking[0] && <Stat icon="medal" label={`Best franchise team · ${fmt(ranking[0].total, 0)}`} value={name(ranking[0].id)} />}
       </div>
-      <Card title="Starting Lineup" sub={mode === 'Career' ? 'Total starting-lineup points with the franchise' : 'Best single season of starting points'}>
-        <div className="at-lineup">
-          {team.picks.map(({ slot, e }) => <Row key={slot + e.pid} slot={slot} e={e} showTeam={member === 'ALL'} />)}
-        </div>
-      </Card>
-      {team.bench.length > 0 && (
-        <Card title="Bench">
+      {teams.map((t, i) => t.picks.length > 0 && (
+        <Card key={TEAMS[i]} title={`${member === 'ALL' ? 'All-League' : 'All-Franchise'} ${TEAMS[i]}`}
+          sub={i === 0 ? (mode === 'Career' ? 'Total starting-lineup points with the franchise' : 'Best single season of starting points') : undefined}
+          right={<b>{fmt(t.total, 0)}</b>}>
           <div className="at-lineup">
-            {team.bench.map((e) => <Row key={e.pid + e.seasons.join()} slot="BN" e={e} showTeam={member === 'ALL'} />)}
+            {t.picks.map(({ slot, e }, j) => <Row key={slot + j + e.pid} slot={slot} e={e} showTeam={member === 'ALL'} />)}
           </div>
         </Card>
-      )}
-      <Card title="All-Time Team Rankings" sub="Each franchise's best lineup total, same mode">
+      ))}
+      <Card title="All-Time Team Rankings" sub="Each franchise's First Team total, same mode">
         <div className="at-rank">
           {ranking.map((r, i) => (
             <button key={r.id} className={`at-rank-row ${r.id === member ? 'active' : ''}`} onClick={() => setMember(r.id)}>
