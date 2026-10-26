@@ -19,9 +19,9 @@ export default function RecordBook() {
   const cols: Col<(typeof holderRows)[number]>[] = [
     { key: 'm', label: 'Member', render: (r) => <MemberLink id={r.id} /> },
     { key: 'pos', label: 'Records Held', render: (r) => <span className="pos"><b>{r.pos}</b></span>, sort: (r) => r.pos, tip: 'Positive records where this member holds #1 (ties count).' },
-    { key: 'posTop', label: 'Top 25s', render: (r) => r.posTop, sort: (r) => r.posTop },
+    { key: 'posTop', label: 'Top 3s', render: (r) => r.posTop, sort: (r) => r.posTop, tip: 'Top-3 spots across all records.' },
     { key: 'neg', label: 'Chud-cords Held', render: (r) => <span className="neg"><b>{r.neg}</b></span>, sort: (r) => r.neg, tip: 'Chud-cords (bad records) where this member holds #1.' },
-    { key: 'negTop', label: 'Chud-cord Top 25s', render: (r) => r.negTop, sort: (r) => r.negTop },
+    { key: 'negTop', label: 'Chud-cord Top 3s', render: (r) => r.negTop, sort: (r) => r.negTop, tip: 'Top-3 spots across all chud-cords.' },
     { key: 'tot', label: 'Total Held', render: (r) => <b>{r.pos + r.neg}</b>, sort: (r) => r.pos + r.neg },
   ]
   const milestoneWatch = defs

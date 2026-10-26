@@ -311,11 +311,11 @@ export function recordHolders(defs: RecordDef[]) {
   for (const d of defs) {
     if (d.category === 'Milestones') continue
     const best = d.rows[0]?.value
-    for (const r of d.rows) {
+    d.rows.forEach((r, i) => {
       const x = (t[r.memberId] ??= { pos: 0, neg: 0, posTop: 0, negTop: 0 })
-      if (d.positive) x.posTop++; else x.negTop++
+      if (i < 3) { if (d.positive) x.posTop++; else x.negTop++ }
       if (r.value === best) { if (d.positive) x.pos++; else x.neg++ }
-    }
+    })
   }
   return t
 }
