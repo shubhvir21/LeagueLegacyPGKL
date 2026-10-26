@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { useLeague } from '../lib/data'
 import { fmt, record, type League } from '../lib/stats'
+import { Card } from './ui'
 
 type Kind = 'champ' | 'second' | 'third' | 'points' | 'allplay' | 'toilet'
 interface Award { kind: Kind; year: number; detail: string; value?: string }
@@ -38,19 +39,12 @@ export function TrophyRoom({ id }: { id: string }) {
   const rest = awards.filter((a) => a.kind !== 'champ')
   const count = (k: Kind) => awards.filter((a) => a.kind === k).length
   const sub = ORDER.filter((k) => count(k)).map((k) => `${count(k)} × ${LABEL[k]}`).join(' · ')
-  const owner = lg.memberById[id]?.name
   return (
-    <section className="trophy-room" aria-label="Trophy Room">
-      <div className="trophy-room-head">
-        <div className="trophy-plaque"><span>The {owner} Trophy Room</span></div>
-        {sub && <p className="trophy-room-sub">{sub}</p>}
-      </div>
-      {!awards.length && <p className="trophy-room-empty">The shelves are empty… for now.</p>}
+    <Card title="Trophy Room" sub={sub || undefined}>
+      {!awards.length && <p className="muted">The shelf is empty… for now.</p>}
       {champs.length > 0 && (
-        <div className="trophy-case">
-          <div className="trophy-shelf champ">
-            {champs.map((a, i) => <TrophyItem key={a.kind + a.year} a={a} nth={i + 1} />)}
-          </div>
+        <div className="trophy-shelf champ">
+          {champs.map((a, i) => <TrophyItem key={a.kind + a.year} a={a} nth={i + 1} />)}
         </div>
       )}
       {rest.length > 0 && (
@@ -58,7 +52,7 @@ export function TrophyRoom({ id }: { id: string }) {
           {rest.map((a) => <TrophyItem key={a.kind + a.year} a={a} />)}
         </div>
       )}
-    </section>
+    </Card>
   )
 }
 
@@ -86,13 +80,7 @@ function Grad({ id, c, dir = 'h' }: { id: string; c: string[]; dir?: 'h' | 'v' }
   )
 }
 
-const starPath = (cx: number, cy: number, r: number) =>
-  Array.from({ length: 10 }, (_, i) => {
-    const a = (Math.PI / 5) * i - Math.PI / 2, d = i % 2 ? r * 0.45 : r
-    return `${i ? 'L' : 'M'}${(cx + d * Math.cos(a)).toFixed(2)} ${(cy + d * Math.sin(a)).toFixed(2)}`
-  }).join(' ') + ' Z'
-
-/** `nth` = which title this cup is; from the second one on, it carries one star per title. */
+/** `nth` = which title this cup is; it carries one star per title. */
 function ChampionCup({ year, nth = 1 }: { kind: Kind; year: number; nth?: number }) {
   const u = useId().replace(/:/g, '')
   const g = `g${u}`, gv = `gv${u}`, wood = `w${u}`, shine = `s${u}`
@@ -113,17 +101,14 @@ function ChampionCup({ year, nth = 1 }: { kind: Kind; year: number; nth?: number
       <ellipse cx="80" cy="25" rx="44" ry="5" fill={METAL.gold[3]} />
       <path d="M40 34 C42 74 54 100 72 112" fill="none" stroke="#fff" strokeOpacity=".55" strokeWidth="4" strokeLinecap="round" />
       <ellipse cx="62" cy="58" rx="22" ry="30" fill={`url(#${shine})`} />
-      {/* title stars */}
-      {nth > 1 && Array.from({ length: nth }, (_, i) => {
-        const gap = Math.min(14, 64 / nth)
-        return <path key={i} d={starPath(80 + (i - (nth - 1) / 2) * gap, 42, Math.min(6, gap * 0.45))} className="engrave" />
-      })}
       {/* engraving */}
       <text x="80" y="66" textAnchor="middle" className="engrave" fontSize="19" fontWeight="800" letterSpacing="2">PGKL</text>
       <path d="M58 74 H102" stroke={METAL.gold[3]} strokeOpacity=".6" strokeWidth="1.2" />
       <text x="80" y="86" textAnchor="middle" className="engrave" fontSize="7.5" fontWeight="700" letterSpacing="1.5">CHAMPION</text>
-      {/* star finial on lid rim */}
-      <path d="M80 4 l3.2 6.6 7.2 1 -5.2 5 1.3 7.2 -6.5 -3.4 -6.5 3.4 1.3 -7.2 -5.2 -5 7.2 -1 Z" fill={`url(#${g})`} stroke={METAL.gold[3]} strokeWidth=".6" />
+      {/* star finials on the lid rim, one per title */}
+      {Array.from({ length: nth }, (_, i) => (
+        <path key={i} transform={`translate(${(i - (nth - 1) / 2) * Math.min(15, 90 / nth)} 0)`} d="M80 4 l3.2 6.6 7.2 1 -5.2 5 1.3 7.2 -6.5 -3.4 -6.5 3.4 1.3 -7.2 -5.2 -5 7.2 -1 Z" fill={`url(#${g})`} stroke={METAL.gold[3]} strokeWidth=".6" />
+      ))}
       {/* stem and knot */}
       <path d="M72 118 H88 L85 142 H75 Z" fill={`url(#${g})`} />
       <ellipse cx="80" cy="142" rx="14" ry="5" fill={`url(#${g})`} />
