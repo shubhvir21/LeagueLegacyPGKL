@@ -170,7 +170,8 @@ export function Preview({ g }: { g: ScheduledGame }) {
 /** Upcoming weeks for the current season, shown on its season page. */
 export function UpcomingSchedule({ year }: { year: number }) {
   const lg = useLeague()
-  const weeks = [...new Set(lg.schedule.filter((g) => g.season === year).map((g) => g.week))].sort((a, b) => a - b)
+  // Playoff weeks hold Sleeper's placeholder pairings until the bracket is set.
+  const weeks = [...new Set(lg.schedule.filter((g) => g.season === year && !g.playoff).map((g) => g.week))].sort((a, b) => a - b)
   return (
     <>
       {weeks.length > 0 && <h2>Upcoming Schedule</h2>}
