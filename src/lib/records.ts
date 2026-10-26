@@ -1,9 +1,10 @@
 // Record Book: ranked lists computed from the league model.
-import { careers, fmt, ordinal, pct, record, type Game, type League, type TeamSeason } from './stats'
+import { careers, fmt, headToHead, ordinal, pct, record, type Game, type League, type TeamSeason } from './stats'
 import { gameOdds, UPSET_LINE, type GameOdds } from './upsets'
 import { franchiseElo } from './elo'
 import { managementCached, managementCareer } from './management'
 import { playerName, playerPos, playersOf } from './players'
+import { rivalries } from './rivalry'
 
 const UPSET_TIP = 'pre-game chance from projected lineups and form'
 
@@ -206,6 +207,21 @@ export function buildRecords(lg: League): RecordDef[] {
   ]).filter((x) => x.pts > 0)
   add('Matchup', 'm-overproj', 'Biggest Over-Projection', 'Most points above the pre-game projection.', true,
     top(projSides, (x) => x.pts - x.exp).map((x) => ({ memberId: x.id, value: x.pts - x.exp, display: `+${fmt(x.pts - x.exp)}`, context: `${x.o.g.season} W${x.o.g.week} vs ${name(x.opp)} · ${fmt(x.pts)} vs proj ${fmt(x.exp, 1)}`, link: `/versus/${x.id}/${x.opp}` })))
+  // Head-to-head series (playoffs included); a series needs 4+ meetings to count.
+  const pairs = cr.flatMap((x, i) => cr.slice(i + 1).map((y) => ({ a: x.member.id, b: y.member.id, h: headToHead(lg, x.member.id, y.member.id) })))
+    .filter((p) => p.h.games.length >= 4)
+  const series = pairs.map((p) => (p.h.w >= p.h.l ? { id: p.a, opp: p.b, w: p.h.w, l: p.h.l, t: p.h.t } : { id: p.b, opp: p.a, w: p.h.l, l: p.h.w, t: p.h.t }))
+  add('Matchup', 'm-series', 'Most Dominant Series', 'Best record against one opponent (4+ meetings, playoffs included).', true,
+    top(series, (x) => x.w / (x.w + x.l + x.t || 1)).map((x) => ({ memberId: x.id, value: x.w / (x.w + x.l + x.t || 1), display: record(x.w, x.l, x.t), context: `vs ${name(x.opp)} · ${x.w + x.l + x.t} meetings`, link: `/versus/${x.id}/${x.opp}` })))
+  const rivalryRow = (p: (typeof pairs)[number]): RecordRow => {
+    const v = (p.h.pf + p.h.pa) / p.h.games.length
+    return { memberId: p.a, memberId2: p.b, value: v, display: fmt(v), context: `combined per game · ${p.h.games.length} meetings`, link: `/versus/${p.a}/${p.b}` }
+  }
+  add('Matchup', 'm-intense', 'Most Intense Rivalry', 'Rivalry intensity (0–100): playoff stakes, games played, close games, series balance and drama.', true,
+    top(rivalries(lg), (r) => r.score).map((r) => ({ memberId: r.a, memberId2: r.b, value: r.score, display: fmt(r.score, 0), context: `${record(r.aW, r.bW, r.ties)} series · ${r.games} meetings${r.tags.length ? ` · ${r.tags.slice(0, 2).join(', ')}` : ''}`, link: `/versus/${r.a}/${r.b}` })))
+  const combinedPg = (p: (typeof pairs)[number]) => (p.h.pf + p.h.pa) / p.h.games.length
+  add('Matchup', 'm-rivalry-high', 'Highest-Scoring Rivalry', 'Best combined points per game across every meeting (4+ meetings).', true, top(pairs, combinedPg).map(rivalryRow))
+  add('Matchup', 'm-rivalry-low', 'Lowest-Scoring Rivalry', 'Fewest combined points per game across every meeting (4+ meetings).', false, top(pairs, combinedPg, true).map(rivalryRow))
   const benchWeeks = managementCached(lg).filter((m) => m.worstBench)
   add('Matchup', 'm-bench', 'Most Points Left on the Bench', 'Optimal lineup points minus actual points in one week.', false,
     top(benchWeeks, (m) => m.worstBench!.pts).map((m) => ({ memberId: m.memberId, value: m.worstBench!.pts, display: fmt(m.worstBench!.pts), context: `${m.season} W${m.worstBench!.week}`, link: `/season/${m.season}/team/${m.memberId}` })))
