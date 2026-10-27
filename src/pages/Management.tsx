@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts'
 import { useLeague } from '../lib/data'
 import { managementCached, managementCareer, type ManagerSeason } from '../lib/management'
@@ -23,11 +23,10 @@ const T = {
 
 type Row = ManagerSeason & { seasons?: number }
 
-export default function Management() {
+/** Lineup and roster-building scores. `view` is 'All-Time' or a season year; `extra` adds stat tiles. */
+export function ManagementSection({ view, extra }: { view: string; extra?: ReactNode }) {
   const lg = useLeague()
   const all = useMemo(() => managementCached(lg), [lg])
-  const years = [...new Set(all.map((r) => r.season))].sort((a, b) => b - a)
-  const [view, setView] = useState<string>('All-Time')
   const rows: Row[] = view === 'All-Time' ? managementCareer(all) : all.filter((r) => r.season === Number(view))
   const perSeason = view === 'All-Time'
   const best = <K extends keyof Row>(k: K, asc = false) => [...rows].sort((a, b) => (asc ? 1 : -1) * (Number(a[k]) - Number(b[k])))[0]
@@ -57,17 +56,7 @@ export default function Management() {
   const scatter = rows.map((r) => ({ x: +r.efficiency.toFixed(1), y: +r.waiverValue.toFixed(1), z: r.managerScore, name: name(r) }))
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>Management</h1>
-          <p className="muted">Lineup decisions and in-season roster building. {perSeason ? 'All-time: per-season averages unless noted.' : ''}</p>
-        </div>
-        <select value={view} onChange={(e) => setView(e.target.value)}>
-          <option>All-Time</option>
-          {years.map((y) => <option key={y}>{y}</option>)}
-        </select>
-      </div>
+    <>
       {inProgress && <div className="banner">{view} is in progress — numbers cover weeks played so far.</div>}
 
       <div className="stat-grid">
@@ -77,9 +66,10 @@ export default function Management() {
         <Stat icon="plus" label={`Waiver hawk · ${signed(hawk?.waiverValue ?? 0)}`} value={name(hawk)} tip={T.waiver} />
         <Stat icon="dollar" label={`Best value per FAAB · ${thrifty ? fmt(thrifty.valuePerFaab) : '—'}`} value={name(thrifty)} tip={T.vpf} />
         <Stat icon="swap" label={`Best trader · ${signed(trader?.tradeValue ?? 0)}`} value={name(trader)} tip={T.trade} />
+        {extra}
       </div>
 
-      <Card title="Manager Rankings" sub="Click any column to sort; click again to flip.">
+      <Card title="Manager Rankings" sub={`Lineups, waivers and trades in one score.${perSeason ? ' All-time: per-season averages unless noted.' : ''}`}>
         <Table key={view} rows={rows} cols={cols} initialSort="mgr" rowKey={(r) => r.memberId} />
       </Card>
 
@@ -99,7 +89,7 @@ export default function Management() {
           </ScatterChart>
         </ResponsiveContainer>
       </Card>
-    </div>
+    </>
   )
 }
 

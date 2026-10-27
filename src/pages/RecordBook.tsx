@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useLeague } from '../lib/data'
 import { buildRecords, CATEGORIES, recordHolders, type RecordDef } from '../lib/records'
 import { careers, fmt } from '../lib/stats'
@@ -13,7 +13,11 @@ export default function RecordBook() {
   const lg = useLeague()
   const defs = useMemo(() => buildRecords(lg), [lg])
   const races = useMemo(() => buildMilestones(lg), [lg])
+  const loc = useLocation()
+  const asked = (loc.state as { view?: string } | null)?.view
   const [view, setView] = useState<(typeof VIEWS)[number]>('Overview')
+  // Search links land on a specific tab.
+  useEffect(() => { if (asked && (VIEWS as readonly string[]).includes(asked)) setView(asked as (typeof VIEWS)[number]) }, [asked, loc.key])
   const holders = recordHolders(defs)
   const count = (c: string, positive: boolean) => defs.filter((d) => d.category === c && d.positive === positive).length
 

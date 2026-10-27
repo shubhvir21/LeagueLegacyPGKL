@@ -9,6 +9,7 @@ import { GameCard } from './Season'
 import { playersOf } from '../lib/players'
 import { PlayerLink } from '../components/PlayerLink'
 import { Icon } from '../components/Icon'
+import { Newsletter } from '../components/Newsletter'
 
 export default function Home() {
   const lg = useLeague()
@@ -67,6 +68,8 @@ export default function Home() {
         </ol>
       )}
 
+      <Newsletter />
+
       {current.complete
         ? <SeasonStoryStrip year={current.year} />
         : lastGames.length > 0
@@ -103,7 +106,7 @@ export default function Home() {
             </tr>
           ))}</tbody></table></div>
         </Card>
-        <Card title="League Activity" sub="Latest transactions." right={<Link to="/transactions">All →</Link>}>
+        <Card title="League Activity" sub="Latest transactions." right={<Link to="/frontoffice">All →</Link>}>
           <ul className="feed">
             {activity.map((a, i) => (
               <li key={i} className="feed-item">
@@ -238,7 +241,6 @@ function WeeklyStoryStrip({ year, week, games }: { year: number; week: number; g
   const close = [...wins].sort((a, b) => (a.pts - a.oppPts) - (b.pts - b.oppPts))[0]
   const blow = [...wins].sort((a, b) => (b.pts - b.oppPts) - (a.pts - a.oppPts))[0]
   const hot = latest ? [...latest.rows].sort((a, b) => b.recent - a.recent)[0] : null
-  const powerTop = latest?.rows[0]
   const pct = (p: number) => `${Math.round(p * 100)}%`
 
   const beats: StoryBeat[] = [
@@ -249,11 +251,9 @@ function WeeklyStoryStrip({ year, week, games }: { year: number; week: number; g
   if (blow && blow !== close) beats.push({ icon: 'zap', label: 'Blowout', who: nm(blow.id), detail: `over ${nm(blow.opp)} by ${fmt(blow.pts - blow.oppPts, 1)}`, to: `/member/${blow.id}`, tone: 'pos' })
   if (upset && upset.pWinner < 0.5) {
     beats.push({ icon: 'zap', label: 'Upset', who: nm(upset.winner!), detail: `won at ${pct(upset.pWinner)} vs ${nm(upset.loser!)}`, to: `/member/${upset.winner!}`, tone: 'pos' })
-  } else if (powerTop) {
-    beats.push({ icon: 'crown', label: 'Power No. 1', who: <TeamName id={powerTop.memberId} season={year} />, detail: `${fmt(powerTop.score, 1)} power`, to: '/power' })
   }
-  if (hot && (!powerTop || hot.memberId !== powerTop.memberId)) {
-    beats.push({ icon: 'flame', label: 'Hottest', who: <TeamName id={hot.memberId} season={year} />, detail: `${fmt(hot.recent, 1)} /g last 3`, to: '/power' })
+  if (hot) {
+    beats.push({ icon: 'flame', label: 'Hottest', who: <TeamName id={hot.memberId} season={year} />, detail: `${fmt(hot.recent, 1)} /g last 3`, to: `/member/${hot.memberId}` })
   }
 
   return (

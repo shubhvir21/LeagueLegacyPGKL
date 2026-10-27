@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useData } from '../lib/data'
 import { Icon } from './Icon'
+import { SearchPalette } from './Search'
 
 type NavItem = { to: string; label: string; icon: string; end?: boolean; also?: string }
 const NAV: { group: string; items: NavItem[] }[] = [
@@ -21,7 +22,6 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { to: '/matchups', label: 'Matchups', icon: 'football', end: true },
       { to: '/playoffs', label: 'Playoffs', icon: 'trophy' },
-      { to: '/power', label: 'Power Rankings', icon: 'chart' },
       { to: '/versus', label: 'Versus', icon: 'swords' },
       { to: '/butterfly', label: 'Butterfly Effect', icon: 'zap' },
     ],
@@ -29,8 +29,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Roster',
     items: [
-      { to: '/management', label: 'Management', icon: 'list' },
-      { to: '/transactions', label: 'Transactions', icon: 'swap' },
+      { to: '/frontoffice', label: 'Front Office', icon: 'swap' },
       { to: '/keepers', label: 'Keepers', icon: 'lock' },
       { to: '/draft', label: 'Draft History', icon: 'list' },
       { to: '/players', label: 'Players', icon: 'user', also: '/player/' },
@@ -45,6 +44,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
   },
 ]
 
+const PAGES = NAV.flatMap((g) => g.items)
+
 function ago(iso: string) {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
   if (m < 1) return 'just now'
@@ -56,6 +57,15 @@ function ago(iso: string) {
 export default function Layout() {
   const { league, error, syncing, resync } = useData()
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState(false)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')
+      if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) { e.preventDefault(); setSearch(true) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const loc = useLocation()
   useEffect(() => { setOpen(false); window.scrollTo(0, 0) }, [loc.pathname])
   useEffect(() => { document.body.classList.toggle('no-scroll', open) }, [open])
@@ -75,7 +85,7 @@ export default function Layout() {
       <header className="topbar">
         <button className="icon-btn" onClick={() => setOpen(true)} aria-label="Open menu"><Icon name="menu" size={20} /></button>
         {brand}
-        <button className="icon-btn" onClick={resync} disabled={syncing} aria-label="Resync"><Icon name="refresh" size={18} className={syncing ? 'spin' : ''} /></button>
+        <button className="icon-btn" onClick={() => setSearch(true)} aria-label="Search"><Icon name="search" size={18} /></button>
       </header>
 
       <div className={`scrim ${open ? 'show' : ''}`} onClick={() => setOpen(false)} />
@@ -84,6 +94,11 @@ export default function Layout() {
           {brand}
           <button className="icon-btn close" onClick={() => setOpen(false)} aria-label="Close menu"><Icon name="x" size={20} /></button>
         </div>
+        <button className="search-trigger" onClick={() => { setOpen(false); setSearch(true) }}>
+          <Icon name="search" size={15} />
+          <span>Search</span>
+          <kbd>{/Mac/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd>
+        </button>
         <nav>
           {NAV.map((g) => (
             <div key={g.group} className="nav-group">
@@ -106,6 +121,7 @@ export default function Layout() {
         </div>
       </aside>
 
+      {league && <SearchPalette lg={league} pages={PAGES} open={search} onClose={() => setSearch(false)} />}
       <main className="content">
         {error && <div className="banner">{error}</div>}
         {league ? <Outlet /> : !error && <div className="loading"><span className="spinner" /> Loading league…</div>}

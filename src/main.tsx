@@ -11,14 +11,12 @@ import Versus, { VersusDetail } from './pages/Versus'
 import Matchups from './pages/Matchups'
 import Playoffs from './pages/Playoffs'
 import RecordBook from './pages/RecordBook'
-import Management from './pages/Management'
+import FrontOffice from './pages/FrontOffice'
 import Rules from './pages/Rules'
-import Transactions from './pages/Transactions'
 import Players, { Player } from './pages/Players'
 import Home from './pages/Home'
 import Keepers from './pages/Keepers'
 import Draft from './pages/Draft'
-import Power from './pages/Power'
 import { RecapRedirect } from './pages/Recap'
 import AllTime from './pages/AllTime'
 import Butterfly from './pages/Butterfly'
@@ -39,9 +37,10 @@ createRoot(document.getElementById('root')!).render(
             <Route path="history" element={<History />} />
             <Route path="elo" element={<Elo />} />
             <Route path="schedule" element={<SeasonIndex />} />
-            <Route path="management" element={<Management />} />
+            <Route path="frontoffice" element={<FrontOffice />} />
+            <Route path="management" element={<Navigate to="/frontoffice" replace />} />
             <Route path="rules" element={<Rules />} />
-            <Route path="transactions" element={<Transactions />} />
+            <Route path="transactions" element={<Navigate to="/frontoffice" replace />} />
             <Route path="players" element={<Players />} />
             <Route path="player/:id" element={<Player />} />
             <Route path="achievements" element={<Navigate to="/" replace />} />
@@ -59,7 +58,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="draft" element={<Draft />} />
             <Route path="odds" element={<Navigate to="/playoffs" replace />} />
             <Route path="trades" element={<Navigate to="/butterfly" replace />} />
-            <Route path="power" element={<Power />} />
+            <Route path="power" element={<Navigate to="/" replace />} />
             <Route path="recap" element={<RecapRedirect />} />
             <Route path="recap/:year" element={<RecapRedirect />} />
             <Route path="dynasty" element={<Navigate to="/members" replace />} />
