@@ -48,12 +48,16 @@ export function parseSituations(events: EspnEvent[]): Map<string, GameSituation>
 
 /**
  * The odds feed can lag minutes behind a final whistle, leaving its last in-game "remaining" points on finished players.
- * ESPN is the authority on a game being over, so those games are closed out here: status final, nothing remaining.
+ * It also drops finished early games, leaving only a team's next-week game (status scheduled) to match against.
+ * ESPN's scoreboard is this week's authority, so a live game with both teams finished, or any game involving a team
+ * that already finished this week (it can only be a future week's), is closed out: status final, nothing remaining.
  */
 export function applyFinals(feed: LiveFeed | null, finishedTeams: Set<string>): LiveFeed | null {
   if (!feed || finishedTeams.size === 0) return feed
+  const isFinished = (abbr: string) => finishedTeams.has(normalizeTeam(abbr))
   const games = Object.fromEntries(Object.entries(feed.games).map(([id, lg]) => {
-    const isOver = lg.game.status === 'live' && finishedTeams.has(normalizeTeam(lg.game.home)) && finishedTeams.has(normalizeTeam(lg.game.away))
+    const { status, home, away } = lg.game
+    const isOver = (status === 'live' && isFinished(home) && isFinished(away)) || (status === 'scheduled' && (isFinished(home) || isFinished(away)))
     return [id, isOver ? { game: { ...lg.game, status: 'final' as const }, players: lg.players.map((r) => ({ ...r, remaining: 0, projected: r.actual })) } : lg]
   }))
   return { ...feed, games }
