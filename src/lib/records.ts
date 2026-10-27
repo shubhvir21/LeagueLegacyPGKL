@@ -24,7 +24,7 @@ export interface RecordDef {
   positive: boolean // good thing to hold vs a blunder
   rows: RecordRow[] // best first
 }
-export const CATEGORIES = ['League', 'Season', 'Matchup', 'Streaks & Droughts', 'Milestones'] as const
+export const CATEGORIES = ['League', 'Season', 'Matchup', 'Streaks & Droughts'] as const
 export type Category = (typeof CATEGORIES)[number]
 
 /** One row per team per week (both sides of every game). */
@@ -38,11 +38,13 @@ export interface TeamWeek {
   playoff: boolean
   bracket: Game['bracket']
   place?: number
+  /** Real toilet bowl game: losers bracket minus the 7th/8th consolation game. */
+  toilet: boolean
 }
 export function teamWeeks(lg: League): TeamWeek[] {
   return lg.games.flatMap((g) => [
-    { season: g.season, week: g.week, memberId: g.a, oppId: g.b, pts: g.aPts, oppPts: g.bPts, playoff: g.playoff, bracket: g.bracket, place: g.place },
-    { season: g.season, week: g.week, memberId: g.b, oppId: g.a, pts: g.bPts, oppPts: g.aPts, playoff: g.playoff, bracket: g.bracket, place: g.place },
+    { season: g.season, week: g.week, memberId: g.a, oppId: g.b, pts: g.aPts, oppPts: g.bPts, playoff: g.playoff, bracket: g.bracket, place: g.place, toilet: g.bracket === 'losers' && g.lPlace !== 3 },
+    { season: g.season, week: g.week, memberId: g.b, oppId: g.a, pts: g.bPts, oppPts: g.aPts, playoff: g.playoff, bracket: g.bracket, place: g.place, toilet: g.bracket === 'losers' && g.lPlace !== 3 },
   ])
 }
 
@@ -81,8 +83,8 @@ export function buildRecords(lg: League): RecordDef[] {
   const weekLow: Record<string, number> = {}
   for (const t of regTw.filter((t) => t.pts > 0)) { const k = `${t.season}|${t.week}`; weekLow[k] = Math.min(weekLow[k] ?? Infinity, t.pts) }
   const lows = (id: string) => regTw.filter((t) => t.memberId === id && t.pts > 0 && t.pts === weekLow[`${t.season}|${t.week}`]).length
-  // Toilet bowl: the lower score advances, so every losers-bracket game you scored less in counts.
-  const toiletLosses = (id: string) => tw.filter((t) => t.memberId === id && t.bracket === 'losers' && t.pts > 0 && t.pts < t.oppPts).length
+  // Toilet bowl: the lower score advances, so every toilet bowl game (first round or final) you scored less in counts.
+  const toiletLosses = (id: string) => tw.filter((t) => t.memberId === id && t.toilet && t.pts > 0 && t.pts < t.oppPts).length
 
   // Supporting detail shown next to each career value.
   const mine = (id: string) => tsAll.filter((t) => t.memberId === id).sort((a, b) => a.season - b.season)
@@ -111,7 +113,7 @@ export function buildRecords(lg: League): RecordDef[] {
     highs: (r) => `best: ${week(r.member.id, 1)}`,
     lows: (r) => `worst: ${week(r.member.id, -1)}`,
     papg: (r) => `${signed(r.pa / (r.games || 1) - leaguePpg)} vs league avg`,
-    toilet: (r) => years([...new Set(tw.filter((t) => t.memberId === r.member.id && t.bracket === 'losers' && t.pts > 0 && t.pts < t.oppPts).map((t) => t.season))]),
+    toilet: (r) => years([...new Set(tw.filter((t) => t.memberId === r.member.id && t.toilet && t.pts > 0 && t.pts < t.oppPts).map((t) => t.season))]),
     'mgr-low': (r) => { const m = mgrRow[r.member.id]; return m ? `lineups ${fmt(m.coachScore, 0)} · waivers ${pts(m.waiverValue)} pts/yr · trades ${pts(m.tradeValue)} pts/yr` : '' },
   }
 
@@ -313,19 +315,6 @@ export function buildRecords(lg: League): RecordDef[] {
   add('Streaks & Droughts', 'st-po', 'Consecutive Playoff Appearances', 'Back-to-back winners-bracket trips.', true, top(seasonRuns((t) => t.madePlayoffs), (r) => r.value))
   add('Streaks & Droughts', 'st-nopo', 'Playoff Drought', 'Consecutive seasons missing the playoffs.', false, top(seasonRuns((t) => !t.madePlayoffs), (r) => r.value))
 
-  // ---------- Milestones ----------
-  const milestone = (id: string, title: string, step: number, f: (r: (typeof cr)[number]) => number, unit: string, positive = true) =>
-    add('Milestones', id, title, `Next milestone every ${step.toLocaleString()} ${unit}.`, positive, top(cr, f).map((r) => {
-      const v = f(r), next = (Math.floor(v / step) + 1) * step
-      return { memberId: r.member.id, value: v, display: Math.round(v).toLocaleString(), context: `${Math.ceil(next - v).toLocaleString()} away from ${next.toLocaleString()}`, link: `/member/${r.member.id}` }
-    }))
-  milestone('ms-wins', 'Total Wins', 25, (r) => r.wins, 'wins')
-  milestone('ms-ap', 'All-Play Wins', 100, (r) => r.apW, 'all-play wins')
-  milestone('ms-pts', 'Total Points', 1000, (r) => r.pf, 'points')
-  milestone('ms-losses', 'Total Losses', 25, (r) => r.losses, 'losses', false)
-  milestone('ms-aplosses', 'All-Play Losses', 100, (r) => r.apL, 'all-play losses', false)
-  milestone('ms-pa', 'Total Points Against', 1000, (r) => r.pa, 'points allowed', false)
-
   return defs
 }
 
@@ -353,7 +342,6 @@ function runs(seq: TeamWeek[], pred: (t: TeamWeek) => boolean) {
 export function recordHolders(defs: RecordDef[]) {
   const t: Record<string, { pos: number; neg: number; posTop: number; negTop: number }> = {}
   for (const d of defs) {
-    if (d.category === 'Milestones') continue
     const best = d.rows[0]?.value
     d.rows.forEach((r, i) => {
       for (const id of [r.memberId, r.memberId2]) {

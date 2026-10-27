@@ -16,6 +16,7 @@ export interface Game {
   playoff: boolean
   bracket: 'winners' | 'losers' | null
   place?: number // bracket match deciding this place (1 = championship)
+  lPlace?: number // losers bracket: 1 = toilet bowl final, 3 = the consolation game for 7th/8th
   a: string // member id
   b: string
   aPts: number
@@ -183,17 +184,18 @@ function buildSeason(raw: RawSeason, games: Game[], schedule: ScheduledGame[]) {
       const [x, y] = pair
       let bracket: Game['bracket'] = null
       let place: number | undefined
+      let lPlace: number | undefined
       if (isPlayoff) {
         const find = (br: BracketMatch[]) =>
           br.find((b) => b.r === bracketRound && ((b.t1 === x.roster_id && b.t2 === y.roster_id) || (b.t1 === y.roster_id && b.t2 === x.roster_id)))
         const wm = find(raw.winnersBracket), lm = find(raw.losersBracket)
         if (wm) { bracket = 'winners'; place = wm.p }
-        else if (lm) bracket = 'losers'
+        else if (lm) { bracket = 'losers'; lPlace = lm.p }
         else continue // not a real playoff game
       }
       games.push({
         season: year, week, playoff: isPlayoff, bracket,
-        a: owner[x.roster_id], b: owner[y.roster_id], aPts: x.points, bPts: y.points, place,
+        a: owner[x.roster_id], b: owner[y.roster_id], aPts: x.points, bPts: y.points, place, lPlace,
       })
       if (!isPlayoff) {
         const tx = ts[x.roster_id], ty = ts[y.roster_id]
