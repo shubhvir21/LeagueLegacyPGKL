@@ -1074,3 +1074,64 @@ button.elo-chip { font: inherit; }
   .draft-board tr > td { position: static; box-shadow: none; min-width: 0; padding: 7px 8px !important; border-radius: 8px; font-size: 12px; }
   .draft-player { max-width: none; }
 }
+
+/* ---------- Record Book: almanac styling ---------- */
+.rb-title { text-align: center; padding: 6px 0 2px; }
+.rb-kicker { font-size: 11px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+.rb-title h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 44px; font-weight: 800; letter-spacing: -0.01em; }
+.rb-double-rule { margin: 14px auto 0; max-width: 520px; height: 5px; border-top: 1px solid var(--border-strong); border-bottom: 1px solid var(--border-strong); }
+.rb-title + .tabs { margin: 0 auto 4px; }
+
+.rb-no { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rb-chapter { gap: 6px; }
+.rb-chapter-name { font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 700; color: var(--text); }
+.rb-chapter .cat-count { font-size: 22px; }
+
+.rb-section-head { display: flex; align-items: center; gap: 16px; }
+.rb-section-head h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 30px; font-weight: 800; white-space: nowrap; }
+.rb-rule { flex: 1; height: 5px; border-top: 1px solid currentColor; border-bottom: 1px solid currentColor; opacity: .35; }
+.record-section.good .rb-section-head { color: var(--pos); }
+.record-section.bad .rb-section-head { color: var(--neg); }
+.rb-section-sub { text-align: center; margin: -6px 0 6px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+
+.rb-entry { position: relative; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.rb-entry::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: var(--pos); opacity: .8; }
+.rb-entry.bad::before { background: var(--neg); }
+.rb-entry-head { padding: 18px 20px 12px; }
+.rb-entry-head h3 { font-family: 'Playfair Display', Georgia, serif; font-size: 21px; font-weight: 700; margin: 4px 0 4px; color: var(--text); letter-spacing: 0; }
+.rb-entry-head p { font-size: 12.5px; color: var(--muted); font-style: italic; line-height: 1.45; }
+
+.rb-holder { margin: 0 14px; padding: 14px 16px; border-radius: 11px; border: 1px solid rgba(61,220,151,.22); background: linear-gradient(135deg, rgba(61,220,151,.09), rgba(61,220,151,.02) 60%); }
+.rb-entry.bad .rb-holder { border-color: rgba(255,107,122,.22); background: linear-gradient(135deg, rgba(255,107,122,.09), rgba(255,107,122,.02) 60%); }
+.rb-holder-label { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--pos); margin-bottom: 8px; }
+.rb-entry.bad .rb-holder-label { color: var(--neg); }
+.rb-holder-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rb-holder-who { min-width: 0; font-size: 15px; font-weight: 650; }
+.rb-holder-who .avatar { width: 32px !important; height: 32px !important; }
+.rb-holder-value { font-family: 'Playfair Display', Georgia, serif; font-size: 30px; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+.rb-holder-detail { margin-top: 8px; font-size: 12px; color: var(--text-2); }
+
+.rb-ledger { list-style: none; margin: 0; padding: 8px 20px 6px; }
+.rb-ledger li { display: grid; grid-template-columns: 30px auto 1fr auto; align-items: center; column-gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.rb-ledger li:last-child { border-bottom: 0; }
+.rb-rank { color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rb-who { min-width: 0; }
+.rb-dots { align-self: end; margin-bottom: 5px; border-bottom: 1px dotted var(--border-strong); min-width: 12px; }
+.rb-val { font-variant-numeric: tabular-nums; color: var(--text); }
+.rb-ctx { grid-column: 2 / -1; font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+.rb-more { margin: 0 20px 16px; align-self: flex-start; }
+.rb-entry > :last-child:not(.rb-more) { margin-bottom: 14px; }
+
+@media (max-width: 640px) {
+  .rb-title h1 { font-size: 32px; }
+  .rb-section-head h2 { font-size: 24px; }
+  .rb-entry-head { padding: 16px 16px 10px; }
+  .rb-holder { margin: 0 10px; padding: 12px; }
+  .rb-holder-value { font-size: 24px; }
+  .rb-ledger { padding: 6px 16px 4px; }
+  .rb-more { margin: 0 16px 14px; }
+}
+.rb-entry-head h3 { text-transform: none; }
+.rb-dots { align-self: center; margin: 0; transform: translateY(3px); }
+.rb-ctx a, .rb-holder-detail a { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+.rb-ctx a:hover, .rb-holder-detail a:hover { color: var(--text); }

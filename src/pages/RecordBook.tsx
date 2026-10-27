@@ -32,15 +32,20 @@ export default function RecordBook() {
 
   return (
     <div className="page">
-      <h1>Record Book</h1>
+      <header className="rb-title">
+        <div className="rb-kicker">PGKL · Official League Almanac</div>
+        <h1>The Record Book</h1>
+        <div className="rb-double-rule" />
+      </header>
       <Tabs tabs={VIEWS} value={view} onChange={setView} />
       {view === 'Overview' ? (
         <>
           <div className="cat-grid">
-            {CATEGORIES.map((c) => (
-              <button key={c} className="cat-card" onClick={() => setView(c)}>
-                <span className="cat-count">{count(c, true) + count(c, false)}</span>
-                <span>{c}</span>
+            {CATEGORIES.map((c, i) => (
+              <button key={c} className="cat-card rb-chapter" onClick={() => setView(c)}>
+                <span className="rb-no">Chapter {ROMAN[i]}</span>
+                <span className="rb-chapter-name">{c}</span>
+                <span className="cat-count">{count(c, true) + count(c, false)} <span className="muted small">entries</span></span>
                 <span className="muted small"><span className="pos">{count(c, true)} records</span> · <span className="neg">{count(c, false)} chud-cords</span></span>
               </button>
             ))}
@@ -73,15 +78,20 @@ export default function RecordBook() {
   )
 }
 
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
+
 function RecordSection({ title, defs, bad = false }: { title: string; defs: RecordDef[]; bad?: boolean }) {
   if (!defs.length) return null
   return (
     <section className={`record-section ${bad ? 'bad' : 'good'}`}>
-      <div className="record-section-head">
+      <div className="rb-section-head">
+        <span className="rb-rule" />
         <h2>{title}</h2>
+        <span className="rb-rule" />
       </div>
+      <p className="rb-section-sub">{defs.length} entries · {bad ? 'the marks nobody wants' : 'the marks everyone chases'}</p>
       <div className="record-grid">
-        {defs.map((d) => <RecordCard key={d.id} d={d} />)}
+        {defs.map((d, i) => <RecordCard key={d.id} d={d} n={i + 1} />)}
       </div>
     </section>
   )
@@ -89,31 +99,54 @@ function RecordSection({ title, defs, bad = false }: { title: string; defs: Reco
 
 const stepOf = (d: RecordDef) => Number(d.desc.match(/every ([\d,]+)/)?.[1].replace(/,/g, '') ?? 1)
 
-function RecordCard({ d }: { d: RecordDef }) {
+function Holder({ r }: { r: RecordDef['rows'][number] }) {
+  return r.memberId2
+    ? <span className="record-pair"><MemberLink id={r.memberId} /><span className="muted">&amp;</span><MemberLink id={r.memberId2} /></span>
+    : <MemberLink id={r.memberId} />
+}
+
+function RecordCard({ d, n }: { d: RecordDef; n: number }) {
   const [open, setOpen] = useState(false)
-  const rows = d.rows.slice(0, open ? 25 : 5)
-  const best = d.rows[0]?.value
+  const [top, ...rest] = d.rows
+  const rows = rest.slice(0, open ? 24 : 4)
+  // Ties share a rank: "T-1", "T-3", ...
+  const rankOf = (i: number) => {
+    const first = d.rows.findIndex((r) => r.value === d.rows[i].value)
+    const tied = d.rows.filter((r) => r.value === d.rows[i].value).length > 1
+    return `${tied ? 'T-' : ''}${first + 1}`
+  }
+  const detail = (r: RecordDef['rows'][number]) => (r.link ? <Link to={r.link}>{r.context}</Link> : r.context)
   return (
-    <section className={`card record ${d.positive ? '' : 'blunder'}`}>
-      <header className="card-head">
-        <div>
-          <h2>{d.title}</h2>
-          <p className="muted">{d.desc}</p>
-        </div>
+    <article className={`rb-entry ${d.positive ? 'good' : 'bad'}`}>
+      <header className="rb-entry-head">
+        <span className="rb-no">No. {String(n).padStart(2, '0')}</span>
+        <h3>{d.title}</h3>
+        <p>{d.desc}</p>
       </header>
-      <div className="table-wrap"><table>
-        <tbody>
+      {top && (
+        <div className="rb-holder">
+          <div className="rb-holder-label">{d.positive ? 'Record holder' : 'Chud-cord holder'}{rankOf(0).startsWith('T') && ' · tied'}</div>
+          <div className="rb-holder-row">
+            <div className="rb-holder-who"><Holder r={top} /></div>
+            <div className="rb-holder-value">{top.display}</div>
+          </div>
+          {top.context && <div className="rb-holder-detail">{detail(top)}</div>}
+        </div>
+      )}
+      {rows.length > 0 && (
+        <ol className="rb-ledger">
           {rows.map((r, i) => (
-            <tr key={i} className={r.value === best ? 'holder' : ''}>
-              <td className="muted">{i + 1}</td>
-              <td>{r.memberId2 ? <span className="record-pair"><MemberLink id={r.memberId} /><span className="muted">&amp;</span><MemberLink id={r.memberId2} /></span> : <MemberLink id={r.memberId} />}</td>
-              <td className="right"><b>{r.display}</b></td>
-              <td className="muted small">{r.link ? <Link to={r.link}>{r.context}</Link> : r.context}</td>
-            </tr>
+            <li key={i}>
+              <span className="rb-rank">{rankOf(i + 1)}</span>
+              <span className="rb-who"><Holder r={r} /></span>
+              <span className="rb-dots" />
+              <b className="rb-val">{r.display}</b>
+              {r.context && <span className="rb-ctx">{detail(r)}</span>}
+            </li>
           ))}
-        </tbody>
-      </table></div>
-      {d.rows.length > 5 && <button className="link-btn" onClick={() => setOpen(!open)}>{open ? 'Show less' : `Show top ${Math.min(25, d.rows.length)}`}</button>}
-    </section>
+        </ol>
+      )}
+      {d.rows.length > 5 && <button className="link-btn rb-more" onClick={() => setOpen(!open)}>{open ? 'Show less' : `Full top ${Math.min(25, d.rows.length)}`}</button>}
+    </article>
   )
 }
