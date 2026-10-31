@@ -71,7 +71,7 @@ export function buildRecords(lg: League): RecordDef[] {
   const careerOf = (pool: typeof cr, id: string, title: string, desc: string, positive: boolean, f: (r: (typeof cr)[number]) => number, show: (r: (typeof cr)[number]) => string, asc = false) =>
     add('League', id, title, desc, positive, top(pool, f, asc).map((r) => ({ memberId: r.member.id, value: f(r), display: show(r), context: detail[id]?.(r) ?? `${r.seasons.length} seasons`, link: `/member/${r.member.id}` })))
   const winPct = (r: (typeof cr)[number]) => r.wins / (r.wins + r.losses + r.ties || 1)
-  const apPct = (r: (typeof cr)[number]) => r.apW / (r.apW + r.apL + r.apT || 1)
+  const apPct = (r: (typeof cr)[number]) => (r.apW + r.apT / 2) / (r.apW + r.apL + r.apT || 1)
   const ppg = (r: (typeof cr)[number]) => r.pf / (r.games || 1)
   const poPct = (r: (typeof cr)[number]) => r.playoffW / (r.playoffW + r.playoffL || 1)
   const done = lg.seasons.filter((s) => s.complete)
@@ -104,7 +104,7 @@ export function buildRecords(lg: League): RecordDef[] {
     titles: (r) => years(done.filter((s) => s.champion === r.member.id).map((s) => s.year)),
     podiums: (r) => [...done].sort((a, b) => a.year - b.year).filter((s) => [s.champion, s.runnerUp, s.third].includes(r.member.id)).map((s) => `${ordinal(s.champion === r.member.id ? 1 : s.runnerUp === r.member.id ? 2 : 3)} ${s.year}`).join(' · ') || '—',
     playoffs: (r) => years(mine(r.member.id).filter((t) => t.madePlayoffs).map((t) => t.season)),
-    'popct-low': (r) => years(mine(r.member.id).filter((t) => t.madePlayoffs).map((t) => t.season)),
+    'popct-low': (r) => `${record(r.playoffW, r.playoffL)} · ${years(mine(r.member.id).filter((t) => t.madePlayoffs).map((t) => t.season))}`,
     pwins: (r) => `${record(r.playoffW, r.playoffL)} in the playoffs`,
     avgfinish: (r) => mine(r.member.id).filter((t) => done.some((s) => s.year === t.season) && t.finalRank).map((t) => ordinal(t.finalRank!)).join(' · '),
     coach: (r) => `${fmt(mine(r.member.id).reduce((a, t) => a + (t.maxPf ? t.maxPf - t.pf : 0), 0), 0)} pts left on bench`,
@@ -114,6 +114,7 @@ export function buildRecords(lg: League): RecordDef[] {
     lows: (r) => `worst: ${week(r.member.id, -1)}`,
     papg: (r) => `${signed(r.pa / (r.games || 1) - leaguePpg)} vs league avg`,
     toilet: (r) => years([...new Set(tw.filter((t) => t.memberId === r.member.id && t.toilet && t.pts > 0 && t.pts < t.oppPts).map((t) => t.season))]),
+    mgr: (r) => { const m = mgrRow[r.member.id]; return m ? `lineups ${fmt(m.coachScore, 0)} · waivers ${pts(m.waiverValue)} pts/yr · trades ${pts(m.tradeValue)} pts/yr` : '' },
     'mgr-low': (r) => { const m = mgrRow[r.member.id]; return m ? `lineups ${fmt(m.coachScore, 0)} · waivers ${pts(m.waiverValue)} pts/yr · trades ${pts(m.tradeValue)} pts/yr` : '' },
   }
 
@@ -126,6 +127,7 @@ export function buildRecords(lg: League): RecordDef[] {
   career('pwins', 'Most Playoff Wins', 'Winners-bracket games won.', true, (r) => r.playoffW, (r) => String(r.playoffW))
   careerOf(cr.filter((r) => r.avgFinish != null), 'avgfinish', 'Best Average Finish', 'Average final place across completed seasons.', true, (r) => r.avgFinish!, (r) => r.avgFinish!.toFixed(1), true)
   career('coach', 'Best Career Coach Score', 'All-time points ÷ max possible points from your rosters.', true, (r) => coachOf(r.member.id), (r) => coachOf(r.member.id).toFixed(1))
+  careerOf(crMgr, 'mgr', 'Best Manager Score', 'Career average Manager Score (lineups, waivers and trades, 0–100).', true, (r) => mgr[r.member.id], (r) => mgr[r.member.id].toFixed(0))
   career('luck', 'Luckiest All-Time', 'Total luck (actual minus expected H2H wins).', true, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)))
   career('highs', 'Most Weekly High Scores', 'Weeks finishing as the top scorer.', true, (r) => careerSum(tsAll, r.member.id, (t) => t.highScores), (r) => String(careerSum(tsAll, r.member.id, (t) => t.highScores)))
 
@@ -133,7 +135,7 @@ export function buildRecords(lg: League): RecordDef[] {
   careerOf(crFull, 'appct-low', 'Worst All-Play Percentage', 'All-time all-play win %. Needs a completed season.', false, apPct, (r) => pct(r.apW, r.apL, r.apT), true)
   careerOf(crFull, 'ppg-low', 'Worst Points Per Game', 'All-time regular-season points per game. Needs a completed season.', false, ppg, (r) => fmt(ppg(r)), true)
   careerOf(crFull, 'papg', 'Most Points Against Per Game', 'All-time regular-season points allowed per game. The schedule hated you.', false, (r) => r.pa / (r.games || 1), (r) => fmt(r.pa / (r.games || 1)))
-  careerOf(crPo, 'popct-low', 'Worst Playoff Win Percentage', 'Winners-bracket record. Needs 3+ playoff games.', false, poPct, (r) => record(r.playoffW, r.playoffL), true)
+  careerOf(crPo, 'popct-low', 'Worst Playoff Win Percentage', 'Winners-bracket record. Needs 3+ playoff games.', false, poPct, (r) => pct(r.playoffW, r.playoffL), true)
   career('toilet', 'Most Toilet Bowl Losses', 'Toilet bowl games where you scored less, semifinals and finals.', false, (r) => toiletLosses(r.member.id), (r) => String(toiletLosses(r.member.id)))
   career('lows', 'Most Weekly Low Scores', 'Weeks finishing as the bottom scorer.', false, (r) => lows(r.member.id), (r) => String(lows(r.member.id)))
   careerOf(crMgr, 'mgr-low', 'Worst Manager Score', 'Career average Manager Score (lineups, waivers and trades, 0–100).', false, (r) => mgr[r.member.id], (r) => mgr[r.member.id].toFixed(0), true)
@@ -147,8 +149,9 @@ export function buildRecords(lg: League): RecordDef[] {
   season('s-ppg', 'Best Points Per Game', 'Regular-season PPG (includes the current season).', true, tsAll, (t) => t.pf / (t.games || 1), (t) => fmt(t.pf / (t.games || 1)))
   season('s-winpct', 'Best Win Percentage', 'Regular-season win % incl. median (includes the current season).', true, tsAll, (t) => t.wins / (t.wins + t.losses + t.ties || 1), (t) => `${record(t.wins, t.losses, t.ties)} (${pct(t.wins, t.losses, t.ties)})`)
   season('s-winpct-low', 'Worst Win Percentage', 'Regular-season win % incl. median (includes the current season).', false, tsAll, (t) => t.wins / (t.wins + t.losses + t.ties || 1), (t) => `${record(t.wins, t.losses, t.ties)} (${pct(t.wins, t.losses, t.ties)})`, true)
-  season('s-ap', 'Best All-Play Season', 'All-play win %.', true, tsAll, (t) => t.apW / (t.apW + t.apL + t.apT || 1), (t) => `${record(t.apW, t.apL, t.apT)} (${pct(t.apW, t.apL, t.apT)})`)
-  season('s-ap-low', 'Worst All-Play Season', 'All-play win %.', false, tsAll, (t) => t.apW / (t.apW + t.apL + t.apT || 1), (t) => `${record(t.apW, t.apL, t.apT)} (${pct(t.apW, t.apL, t.apT)})`, true)
+  const apSeason = (t: TeamSeason) => (t.apW + t.apT / 2) / (t.apW + t.apL + t.apT || 1)
+  season('s-ap', 'Best All-Play Percentage', 'All-play win % (your record if you played every team every week).', true, tsAll, apSeason, (t) => `${pct(t.apW, t.apL, t.apT)} (${record(t.apW, t.apL, t.apT)})`)
+  season('s-ap-low', 'Worst All-Play Percentage', 'All-play win % (your record if you played every team every week).', false, tsAll, apSeason, (t) => `${pct(t.apW, t.apL, t.apT)} (${record(t.apW, t.apL, t.apT)})`, true)
   season('s-pa', 'Most Points Against', 'Regular-season points allowed.', false, tsDone, (t) => t.pa, (t) => fmt(t.pa))
   season('s-luck', 'Luckiest Season', 'Actual minus expected H2H wins.', true, tsAll, (t) => t.luck, (t) => signed(t.luck))
   season('s-unluck', 'Unluckiest Season', 'Actual minus expected H2H wins.', false, tsAll, (t) => t.luck, (t) => signed(t.luck), true)
