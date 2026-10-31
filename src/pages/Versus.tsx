@@ -128,27 +128,6 @@ export function VersusDetail() {
           <RivalryMeter r={riv} />
         </Card>
       )}
-      {archived.length > 0 && (
-        <Card title="Archived series" sub="Meetings under earlier managers. They don't count toward the current head-to-head." right={<span id="archived" />}>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Series</th><th className="right">Record</th><th>Season</th><th>Week</th><th>Winner</th><th className="right">Score</th></tr></thead>
-              <tbody>
-                {archived.flatMap((x) => x.gs.map((g, i) => (
-                  <tr key={`${g.season}-${g.week}`}>
-                    <td>{i === 0 ? <b>{x.aName} vs {x.bName}</b> : null}</td>
-                    <td className="right">{i === 0 ? record(x.w, x.l, x.r.ties) : null}</td>
-                    <td><Link to={`/season/${g.season}`}>{g.season}</Link></td>
-                    <td>{g.week}</td>
-                    <td>{g.aPts > g.bPts ? x.aName : g.bPts > g.aPts ? x.bName : 'Tie'}</td>
-                    <td className="right">{fmt(g.aPts)} – {fmt(g.bPts)}</td>
-                  </tr>
-                )))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
       {h.games.length === 0 ? <p className="muted">{archived.length ? 'The current managers haven\'t played yet.' : 'These two have never played.'}</p> : (
         <>
           <div className="stat-grid">
@@ -183,6 +162,27 @@ export function VersusDetail() {
             </div>
           </Card>
         </>
+      )}
+      {archived.length > 0 && (
+        <Card title="Archived series" sub="Meetings under earlier managers. They don't count toward the current head-to-head." right={<span id="archived" />}>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Series</th><th className="right">Record</th><th>Season</th><th>Week</th><th>Winner</th><th className="right">Score</th></tr></thead>
+              <tbody>
+                {archived.flatMap((x) => x.gs.map((g, i) => (
+                  <tr key={`${g.season}-${g.week}`}>
+                    <td>{i === 0 ? <b>{x.aName} vs {x.bName}</b> : null}</td>
+                    <td className="right">{i === 0 ? record(x.w, x.l, x.r.ties) : null}</td>
+                    <td><Link to={`/season/${g.season}`}>{g.season}</Link></td>
+                    <td>{g.week}</td>
+                    <td>{g.aPts > g.bPts ? x.aName : g.bPts > g.aPts ? x.bName : 'Tie'}</td>
+                    <td className="right">{fmt(g.aPts)} – {fmt(g.bPts)}</td>
+                  </tr>
+                )))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </div>
   )
