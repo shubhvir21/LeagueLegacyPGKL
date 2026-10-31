@@ -162,7 +162,6 @@ export function buildRecords(lg: League): RecordDef[] {
   const ppgOf = (t: TeamSeason) => t.pf / (t.games || 1)
   const seasonOf = (y: number) => lg.seasons.find((x) => x.year === y)!
   const champs = tsDone.filter((t) => seasonOf(t.season).champion === t.memberId)
-  season('s-cinderella', 'Cinderella Champion', 'Lowest regular-season seed to win the title.', true, champs, (t) => t.regRank, (t) => `#${t.regRank} seed`)
   const runPpg = (t: TeamSeason) => { const gs = tw.filter((x) => x.season === t.season && x.memberId === t.memberId && x.bracket === 'winners' && x.pts > 0); return gs.reduce((a, x) => a + x.pts, 0) / (gs.length || 1) }
   season('s-run', 'Best Playoff Run', 'Points per game on the way to a title.', true, champs, runPpg, (t) => fmt(runPpg(t)))
   season('s-median', 'Best Median Win %', 'Share of weeks beating the league median.', true, tsAll.filter((t) => t.medW + t.medL > 0), (t) => t.medW / (t.medW + t.medL), (t) => `${pct(t.medW, t.medL)} (${record(t.medW, t.medL)})`)
