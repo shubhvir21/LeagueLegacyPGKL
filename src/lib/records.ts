@@ -142,17 +142,19 @@ export function buildRecords(lg: League): RecordDef[] {
   career('unluck', 'Unluckiest All-Time', 'Lowest total luck.', false, (r) => careerSum(tsAll, r.member.id, (t) => t.luck), (r) => signed(careerSum(tsAll, r.member.id, (t) => t.luck)), true)
 
   // ---------- Season ----------
+  // Scoring, win % and lineup records include the season in progress (tagged "in progress");
+  // anything about finishes, playoffs, season scores or full-season Elo uses completed seasons only.
   const inProgress = new Set(lg.seasons.filter((x) => !x.complete).map((x) => x.year))
   const ctx = (t: TeamSeason) => `${t.season} · ${t.teamName}${inProgress.has(t.season) ? ' (in progress)' : ''}`
   const season = (id: string, title: string, desc: string, positive: boolean, pool: TeamSeason[], f: (t: TeamSeason) => number, show: (t: TeamSeason) => string, asc = false) =>
     add('Season', id, title, desc, positive, top(pool, f, asc).map((t) => ({ memberId: t.memberId, value: f(t), display: show(t), context: ctx(t), link: `/season/${t.season}/team/${t.memberId}` })))
-  season('s-ppg', 'Best Points Per Game', 'Regular-season PPG (includes the current season).', true, tsAll, (t) => t.pf / (t.games || 1), (t) => fmt(t.pf / (t.games || 1)))
-  season('s-winpct', 'Best Win Percentage', 'Regular-season win % incl. median (includes the current season).', true, tsAll, (t) => t.wins / (t.wins + t.losses + t.ties || 1), (t) => `${record(t.wins, t.losses, t.ties)} (${pct(t.wins, t.losses, t.ties)})`)
-  season('s-winpct-low', 'Worst Win Percentage', 'Regular-season win % incl. median (includes the current season).', false, tsAll, (t) => t.wins / (t.wins + t.losses + t.ties || 1), (t) => `${record(t.wins, t.losses, t.ties)} (${pct(t.wins, t.losses, t.ties)})`, true)
+  season('s-ppg', 'Best Points Per Game', 'Regular-season PPG.', true, tsAll, (t) => t.pf / (t.games || 1), (t) => fmt(t.pf / (t.games || 1)))
+  season('s-winpct', 'Best Win Percentage', 'Regular-season win % incl. median.', true, tsAll, (t) => t.wins / (t.wins + t.losses + t.ties || 1), (t) => `${record(t.wins, t.losses, t.ties)} (${pct(t.wins, t.losses, t.ties)})`)
+  season('s-winpct-low', 'Worst Win Percentage', 'Regular-season win % incl. median.', false, tsAll, (t) => t.wins / (t.wins + t.losses + t.ties || 1), (t) => `${record(t.wins, t.losses, t.ties)} (${pct(t.wins, t.losses, t.ties)})`, true)
   const apSeason = (t: TeamSeason) => (t.apW + t.apT / 2) / (t.apW + t.apL + t.apT || 1)
   season('s-ap', 'Best All-Play Percentage', 'All-play win % (your record if you played every team every week).', true, tsAll, apSeason, (t) => `${pct(t.apW, t.apL, t.apT)} (${record(t.apW, t.apL, t.apT)})`)
   season('s-ap-low', 'Worst All-Play Percentage', 'All-play win % (your record if you played every team every week).', false, tsAll, apSeason, (t) => `${pct(t.apW, t.apL, t.apT)} (${record(t.apW, t.apL, t.apT)})`, true)
-  season('s-pa', 'Most Points Against', 'Regular-season points allowed.', false, tsDone, (t) => t.pa, (t) => fmt(t.pa))
+  season('s-pa', 'Most Points Against', 'Regular-season points allowed.', false, tsAll, (t) => t.pa, (t) => fmt(t.pa))
   season('s-luck', 'Luckiest Season', 'Actual minus expected H2H wins.', true, tsAll, (t) => t.luck, (t) => signed(t.luck))
   season('s-unluck', 'Unluckiest Season', 'Actual minus expected H2H wins.', false, tsAll, (t) => t.luck, (t) => signed(t.luck), true)
   season('s-coach', 'Best Coach Score', 'Points ÷ max possible points.', true, tsAll.filter((t) => t.coachScore != null), (t) => t.coachScore!, (t) => t.coachScore!.toFixed(1))
@@ -171,7 +173,7 @@ export function buildRecords(lg: League): RecordDef[] {
   const mgrOf = (t: TeamSeason) => mgrSeasons.find((m) => m.season === t.season && m.memberId === t.memberId)!
   season('s-mgr', 'Best Manager Score', 'Single-season Manager Score (lineups, waivers and trades, 0–100).', true, mgrPool, (t) => mgrOf(t).managerScore, (t) => mgrOf(t).managerScore.toFixed(0))
 
-  season('s-ppg-low', 'Worst Points Per Game', 'Regular-season PPG (includes the current season).', false, tsAll, ppgOf, (t) => fmt(ppgOf(t)), true)
+  season('s-ppg-low', 'Worst Points Per Game', 'Regular-season PPG.', false, tsAll, ppgOf, (t) => fmt(ppgOf(t)), true)
   season('s-score-low', 'Worst Season Score', 'Team Rankings season score.', false, tsDone, (t) => t.seasonScore ?? 0, (t) => (t.seasonScore ?? 0).toFixed(1), true)
   const seasonLows = (t: TeamSeason) => regTw.filter((x) => x.season === t.season && x.memberId === t.memberId && x.pts > 0 && x.pts === weekLow[`${x.season}|${x.week}`]).length
   season('s-lows', 'Most Low Scores in a Season', 'Weeks as bottom scorer.', false, tsAll, seasonLows, (t) => String(seasonLows(t)))
@@ -240,13 +242,13 @@ export function buildRecords(lg: League): RecordDef[] {
     top(eloIds, (id) => elo.peak[id]?.rating ?? 0).map((id) => ({ memberId: id, value: elo.peak[id].rating, display: String(elo.peak[id].rating), context: when(elo.peak[id]), link: `/member/${id}` })))
   add('League', 'elo-low', 'Lowest Elo Ever', 'Worst Elo rating ever reached.', false,
     top(eloIds, (id) => elo.low[id]?.rating ?? 9999, true).map((id) => ({ memberId: id, value: elo.low[id].rating, display: String(elo.low[id].rating), context: when(elo.low[id]), link: `/member/${id}` })))
-  const seasonSwing = eloIds.flatMap((id) => [...new Set(elo.history[id].map((p) => p.season))].map((y) => {
+  const seasonSwing = eloIds.flatMap((id) => [...new Set(elo.history[id].map((p) => p.season))].filter((y) => !inProgress.has(y)).map((y) => {
     const h = elo.history[id].filter((p) => p.season === y)
     return { id, y, d: h.at(-1)!.rating - h[0].rating }
   }))
-  add('Season', 'elo-rise', 'Biggest Elo Rise in a Season', 'Elo gained from the start of a season to the end.', true,
+  add('Season', 'elo-rise', 'Biggest Elo Rise in a Season', 'Elo gained from the start of a completed season to the end.', true,
     top(seasonSwing, (x) => x.d).filter((x) => x.d > 0).map((x) => ({ memberId: x.id, value: x.d, display: `+${x.d}`, context: String(x.y), link: `/season/${x.y}/team/${x.id}` })))
-  add('Season', 'elo-fall', 'Biggest Elo Drop in a Season', 'Elo lost from the start of a season to the end.', false,
+  add('Season', 'elo-fall', 'Biggest Elo Drop in a Season', 'Elo lost from the start of a completed season to the end.', false,
     top(seasonSwing, (x) => x.d, true).filter((x) => x.d < 0).map((x) => ({ memberId: x.id, value: x.d, display: String(x.d), context: String(x.y), link: `/season/${x.y}/team/${x.id}` })))
   const weeksAtTop: Record<string, number> = {}
   const allKeys = [...new Set(Object.values(elo.history).flat().filter((p) => p.week > 0).map((p) => p.season * 100 + p.week))]

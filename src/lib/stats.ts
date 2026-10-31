@@ -233,7 +233,8 @@ function buildSeason(raw: RawSeason, games: Game[], schedule: ScheduledGame[]) {
     t.sos = t.games ? t.pa / t.games : 0
     t.luck = t.h2hW - t.expectedWins
     t.coachScore = t.maxPf ? (t.pf / t.maxPf) * 100 : null
-    t.madePlayoffs = playoffIds.has(t.rosterId)
+    // Sleeper pre-fills the bracket with the current top seeds; it only counts once the regular season is over.
+    t.madePlayoffs = (complete || raw.lastScored >= playoffStart - 1) && playoffIds.has(t.rosterId)
   }
   list.sort((a, b) => b.wins - a.wins || b.pf - a.pf)
   list.forEach((t, i) => (t.regRank = i + 1))
