@@ -38,19 +38,13 @@ export default function Elo() {
   // New-manager markers sit on each franchise's season-start point.
   const takeovers = e.takeovers.filter((t) => season === 'all' || t.season === season)
   const startKey = (yr: number) => (season === 'all' ? `${yr}` : 'Start')
-  // Takeovers in the same offseason at nearly the same rating share one label.
-  const labelFor = (t: (typeof takeovers)[number]) => {
-    const near = takeovers.filter((x) => x.season === t.season && shown(x.memberId) && Math.abs(x.after - t.after) < 80)
-    if (near[0] !== t) return undefined
-    return { value: `New GM: ${near.map((x) => lg.memberById[x.memberId]?.name).join(', ')}`, position: 'right' as const, fill: 'var(--text-2)', fontSize: 11 }
-  }
 
   return (
     <div className="page">
       <h1>Elo Ratings</h1>
       <Card
         title="Rating History"
-        sub="Click teams to highlight them; drag the handles under the chart to zoom. Dashed lines mark the tiers; ringed dots mark a new manager taking over."
+        sub="Click teams to highlight them; drag the handles under the chart to zoom. Dashed lines mark the tiers."
         right={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <select value={season} onChange={(ev) => setSeason(ev.target.value === 'all' ? 'all' : Number(ev.target.value))}>
@@ -82,9 +76,8 @@ export default function Elo() {
             {TIERS.filter((t) => t.min > 0).map((t) => <ReferenceLine key={t.name} y={t.min} stroke="var(--muted)" strokeDasharray="4 4" label={{ value: t.name, position: 'insideTopLeft', fill: 'var(--muted)', fontSize: 10 }} />)}
             {takeovers.filter((t) => shown(t.memberId)).map((t) => (
               <ReferenceDot
-                key={`${t.season}-${t.memberId}`} x={startKey(t.season)} y={t.after} r={6}
-                fill="var(--panel)" stroke={color(t.memberId)} strokeWidth={3}
-                label={labelFor(t)}
+                key={`${t.season}-${t.memberId}`} x={startKey(t.season)} y={t.after}
+                shape={(p: { cx?: number; cy?: number }) => <Star x={p.cx ?? 0} y={p.cy ?? 0} fill={color(t.memberId)} />}
               />
             ))}
             <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }} itemSorter={(item) => -Number(item.value ?? 0)} />
@@ -94,6 +87,12 @@ export default function Elo() {
             {data.length > 20 && <Brush dataKey="key" height={24} stroke="var(--muted)" fill="var(--panel-2)" travellerWidth={8} />}
           </LineChart>
         </ResponsiveContainer>
+        {e.takeovers.length > 0 && (
+          <div className="elo-legend muted small">
+            <svg width="16" height="16" viewBox="-10 -10 20 20" aria-hidden><Star x={0} y={0} fill="var(--text-2)" /></svg>
+            New manager took over the franchise ({e.takeovers.map((t) => `${lg.memberById[t.memberId]?.name} ${t.season}`).join(', ')})
+          </div>
+        )}
       </Card>
 
       <Card title="Peaks & Lows" sub="Each franchise's highest and lowest rating after any week.">
@@ -135,4 +134,13 @@ export default function Elo() {
 function bonusScale(top: number[]) {
   const half = Array.from({ length: 5 }, (_, i) => top[i] ?? 0)
   return [...half, ...[...half].reverse().map((v) => -v)].map((v) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : '0')).join(' / ')
+}
+
+/** Five-point star centered on (x, y), used to mark a new manager taking over. */
+function Star({ x, y, fill, r = 10 }: { x: number; y: number; fill: string; r?: number }) {
+  const pts = Array.from({ length: 10 }, (_, i) => {
+    const a = (Math.PI / 5) * i - Math.PI / 2, rad = i % 2 ? r * 0.45 : r
+    return `${x + rad * Math.cos(a)},${y + rad * Math.sin(a)}`
+  }).join(' ')
+  return <polygon points={pts} fill={fill} stroke="var(--panel)" strokeWidth={1.5} />
 }
