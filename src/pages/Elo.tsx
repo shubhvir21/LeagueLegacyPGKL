@@ -1,7 +1,7 @@
 // Franchise Elo: full-size rating chart, per-season view, and how the rating is calculated.
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Brush, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Brush, CartesianGrid, Line, LineChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
 import { Avatar, Card, Tip, TIPS } from '../components/ui'
 import { ELO, FINISH, REG_BONUS, franchiseElo, tierOf, TIERS } from '../lib/elo'
@@ -35,13 +35,22 @@ export default function Elo() {
   const lo = Math.floor((Math.min(...vals) - 25) / step) * step, hi = Math.ceil((Math.max(...vals) + 25) / step) * step
   const yTicks = Array.from({ length: (hi - lo) / step + 1 }, (_, i) => lo + i * step)
   const shown = (id: string) => !focus.size || focus.has(id)
+  // New-manager markers sit on each franchise's season-start point.
+  const takeovers = e.takeovers.filter((t) => season === 'all' || t.season === season)
+  const startKey = (yr: number) => (season === 'all' ? `${yr}` : 'Start')
+  // Takeovers in the same offseason at nearly the same rating share one label.
+  const labelFor = (t: (typeof takeovers)[number]) => {
+    const near = takeovers.filter((x) => x.season === t.season && shown(x.memberId) && Math.abs(x.after - t.after) < 80)
+    if (near[0] !== t) return undefined
+    return { value: `New GM: ${near.map((x) => lg.memberById[x.memberId]?.name).join(', ')}`, position: 'right' as const, fill: 'var(--text-2)', fontSize: 11 }
+  }
 
   return (
     <div className="page">
       <h1>Elo Ratings</h1>
       <Card
         title="Rating History"
-        sub="Click teams to highlight them; drag the handles under the chart to zoom. Dashed lines mark the tiers."
+        sub="Click teams to highlight them; drag the handles under the chart to zoom. Dashed lines mark the tiers; ringed dots mark a new manager taking over."
         right={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <select value={season} onChange={(ev) => setSeason(ev.target.value === 'all' ? 'all' : Number(ev.target.value))}>
@@ -71,6 +80,13 @@ export default function Elo() {
             {starts.map((s) => <ReferenceLine key={s} x={s} stroke="var(--border-strong)" />)}
             {playoffStart && <ReferenceLine x={`W${playoffStart}`} stroke="var(--border-strong)" label={{ value: 'Playoffs', position: 'insideTopRight', fill: 'var(--muted)', fontSize: 10 }} />}
             {TIERS.filter((t) => t.min > 0).map((t) => <ReferenceLine key={t.name} y={t.min} stroke="var(--muted)" strokeDasharray="4 4" label={{ value: t.name, position: 'insideTopLeft', fill: 'var(--muted)', fontSize: 10 }} />)}
+            {takeovers.filter((t) => shown(t.memberId)).map((t) => (
+              <ReferenceDot
+                key={`${t.season}-${t.memberId}`} x={startKey(t.season)} y={t.after} r={6}
+                fill="var(--panel)" stroke={color(t.memberId)} strokeWidth={3}
+                label={labelFor(t)}
+              />
+            ))}
             <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }} itemSorter={(item) => -Number(item.value ?? 0)} />
             {ids.map((id, i) => (
               <Line key={id} dataKey={id} name={lg.memberById[id]?.name} stroke={color(id)} strokeWidth={focus.has(id) ? 3.5 : 2} strokeOpacity={shown(id) ? 1 : 0.12} dot={false} connectNulls isAnimationActive={false} />
@@ -103,6 +119,7 @@ export default function Elo() {
       <Card title="How It's Calculated" sub="A zero-sum rating: every point one team gains, another loses, so the league average is always the starting rating.">
         <ul className="elo-rules">
           <li><b>Start:</b> everyone begins at {ELO.start}. Ratings stay within {ELO.min}–{ELO.max}, and each offseason they move {ELO.regress * 100}% back toward {ELO.start}.</li>
+          <li><b>New managers:</b> when a franchise changes hands, that offseason's pull is {ELO.takeover * 100}% instead, so the new manager inherits half of the roster's standing. The extra points are spread evenly across the other franchises, keeping the league average at {ELO.start}.</li>
           <li><b>Regular-season games:</b> the winner takes {ELO.game[0]}–{ELO.game[1]} points from the loser, scaling with the margin up to a {ELO.marginCap}-point win. Opponent rating doesn't matter.</li>
           <li><b>Median games:</b> ±{ELO.median} for scoring above or below the weekly median.</li>
           <li><b>End of regular season:</b> all-play record rank and points-for rank each pay {bonusScale(REG_BONUS)}.</li>

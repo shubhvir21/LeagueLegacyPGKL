@@ -15,10 +15,14 @@
 //
 // Everyone starts at 2000. Before each new season ratings regress 10% toward 2000. Ratings are
 // kept within 0–5000.
+//
+// Takeovers: when a franchise gets a new manager, its pull toward 2000 that offseason is 50%
+// instead of 10% (the new manager inherits half of the roster's standing). The extra points are
+// spread evenly across every other franchise, so the league stays zero-sum.
 import type { League, Season } from './stats'
 import type { BracketMatch } from './sleeper'
 
-export const ELO = { start: 2000, min: 0, max: 5000, regress: 0.1, median: 10, marginCap: 60, game: [12, 35] }
+export const ELO = { start: 2000, min: 0, max: 5000, regress: 0.1, takeover: 0.5, median: 10, marginCap: 60, game: [12, 35] }
 export const TIERS = [
   { name: 'Dynasty', min: 3000 },
   { name: 'Contender', min: 2000 },
@@ -29,12 +33,14 @@ export const tierOf = (r: number) => TIERS.find((t) => r >= t.min)!.name
 
 export interface EloPoint { season: number; week: number; rating: number }
 export interface EloGame { season: number; week: number; winner: string; loser: string; margin: number; pts: number; playoff: boolean }
+export interface EloTakeover { season: number; memberId: string; before: number; after: number }
 export interface EloFinish { season: number; memberId: string; place: number; pts: number }
 export interface EloResult {
   current: Record<string, number>
   history: Record<string, EloPoint[]>
   games: EloGame[]
   finishes: EloFinish[]
+  takeovers: EloTakeover[]
   peak: Record<string, EloPoint>
   low: Record<string, EloPoint>
 }
@@ -99,8 +105,27 @@ function compute(lg: League): EloResult {
   const history: Record<string, EloPoint[]> = {}
   const games: EloGame[] = []
   const finishes: EloFinish[] = []
+  const takeovers: EloTakeover[] = []
+  // The Sleeper account running a franchise in a season (orphaned rosters count as their own).
+  const account = (year: number, id: string) => {
+    const rs = lg.raw.seasons.find((x) => Number(x.league.season) === year)
+    const ro = rs?.rosters.find((x) => lg.rosterOwner[year]?.[x.roster_id] === id)
+    return ro ? ro.owner_id ?? `orphan-${ro.roster_id}` : null
+  }
   for (const s of [...lg.seasons].sort((a, b) => a.year - b.year)) {
+    const ended = { ...r } // ratings at the end of last season
     for (const id of Object.keys(r)) r[id] = ELO.start + (1 - ELO.regress) * (r[id] - ELO.start)
+    for (const id of Object.keys(ended)) {
+      const prev = account(s.year - 1, id), now = account(s.year, id)
+      if (prev == null || now == null || prev === now) continue
+      const before = r[id]
+      const after = ELO.start + (1 - ELO.takeover) * (ended[id] - ELO.start)
+      // Spread the takeover's extra pull across everyone else so the league stays zero-sum.
+      const others = Object.keys(r).filter((x) => x !== id)
+      for (const o of others) r[o] -= (after - before) / others.length
+      r[id] = after
+      takeovers.push({ season: s.year, memberId: id, before: Math.round(before), after: Math.round(after) })
+    }
     const ids = s.teamSeasons.map((t) => t.memberId)
     const paid: Record<string, number> = {}
     for (const id of ids) {
@@ -162,7 +187,7 @@ function compute(lg: League): EloResult {
     peak[id] = pts.reduce((a, p) => (p.rating > a.rating ? p : a), pts[0] ?? h[0])
     low[id] = pts.reduce((a, p) => (p.rating < a.rating ? p : a), pts[0] ?? h[0])
   }
-  return { current: Object.fromEntries(Object.entries(r).map(([id, v]) => [id, Math.round(v)])), history, games, finishes, peak, low }
+  return { current: Object.fromEntries(Object.entries(r).map(([id, v]) => [id, Math.round(v)])), history, games, finishes, takeovers, peak, low }
 }
 
 const cache = new WeakMap<League, EloResult>()
