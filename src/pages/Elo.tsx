@@ -77,7 +77,7 @@ export default function Elo() {
             {takeovers.filter((t) => shown(t.memberId)).map((t) => (
               <ReferenceDot
                 key={`${t.season}-${t.memberId}`} x={startKey(t.season)} y={t.after}
-                shape={(p: { cx?: number; cy?: number }) => <Star x={p.cx ?? 0} y={p.cy ?? 0} fill={color(t.memberId)} />}
+                r={6} fill={color(t.memberId)} stroke="var(--panel)" strokeWidth={2}
               />
             ))}
             <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)' }} itemSorter={(item) => -Number(item.value ?? 0)} />
@@ -89,7 +89,7 @@ export default function Elo() {
         </ResponsiveContainer>
         {e.takeovers.length > 0 && (
           <div className="elo-legend muted small">
-            <svg width="16" height="16" viewBox="-10 -10 20 20" aria-hidden><Star x={0} y={0} fill="var(--text-2)" /></svg>
+            <svg width="12" height="12" aria-hidden><circle cx="6" cy="6" r="5" fill="var(--text-2)" /></svg>
             New manager took over the franchise ({e.takeovers.map((t) => `${lg.memberById[t.memberId]?.name} ${t.season}`).join(', ')})
           </div>
         )}
@@ -136,11 +136,3 @@ function bonusScale(top: number[]) {
   return [...half, ...[...half].reverse().map((v) => -v)].map((v) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : '0')).join(' / ')
 }
 
-/** Five-point star centered on (x, y), used to mark a new manager taking over. */
-function Star({ x, y, fill, r = 10 }: { x: number; y: number; fill: string; r?: number }) {
-  const pts = Array.from({ length: 10 }, (_, i) => {
-    const a = (Math.PI / 5) * i - Math.PI / 2, rad = i % 2 ? r * 0.45 : r
-    return `${x + rad * Math.cos(a)},${y + rad * Math.sin(a)}`
-  }).join(' ')
-  return <polygon points={pts} fill={fill} stroke="var(--panel)" strokeWidth={1.5} />
-}
