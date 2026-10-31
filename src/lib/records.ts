@@ -154,11 +154,9 @@ export function buildRecords(lg: League): RecordDef[] {
   const apSeason = (t: TeamSeason) => (t.apW + t.apT / 2) / (t.apW + t.apL + t.apT || 1)
   season('s-ap', 'Best All-Play Percentage', 'All-play win % (your record if you played every team every week).', true, tsAll, apSeason, (t) => `${pct(t.apW, t.apL, t.apT)} (${record(t.apW, t.apL, t.apT)})`)
   season('s-ap-low', 'Worst All-Play Percentage', 'All-play win % (your record if you played every team every week).', false, tsAll, apSeason, (t) => `${pct(t.apW, t.apL, t.apT)} (${record(t.apW, t.apL, t.apT)})`, true)
-  season('s-pa', 'Most Points Against', 'Regular-season points allowed.', false, tsAll, (t) => t.pa, (t) => fmt(t.pa))
+  season('s-pa', 'Most Points Against Per Game', 'Regular-season points allowed per game.', false, tsAll, (t) => t.pa / (t.games || 1), (t) => fmt(t.pa / (t.games || 1)))
   season('s-luck', 'Luckiest Season', 'Actual minus expected H2H wins.', true, tsAll, (t) => t.luck, (t) => signed(t.luck))
   season('s-unluck', 'Unluckiest Season', 'Actual minus expected H2H wins.', false, tsAll, (t) => t.luck, (t) => signed(t.luck), true)
-  season('s-coach', 'Best Coach Score', 'Points ÷ max possible points.', true, tsAll.filter((t) => t.coachScore != null), (t) => t.coachScore!, (t) => t.coachScore!.toFixed(1))
-  season('s-coach-low', 'Worst Coach Score', 'Points ÷ max possible points.', false, tsAll.filter((t) => t.coachScore != null), (t) => t.coachScore!, (t) => t.coachScore!.toFixed(1), true)
   season('s-score', 'Best Season Score', 'Team Rankings season score.', true, tsDone, (t) => t.seasonScore ?? 0, (t) => (t.seasonScore ?? 0).toFixed(1))
   season('s-highs', 'Most High Scores in a Season', 'Weeks as top scorer.', true, tsAll, (t) => t.highScores, (t) => String(t.highScores))
   const ppgOf = (t: TeamSeason) => t.pf / (t.games || 1)
@@ -167,11 +165,12 @@ export function buildRecords(lg: League): RecordDef[] {
   season('s-cinderella', 'Cinderella Champion', 'Lowest regular-season seed to win the title.', true, champs, (t) => t.regRank, (t) => `#${t.regRank} seed`)
   const runPpg = (t: TeamSeason) => { const gs = tw.filter((x) => x.season === t.season && x.memberId === t.memberId && x.bracket === 'winners' && x.pts > 0); return gs.reduce((a, x) => a + x.pts, 0) / (gs.length || 1) }
   season('s-run', 'Best Playoff Run', 'Points per game on the way to a title.', true, champs, runPpg, (t) => fmt(runPpg(t)))
-  season('s-median', 'Best Record vs Median', 'Weeks beating the league median.', true, tsAll, (t) => t.medW, (t) => record(t.medW, t.medL))
+  season('s-median', 'Best Median Win %', 'Share of weeks beating the league median.', true, tsAll.filter((t) => t.medW + t.medL > 0), (t) => t.medW / (t.medW + t.medL), (t) => `${pct(t.medW, t.medL)} (${record(t.medW, t.medL)})`)
   const mgrSeasons = managementCached(lg)
   const mgrPool = tsAll.filter((t) => mgrSeasons.some((m) => m.season === t.season && m.memberId === t.memberId))
   const mgrOf = (t: TeamSeason) => mgrSeasons.find((m) => m.season === t.season && m.memberId === t.memberId)!
   season('s-mgr', 'Best Manager Score', 'Single-season Manager Score (lineups, waivers and trades, 0–100).', true, mgrPool, (t) => mgrOf(t).managerScore, (t) => mgrOf(t).managerScore.toFixed(0))
+  season('s-mgr-low', 'Worst Manager Score', 'Single-season Manager Score (lineups, waivers and trades, 0–100).', false, mgrPool, (t) => mgrOf(t).managerScore, (t) => mgrOf(t).managerScore.toFixed(0), true)
 
   season('s-ppg-low', 'Worst Points Per Game', 'Regular-season PPG.', false, tsAll, ppgOf, (t) => fmt(ppgOf(t)), true)
   season('s-score-low', 'Worst Season Score', 'Team Rankings season score.', false, tsDone, (t) => t.seasonScore ?? 0, (t) => (t.seasonScore ?? 0).toFixed(1), true)
@@ -221,15 +220,9 @@ export function buildRecords(lg: League): RecordDef[] {
   const series = pairs.map((p) => (p.h.w >= p.h.l ? { id: p.a, opp: p.b, w: p.h.w, l: p.h.l, t: p.h.t } : { id: p.b, opp: p.a, w: p.h.l, l: p.h.w, t: p.h.t }))
   add('Matchup', 'm-series', 'Most Dominant Series', 'Best record against one opponent (4+ meetings, playoffs included).', true,
     top(series, (x) => x.w / (x.w + x.l + x.t || 1)).map((x) => ({ memberId: x.id, value: x.w / (x.w + x.l + x.t || 1), display: record(x.w, x.l, x.t), context: `vs ${name(x.opp)} · ${x.w + x.l + x.t} meetings`, link: `/versus/${x.id}/${x.opp}` })))
-  const rivalryRow = (p: (typeof pairs)[number]): RecordRow => {
-    const v = (p.h.pf + p.h.pa) / p.h.games.length
-    return { memberId: p.a, memberId2: p.b, value: v, display: fmt(v), context: `combined per game · ${p.h.games.length} meetings`, link: `/versus/${p.a}/${p.b}` }
-  }
+
   add('Matchup', 'm-intense', 'Most Intense Rivalry', 'Rivalry intensity (0–100): playoff stakes, games played, close games, series balance and drama.', true,
     top(rivalries(lg), (r) => r.score).map((r) => ({ memberId: r.a, memberId2: r.b, value: r.score, display: fmt(r.score, 0), context: `${record(r.aW, r.bW, r.ties)} series · ${r.games} meetings${r.tags.length ? ` · ${r.tags.slice(0, 2).join(', ')}` : ''}`, link: `/versus/${r.a}/${r.b}` })))
-  const combinedPg = (p: (typeof pairs)[number]) => (p.h.pf + p.h.pa) / p.h.games.length
-  add('Matchup', 'm-rivalry-high', 'Highest-Scoring Rivalry', 'Best combined points per game across every meeting (4+ meetings).', true, top(pairs, combinedPg).map(rivalryRow))
-  add('Matchup', 'm-rivalry-low', 'Lowest-Scoring Rivalry', 'Fewest combined points per game across every meeting (4+ meetings).', false, top(pairs, combinedPg, true).map(rivalryRow))
   const benchWeeks = managementCached(lg).filter((m) => m.worstBench)
   add('Matchup', 'm-bench', 'Most Points Left on the Bench', 'Optimal lineup points minus actual points in one week.', false,
     top(benchWeeks, (m) => m.worstBench!.pts).map((m) => ({ memberId: m.memberId, value: m.worstBench!.pts, display: fmt(m.worstBench!.pts), context: `${m.season} W${m.worstBench!.week}`, link: `/season/${m.season}/team/${m.memberId}` })))
@@ -298,9 +291,17 @@ export function buildRecords(lg: League): RecordDef[] {
   // Like the career playoff record, the 5th-place game doesn't count.
   const playoffOrdered = allOrdered.filter((t) => t.bracket === 'winners' && t.place !== 5)
   add('Streaks & Droughts', 'st-pwin', 'Longest Playoff Win Streak', 'Consecutive winners-bracket wins, across seasons.', true, top(streakRows((t) => t.pts > t.oppPts, playoffOrdered), (r) => r.value))
-  add('Streaks & Droughts', 'st-135', 'Longest Streak Scoring 135+', 'Consecutive regular-season weeks with 135 or more points.', true, top(streakRows((t) => t.pts >= 135, ordered.filter((t) => t.pts > 0)), (r) => r.value))
+  // Weekly finish among all teams (1 = top scorer), so streaks stay fair as league scoring changes.
+  const weekRank: Record<string, number> = {}
+  for (const key of new Set(ordered.map((t) => `${t.season}-${t.week}`))) {
+    const wk = ordered.filter((t) => `${t.season}-${t.week}` === key && t.pts > 0)
+    for (const t of wk) weekRank[`${key}-${t.memberId}`] = 1 + wk.filter((o) => o.pts > t.pts).length
+  }
+  const rankIn = (t: TeamWeek) => weekRank[`${t.season}-${t.week}-${t.memberId}`] ?? 99
+  const teamsIn = (t: TeamWeek) => ordered.filter((o) => o.season === t.season && o.week === t.week && o.pts > 0).length
+  add('Streaks & Droughts', 'st-top3', 'Longest Top-3 Scoring Streak', 'Consecutive regular-season weeks as one of the 3 highest scorers.', true, top(streakRows((t) => rankIn(t) <= 3, ordered.filter((t) => t.pts > 0)), (r) => r.value))
   add('Streaks & Droughts', 'st-ploss', 'Longest Playoff Losing Streak', 'Consecutive winners-bracket losses, across seasons.', false, top(streakRows((t) => t.pts < t.oppPts, playoffOrdered), (r) => r.value))
-  add('Streaks & Droughts', 'st-110', 'Longest Streak Under 110', 'Consecutive regular-season weeks scoring under 110.', false, top(streakRows((t) => t.pts < 110, ordered.filter((t) => t.pts > 0)), (r) => r.value))
+  add('Streaks & Droughts', 'st-bot3', 'Longest Bottom-3 Scoring Streak', 'Consecutive regular-season weeks as one of the 3 lowest scorers.', false, top(streakRows((t) => rankIn(t) > teamsIn(t) - 3, ordered.filter((t) => t.pts > 0)), (r) => r.value))
   add('Streaks & Droughts', 'st-med', 'Longest Streak Beating the Median', 'Consecutive weeks above the league median.', true, top(streakRows(aboveMed, ordered), (r) => r.value))
   add('Streaks & Droughts', 'st-med-low', 'Longest Streak Below the Median', 'Consecutive weeks at or below the median.', false, top(streakRows((t) => !aboveMed(t), ordered), (r) => r.value))
   const seasonRuns = (pred: (t: TeamSeason) => boolean) =>
