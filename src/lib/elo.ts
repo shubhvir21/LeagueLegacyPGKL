@@ -21,6 +21,7 @@
 // spread evenly across every other franchise, so the league stays zero-sum.
 import type { League, Season } from './stats'
 import type { BracketMatch } from './sleeper'
+import { managerOf } from './tenure'
 
 export const ELO = { start: 2000, min: 0, max: 5000, regress: 0.1, takeover: 0.5, median: 10, marginCap: 60, game: [12, 35] }
 export const TIERS = [
@@ -106,17 +107,11 @@ function compute(lg: League): EloResult {
   const games: EloGame[] = []
   const finishes: EloFinish[] = []
   const takeovers: EloTakeover[] = []
-  // The Sleeper account running a franchise in a season (orphaned rosters count as their own).
-  const account = (year: number, id: string) => {
-    const rs = lg.raw.seasons.find((x) => Number(x.league.season) === year)
-    const ro = rs?.rosters.find((x) => lg.rosterOwner[year]?.[x.roster_id] === id)
-    return ro ? ro.owner_id ?? `orphan-${ro.roster_id}` : null
-  }
   for (const s of [...lg.seasons].sort((a, b) => a.year - b.year)) {
     const ended = { ...r } // ratings at the end of last season
     for (const id of Object.keys(r)) r[id] = ELO.start + (1 - ELO.regress) * (r[id] - ELO.start)
     for (const id of Object.keys(ended)) {
-      const prev = account(s.year - 1, id), now = account(s.year, id)
+      const prev = managerOf(lg, s.year - 1, id), now = managerOf(lg, s.year, id)
       if (prev == null || now == null || prev === now) continue
       const before = r[id]
       const after = ELO.start + (1 - ELO.takeover) * (ended[id] - ELO.start)

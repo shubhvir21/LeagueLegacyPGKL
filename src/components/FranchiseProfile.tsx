@@ -4,6 +4,7 @@ import { useLeague } from '../lib/data'
 import { playersOf } from '../lib/players'
 import { money, valuationTable, valuationsOf, type Valuation } from '../lib/valuation'
 import { managementCached } from '../lib/management'
+import { tenures } from '../lib/tenure'
 import type { League } from '../lib/stats'
 import { Avatar } from './ui'
 
@@ -93,23 +94,7 @@ function Fact({ k, v }: { k: string; v: string }) {
 }
 
 /** Who actually ran this franchise each season (takeovers are merged into the current owner). */
-export function ownership(lg: League, id: string) {
-  const runs: { who: string; name: string; from: number; to: number }[] = []
-  for (const s of [...lg.raw.seasons].sort((a, b) => Number(a.league.season) - Number(b.league.season))) {
-    const year = Number(s.league.season)
-    const r = s.rosters.find((x) => lg.rosterOwner[year]?.[x.roster_id] === id)
-    if (!r) continue
-    const name = r.owner_id ? s.users.find((u) => u.user_id === r.owner_id)?.display_name ?? 'unknown' : 'an absentee owner'
-    // Compare accounts, not names, so a display-name change isn't a takeover.
-    const who = r.owner_id ?? `orphan-${r.roster_id}`
-    const last = runs.at(-1)
-    if (last && last.who === who) { last.to = year; last.name = name }
-    else runs.push({ who, name, from: year, to: year })
-  }
-  // The current owner's own display name wins for their run.
-  if (runs.length) runs[runs.length - 1].name = lg.memberById[id]?.name ?? runs[runs.length - 1].name
-  return runs
-}
+export const ownership = (lg: League, id: string) => tenures(lg, id).map((t) => ({ who: t.managerId, name: t.name, from: t.from, to: t.to }))
 
 /** A short, data-driven writeup in the voice of a sports-business column that has seen too much. */
 function take(lg: League, id: string, v: Valuation, hist: Valuation[], rank: number, n: number) {

@@ -222,7 +222,7 @@ export function buildRecords(lg: League): RecordDef[] {
     top(series, (x) => x.w / (x.w + x.l + x.t || 1)).map((x) => ({ memberId: x.id, value: x.w / (x.w + x.l + x.t || 1), display: record(x.w, x.l, x.t), context: `vs ${name(x.opp)} · ${x.w + x.l + x.t} meetings`, link: `/versus/${x.id}/${x.opp}` })))
 
   add('Matchup', 'm-intense', 'Most Intense Rivalry', 'Rivalry intensity (0–100): playoff stakes, games played, close games, series balance and drama.', true,
-    top(rivalries(lg), (r) => r.score).map((r) => ({ memberId: r.a, memberId2: r.b, value: r.score, display: fmt(r.score, 0), context: `${record(r.aW, r.bW, r.ties)} series · ${r.games} meetings${r.tags.length ? ` · ${r.tags.slice(0, 2).join(', ')}` : ''}`, link: `/versus/${r.a}/${r.b}` })))
+    top(rivalries(lg).filter((r) => !r.archived), (r) => r.score).map((r) => ({ memberId: r.a, memberId2: r.b, value: r.score, display: fmt(r.score, 0), context: `${record(r.aW, r.bW, r.ties)} series · ${r.games} meetings${r.tags.length ? ` · ${r.tags.slice(0, 2).join(', ')}` : ''}`, link: `/versus/${r.a}/${r.b}` })))
   const benchWeeks = managementCached(lg).filter((m) => m.worstBench)
   add('Matchup', 'm-bench', 'Most Points Left on the Bench', 'Optimal lineup points minus actual points in one week.', false,
     top(benchWeeks, (m) => m.worstBench!.pts).map((m) => ({ memberId: m.memberId, value: m.worstBench!.pts, display: fmt(m.worstBench!.pts), context: `${m.season} W${m.worstBench!.week}`, link: `/season/${m.season}/team/${m.memberId}` })))

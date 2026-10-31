@@ -9,7 +9,8 @@ import { lineupSlots } from '../lib/lineup'
 import { playersOf, type PlayerInfo } from '../lib/players'
 import { applyFinals, fetchEspnSnapshot, type EspnSnapshot, type GameSituation } from '../lib/situation'
 import type { SleeperMatchup, SleeperRoster } from '../lib/sleeper'
-import { fmt, type Game } from '../lib/stats'
+import { fmt, type League } from '../lib/stats'
+import { currentEra } from '../lib/tenure'
 import { Avatar, TeamName } from './ui'
 
 const REFRESH_MS = 60_000
@@ -19,10 +20,11 @@ const STALE_MINUTES = 15
 const SLOT_LABEL: Record<string, string> = { SUPER_FLEX: 'SF', FLEX: 'FLX', REC_FLEX: 'FLX', WRRB_FLEX: 'FLX' }
 
 interface Record3 { w: number; l: number; t: number }
-function headToHead(games: Game[], a?: string, b?: string): Record3 | null {
+function headToHead(lg: League, a?: string, b?: string): Record3 | null {
   if (!a || !b) return null
   const r = { w: 0, l: 0, t: 0 }
-  for (const g of games) {
+  for (const g of lg.games) {
+    if (!currentEra(lg, g)) continue
     const aSide = g.a === a && g.b === b, bSide = g.a === b && g.b === a
     if ((!aSide && !bSide) || (g.aPts === 0 && g.bPts === 0)) continue
     const mine = aSide ? g.aPts : g.bPts, theirs = aSide ? g.bPts : g.aPts
@@ -144,7 +146,7 @@ export function LiveMatchups() {
           </button>
         ))}
       </div>
-      <Scoreboard x={game.x} y={game.y} p={game.p} year={season?.year} h2h={headToHead(lg.games, game.x.memberId, game.y.memberId)} />
+      <Scoreboard x={game.x} y={game.y} p={game.p} year={season?.year} h2h={headToHead(lg, game.x.memberId, game.y.memberId)} />
       <LiveTicker lines={[...game.x.lines, ...game.y.lines]} situations={situations} />
       <div className="lm-rows">
         {Array.from({ length: Math.max(game.x.lines.length, game.y.lines.length) }, (_, i) => (

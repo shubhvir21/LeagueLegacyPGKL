@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLeague } from '../lib/data'
-import { rivalries } from '../lib/rivalry'
+import { rivalries, type Rivalry } from '../lib/rivalry'
+import { tenureOf } from '../lib/tenure'
 import { RivalriesSection, RivalryMeter } from './Rivalries'
 import { HistoricalMatchupsSection } from './HistoricalMatchups'
 import { careers, fmt, headToHead, pct, record, type Game } from '../lib/stats'
@@ -94,9 +95,18 @@ export function VersusDetail() {
   const po = h.games.filter((g) => g.playoff)
   const sub = (gs: Game[]) => { const w = gs.filter((g) => g.aPts > g.bPts).length, l = gs.filter((g) => g.aPts < g.bPts).length; return record(w, l, gs.length - w - l) }
   const biggest = [...h.games].sort((x, y) => Math.abs(y.aPts - y.bPts) - Math.abs(x.aPts - x.bPts))[0]
-  const all = rivalries(lg)
-  const rank = all.findIndex((r) => (r.a === a && r.b === b) || (r.a === b && r.b === a)) + 1
+  const mine = (r: Rivalry) => (r.a === a && r.b === b) || (r.a === b && r.b === a)
+  const all = rivalries(lg).filter((r) => !r.archived)
+  const rank = all.findIndex(mine) + 1
   const riv = all[rank - 1]
+  // Earlier series between these franchises, under managers who have since left (oriented a vs b).
+  const archived = rivalries(lg).filter((r) => r.archived && mine(r)).map((r) => {
+    const flip = r.a !== a
+    const gs = lg.games.filter((g) => (g.a === a && g.b === b) || (g.a === b && g.b === a))
+      .filter((g) => tenureOf(lg, g.season, r.a) === r.aMgr && tenureOf(lg, g.season, r.b) === r.bMgr)
+      .map((g) => (g.a === a ? g : { ...g, a: g.b, b: g.a, aPts: g.bPts, bPts: g.aPts }))
+    return { r, aName: flip ? r.bMgr.name : r.aMgr.name, bName: flip ? r.aMgr.name : r.bMgr.name, w: flip ? r.bW : r.aW, l: flip ? r.aW : r.bW, gs }
+  }).sort((x, y) => (y.r.last?.season ?? 0) - (x.r.last?.season ?? 0))
   const pick = (side: 'a' | 'b', v: string) => nav(side === 'a' ? `/versus/${v}/${b}` : `/versus/${a}/${v}`)
   return (
     <div className="page">
@@ -118,7 +128,28 @@ export function VersusDetail() {
           <RivalryMeter r={riv} />
         </Card>
       )}
-      {h.games.length === 0 ? <p className="muted">These two have never played.</p> : (
+      {archived.length > 0 && (
+        <Card title="Archived series" sub="Meetings under earlier managers. They don't count toward the current head-to-head." right={<span id="archived" />}>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Series</th><th className="right">Record</th><th>Season</th><th>Week</th><th>Winner</th><th className="right">Score</th></tr></thead>
+              <tbody>
+                {archived.flatMap((x) => x.gs.map((g, i) => (
+                  <tr key={`${g.season}-${g.week}`}>
+                    <td>{i === 0 ? <b>{x.aName} vs {x.bName}</b> : null}</td>
+                    <td className="right">{i === 0 ? record(x.w, x.l, x.r.ties) : null}</td>
+                    <td><Link to={`/season/${g.season}`}>{g.season}</Link></td>
+                    <td>{g.week}</td>
+                    <td>{g.aPts > g.bPts ? x.aName : g.bPts > g.aPts ? x.bName : 'Tie'}</td>
+                    <td className="right">{fmt(g.aPts)} – {fmt(g.bPts)}</td>
+                  </tr>
+                )))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+      {h.games.length === 0 ? <p className="muted">{archived.length ? 'The current managers haven\'t played yet.' : 'These two have never played.'}</p> : (
         <>
           <div className="stat-grid">
             <Stat label="Regular season" value={sub(reg)} />

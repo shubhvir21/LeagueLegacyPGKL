@@ -3,6 +3,7 @@ import type { RawData, RawSeason, BracketMatch } from './sleeper'
 import { ELO, franchiseElo } from './elo'
 import { teamRankings } from './teamRank'
 import overrides from '../members.json'
+import { currentEra } from './tenure'
 
 export interface Member {
   id: string // Sleeper user_id — stable across seasons
@@ -401,9 +402,11 @@ export interface H2H {
   streak: string // e.g. "W3"
 }
 
-export function headToHead(lg: League, a: string, b: string): H2H {
+/** a vs b. By default only games between the two current managers count; `all` includes their predecessors. */
+export function headToHead(lg: League, a: string, b: string, era: 'current' | 'all' = 'current'): H2H {
   const games = lg.games
     .filter((g) => (g.a === a && g.b === b) || (g.a === b && g.b === a))
+    .filter((g) => era === 'all' || currentEra(lg, g))
     .map((g) => (g.a === a ? g : { ...g, a: g.b, b: g.a, aPts: g.bPts, bPts: g.aPts }))
   const r: H2H = { w: 0, l: 0, t: 0, pf: 0, pa: 0, games, streak: '' }
   for (const g of games) {
