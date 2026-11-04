@@ -49,22 +49,15 @@ export default function Season() {
       </p>
 
       <Card title="Summary">
-        <p className="blurb">
-          {s.complete ? (
-            <>
-              The {year} season ended with <b>{name(podium[1])}</b> winning the title over <b>{name(podium[0])}</b>, with{' '}
-              <b>{name(podium[2])}</b> taking third. <b>{name(regChamp)}</b> finished the regular season on top at{' '}
-              {record(regChamp.wins, regChamp.losses, regChamp.ties)}, and <b>{name(ptsChamp)}</b> led the league with{' '}
-              {fmt(ptsChamp.pf)} points.{' '}
-              {regChamp.finalRank !== 1 && 'The best regular-season team did not take home the trophy.'}
-            </>
-          ) : (
-            <>
-              Through week {s.weeksPlayed}, <b>{name(regChamp)}</b> leads at {record(regChamp.wins, regChamp.losses, regChamp.ties)} and{' '}
-              <b>{name(ptsChamp)}</b> has scored the most points ({fmt(ptsChamp.pf)}).
-            </>
-          )}
-        </p>
+        {s.complete && (
+          <p className="blurb">
+            The {year} season ended with <b>{name(podium[1])}</b> winning the title over <b>{name(podium[0])}</b>, with{' '}
+            <b>{name(podium[2])}</b> taking third. <b>{name(regChamp)}</b> finished the regular season on top at{' '}
+            {record(regChamp.wins, regChamp.losses, regChamp.ties)}, and <b>{name(ptsChamp)}</b> led the league with{' '}
+            {fmt(ptsChamp.pf)} points.{' '}
+            {regChamp.finalRank !== 1 && 'The best regular-season team did not take home the trophy.'}
+          </p>
+        )}
         {s.complete && (
           <div className="podium">
             {podium.map((t, i) => t && (
