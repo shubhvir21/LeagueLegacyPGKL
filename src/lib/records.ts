@@ -3,7 +3,7 @@ import { careers, fmt, headToHead, ordinal, pct, record, type Game, type League,
 import { gameOdds, UPSET_LINE, type GameOdds } from './upsets'
 import { franchiseElo } from './elo'
 import { managementCached, managementCareer } from './management'
-import { playerName, playerPos, playersOf } from './players'
+import { playerName, playerPos, playersOf, type Move, type Pick } from './players'
 import { rivalries } from './rivalry'
 
 const UPSET_TIP = 'pre-game chance from projected lineups and form'
@@ -24,7 +24,7 @@ export interface RecordDef {
   positive: boolean // good thing to hold vs a blunder
   rows: RecordRow[] // best first
 }
-export const CATEGORIES = ['League', 'Season', 'Matchup', 'Streaks & Droughts'] as const
+export const CATEGORIES = ['League', 'Season', 'Matchup', 'Playoffs', 'Front Office', 'Streaks & Droughts'] as const
 export type Category = (typeof CATEGORIES)[number]
 
 /** One row per team per week (both sides of every game). */
@@ -59,8 +59,10 @@ export function buildRecords(lg: League): RecordDef[] {
   const tw = teamWeeks(lg)
   const regTw = tw.filter((t) => !t.playoff)
   const defs: RecordDef[] = []
+  // Postseason records live in their own chapter, whichever helper builds them.
+  const PLAYOFF_IDS = new Set(['titles', 'podiums', 'playoffs', 'pwins', 'popct', 'popct-low', 'po-lowseed', 'po-topseed-out', 'toilet', 's-run', 's-miss', 'st-pwin', 'st-ploss', 'st-po', 'st-nopo'])
   const add = (category: Category, id: string, title: string, desc: string, positive: boolean, rows: RecordRow[]) =>
-    defs.push({ id, category, title, desc, positive, rows })
+    defs.push({ id, category: PLAYOFF_IDS.has(id) ? 'Playoffs' : category, title, desc, positive, rows })
 
   // ---------- League (career) ----------
   const career = (id: string, title: string, desc: string, positive: boolean, f: (r: (typeof cr)[number]) => number, show: (r: (typeof cr)[number]) => string, asc = false) =>
@@ -104,6 +106,7 @@ export function buildRecords(lg: League): RecordDef[] {
     titles: (r) => years(done.filter((s) => s.champion === r.member.id).map((s) => s.year)),
     podiums: (r) => [...done].sort((a, b) => a.year - b.year).filter((s) => [s.champion, s.runnerUp, s.third].includes(r.member.id)).map((s) => `${ordinal(s.champion === r.member.id ? 1 : s.runnerUp === r.member.id ? 2 : 3)} ${s.year}`).join(' · ') || '—',
     playoffs: (r) => years(mine(r.member.id).filter((t) => t.madePlayoffs).map((t) => t.season)),
+    popct: (r) => `${record(r.playoffW, r.playoffL)} · ${years(mine(r.member.id).filter((t) => t.madePlayoffs).map((t) => t.season))}`,
     'popct-low': (r) => `${record(r.playoffW, r.playoffL)} · ${years(mine(r.member.id).filter((t) => t.madePlayoffs).map((t) => t.season))}`,
     pwins: (r) => `${record(r.playoffW, r.playoffL)} in the playoffs`,
     avgfinish: (r) => mine(r.member.id).filter((t) => done.some((s) => s.year === t.season) && t.finalRank).map((t) => ordinal(t.finalRank!)).join(' · '),
@@ -270,6 +273,73 @@ export function buildRecords(lg: League): RecordDef[] {
   add('League', 'upset-losses', 'Most Upset Losses', `Career losses with over a ${pctStr(1 - UPSET_LINE)} pre-game chance.`, false,
     top(ids, (id) => careerDown[id] ?? 0).filter((id) => careerDown[id]).map((id) => ({ memberId: id, value: careerDown[id], display: String(careerDown[id]), context: `worst: lost at ${pctStr(Math.max(...upsets.filter((o) => o.loser === id).map((o) => 1 - o.pWinner)))}`, link: `/member/${id}` })))
 
+  // ---------- Playoffs ----------
+  const poTw = realTw.filter((t) => t.bracket === 'winners' && t.place !== 5)
+  const poWeekly = (id: string, title: string, desc: string, positive: boolean, pool: TeamWeek[], f: (t: TeamWeek) => number, asc = false) =>
+    add('Playoffs', id, title, desc, positive, top(pool, f, asc).map((t) => ({ memberId: t.memberId, value: f(t), display: fmt(f(t)), context: `${t.season} W${t.week} vs ${name(t.oppId)}${t.place === 1 ? ' (final)' : ''}`, link: `/versus/${t.memberId}/${t.oppId}` })))
+  careerOf(crPo, 'popct', 'Best Playoff Win Percentage', 'Winners-bracket record. Needs 3+ playoff games.', true, poPct, (r) => pct(r.playoffW, r.playoffL))
+  const finals = poTw.filter((t) => t.place === 1)
+  const finalRec = (id: string) => { const f = finals.filter((t) => t.memberId === id); return { w: f.filter((t) => t.pts > t.oppPts).length, l: f.filter((t) => t.pts < t.oppPts).length, years: f.map((t) => t.season) } }
+  const finalIds = [...new Set(finals.map((t) => t.memberId))]
+  add('Playoffs', 'po-finals', 'Most Championship Game Appearances', 'Trips to the title game.', true,
+    top(finalIds, (id) => finals.filter((t) => t.memberId === id).length).map((id) => { const f = finalRec(id); return { memberId: id, value: f.w + f.l, display: String(f.w + f.l), context: `${record(f.w, f.l)} · ${years(f.years)}`, link: `/member/${id}` } }))
+  const bridesmaid = finalIds.filter((id) => finalRec(id).l > 0)
+  add('Playoffs', 'po-finals-low', 'Most Championship Game Losses', 'Title games lost.', false,
+    top(bridesmaid, (id) => finalRec(id).l).map((id) => { const f = finalRec(id); return { memberId: id, value: f.l, display: String(f.l), context: `${record(f.w, f.l)} in finals`, link: `/member/${id}` } }))
+  poWeekly('po-high', 'Most Points in a Playoff Game', 'Single winners-bracket score.', true, poTw, (t) => t.pts)
+  poWeekly('po-blowout', 'Biggest Playoff Blowout', 'Winners-bracket margin of victory.', true, poTw.filter((t) => t.pts > t.oppPts), (t) => t.pts - t.oppPts)
+  poWeekly('po-low', 'Fewest Points in a Playoff Game', 'Single winners-bracket score.', false, poTw, (t) => t.pts, true)
+  poWeekly('po-hiloss', 'Highest Score in a Playoff Loss', 'Most points while getting knocked out.', false, poTw.filter((t) => t.pts < t.oppPts), (t) => t.pts)
+  const poOdds = odds.filter((o) => o.g.bracket === 'winners')
+  add('Playoffs', 'po-upset', 'Biggest Playoff Upset', `Playoff wins with the lowest pre-game win chance (${UPSET_TIP}).`, true,
+    top(poOdds, (o) => o.pWinner, true).map((o) => ({ memberId: o.winner!, value: o.pWinner, display: `${pctStr(o.pWinner)} chance`, context: oddsCtx(o, o.winner!), link: `/versus/${o.winner}/${o.loser}` })))
+  add('Playoffs', 'po-choke', 'Biggest Playoff Choke', `Playoff losses as the heaviest pre-game favorite (${UPSET_TIP}).`, false,
+    top(poOdds, (o) => 1 - o.pWinner).map((o) => ({ memberId: o.loser!, value: 1 - o.pWinner, display: `${pctStr(1 - o.pWinner)} favorite`, context: oddsCtx(o, o.loser!), link: `/versus/${o.loser}/${o.winner}` })))
+  const seedOf = (t: TeamSeason) => t.regRank
+  season('po-lowseed', 'Lowest Seed to Win It All', 'Champion with the worst regular-season finish.', true, champs, seedOf, (t) => `${ordinal(seedOf(t))} seed`)
+  season('po-topseed-out', 'Best Seed Without a Title', 'Highest regular-season finish that didn’t end in a championship.', false,
+    tsDone.filter((t) => t.madePlayoffs && seasonOf(t.season).champion !== t.memberId), seedOf, (t) => `${ordinal(seedOf(t))} seed · finished ${ordinal(t.finalRank ?? 0)}`, true)
+
+  // ---------- Front Office ----------
+  const seasonDone = (y: number) => !inProgress.has(y)
+  const sides = pm.trades.flatMap((t) => t.sides.map((sd) => ({ t, sd })))
+  const tradeCtx = (x: (typeof sides)[number]) => {
+    const other = x.t.sides.filter((o) => o !== x.sd).map((o) => name(o.memberId)).join(', ')
+    const got = [...x.sd.gets.map((id) => playerName(pm, id)), ...x.sd.picksIn].slice(0, 3).join(', ')
+    return `${x.t.season} W${x.t.week} with ${other} · got ${got || 'nothing'}`
+  }
+  const tradeRow = (x: (typeof sides)[number]): RecordRow => ({ memberId: x.sd.memberId, value: x.sd.value, display: signed(x.sd.value), context: tradeCtx(x), link: '/butterfly' })
+  add('Front Office', 'fo-trade', 'Best Trade', 'Started points from players acquired minus started points of players sent away.', true, top(sides, (x) => x.sd.value).filter((x) => x.sd.value > 0).map(tradeRow))
+  add('Front Office', 'fo-trade-low', 'Worst Trade', 'Started points from players acquired minus started points of players sent away.', false, top(sides, (x) => x.sd.value, true).filter((x) => x.sd.value < 0).map(tradeRow))
+  const moveCtx = (m: Move) => `${playerName(pm, m.playerId)} · ${m.season} W${m.week}${m.bid ? ` · $${m.bid}` : ''}`
+  add('Front Office', 'fo-pickup', 'Best Waiver Pickup', 'Lineup points a waiver or free-agent add gained, minus what the drop cost.', true,
+    top(pm.moves, (m) => m.value).map((m) => ({ memberId: m.memberId, value: m.value, display: signed(m.value), context: moveCtx(m), link: `/player/${m.playerId}` })))
+  const busts = pm.moves.filter((m) => (m.bid ?? 0) > 0 && m.gain < 10 && seasonDone(m.season))
+  add('Front Office', 'fo-faab-low', 'Biggest FAAB Bust', 'Most FAAB spent on a pickup that added under 10 lineup points.', false,
+    top(busts, (m) => m.bid!).map((m) => ({ memberId: m.memberId, value: m.bid!, display: `$${m.bid}`, context: `${playerName(pm, m.playerId)} · ${m.season} W${m.week} · +${fmt(m.gain)} pts`, link: `/player/${m.playerId}` })))
+  const graded = pm.picks.filter((p) => !p.pending)
+  const pickRow = (p: Pick): RecordRow => ({ memberId: p.memberId, value: p.surplus, display: signed(p.surplus), context: `${playerName(pm, p.playerId)} · ${p.season} R${p.round} #${p.pickNo}`, link: `/player/${p.playerId}` })
+  add('Front Office', 'fo-steal', 'Best Draft Steal', 'Value over replacement minus what the round normally returns.', true, top(graded.filter((p) => !p.keeper), (p) => p.surplus).map(pickRow))
+  add('Front Office', 'fo-bust', 'Biggest Draft Bust', 'Value over replacement minus what the round normally returns.', false, top(graded.filter((p) => !p.keeper), (p) => p.surplus, true).map(pickRow))
+  add('Front Office', 'fo-keeper', 'Best Keeper', 'Keeper surplus: value minus what the round it cost normally returns.', true, top(graded.filter((p) => p.keeper), (p) => p.surplus).map(pickRow))
+  add('Front Office', 'fo-keeper-low', 'Worst Keeper', 'Keeper surplus: value minus what the round it cost normally returns.', false, top(graded.filter((p) => p.keeper), (p) => p.surplus, true).map(pickRow))
+  add('Front Office', 'fo-drop', 'Costliest Drop', 'Lineup points you would have gained by keeping a player you cut.', false,
+    top(pm.drops, (d) => d.after).filter((d) => d.after > 0).map((d) => ({ memberId: d.memberId, value: d.after, display: fmt(d.after), context: `${playerName(pm, d.playerId)} · ${d.season} W${d.week}`, link: `/player/${d.playerId}` })))
+  const moveCount: Record<string, number> = {}
+  for (const m of pm.moves) moveCount[`${m.season}|${m.memberId}`] = (moveCount[`${m.season}|${m.memberId}`] ?? 0) + 1
+  const tradeCount: Record<string, number> = {}
+  for (const x of sides) tradeCount[x.sd.memberId] = (tradeCount[x.sd.memberId] ?? 0) + 1
+  const movesOf = (t: TeamSeason) => moveCount[`${t.season}|${t.memberId}`] ?? 0
+  add('Front Office', 'fo-active', 'Most Pickups in a Season', 'Waiver and free-agent adds.', true,
+    top(tsAll, movesOf).map((t) => ({ memberId: t.memberId, value: movesOf(t), display: String(movesOf(t)), context: ctx(t), link: `/season/${t.season}/team/${t.memberId}` })))
+  add('Front Office', 'fo-asleep', 'Fewest Pickups in a Season', 'Waiver and free-agent adds in a completed season. Asleep at the wheel.', false,
+    top(tsDone, movesOf, true).map((t) => ({ memberId: t.memberId, value: movesOf(t), display: String(movesOf(t)), context: ctx(t), link: `/season/${t.season}/team/${t.memberId}` })))
+  add('Front Office', 'fo-trades', 'Most Trades', 'Career trades made.', true,
+    top(ids, (id) => tradeCount[id] ?? 0).filter((id) => tradeCount[id]).map((id) => ({ memberId: id, value: tradeCount[id], display: String(tradeCount[id]), context: `${signed(sides.filter((x) => x.sd.memberId === id).reduce((a, x) => a + x.sd.value, 0))} net pts`, link: `/member/${id}` })))
+  const waiverNet = (id: string) => pm.moves.filter((m) => m.memberId === id).reduce((a, m) => a + m.value, 0)
+  add('Front Office', 'fo-waiver', 'Best Waiver Wire Career', 'Total lineup points gained from pickups.', true,
+    top(ids, waiverNet).map((id) => ({ memberId: id, value: waiverNet(id), display: signed(waiverNet(id)), context: `${pm.moves.filter((m) => m.memberId === id).length} adds`, link: `/member/${id}` })))
+
   // ---------- Streaks & droughts ----------
   const members = cr.map((r) => r.member.id)
   const streakRows = (pred: (t: TeamWeek) => boolean, pool: TeamWeek[]) =>
@@ -322,6 +392,7 @@ export function buildRecords(lg: League): RecordDef[] {
 
   return defs
 }
+
 
 function careerSum(ts: TeamSeason[], id: string, f: (t: TeamSeason) => number) {
   return ts.filter((t) => t.memberId === id).reduce((a, t) => a + f(t), 0)
