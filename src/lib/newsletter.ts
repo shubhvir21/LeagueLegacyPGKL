@@ -2,7 +2,7 @@
 // the standings after it, and a preview of the next slate. Everything is written from the data,
 // so a new issue appears on its own once Sleeper finalizes a week (Monday night → Tuesday).
 import { headToHead, type League } from './stats'
-import { playersOf, playerName } from './players'
+import { playersOf, playerName, playerPos } from './players'
 import { buildRecords } from './records'
 import { buildMilestones } from './milestones'
 import { playoffOdds } from './odds'
@@ -80,19 +80,39 @@ export function currentIssue(lg: League): Issue | null {
     .filter((w) => w.season === year && w.week === week && w.memberId === id && w.started)
     .sort((a, b) => b.pts - a.pts)[0]
 
+  const wkPlayers = pm.weeks.filter((w) => w.season === year && w.week === week)
+  const bench = (id: string) => wkPlayers.filter((w) => w.memberId === id && !w.started).sort((a, b) => b.pts - a.pts)
+  const duds = (id: string) => wkPlayers.filter((w) => w.memberId === id && w.started && !['K', 'DEF'].includes(playerPos(pm, w.playerId))).sort((a, b) => a.pts - b.pts)
+
+  // ---- Current h2h streaks (regular season) ----
+  const streak: Record<string, number> = {}
+  for (const g of lg.games.filter((g) => g.season === year && !g.playoff && g.week <= week).sort((a, b) => a.week - b.week)) {
+    for (const [id, p, o] of [[g.a, g.aPts, g.bPts], [g.b, g.bPts, g.aPts]] as const) {
+      const s0 = streak[id] ?? 0
+      streak[id] = p > o ? (s0 > 0 ? s0 + 1 : 1) : p < o ? (s0 < 0 ? s0 - 1 : -1) : 0
+    }
+  }
+
   // ---- Game recaps ----
   const odds = gameOdds(lg).filter((o) => o.g.season === year && o.g.week === week)
   const recap: RecapGame[] = games.map((g, i) => {
     const aWon = g.aPts >= g.bPts
     const [w, l, wp, lp] = aWon ? [g.a, g.b, g.aPts, g.bPts] : [g.b, g.a, g.bPts, g.aPts]
     const m = wp - lp
-    const verb = m < 3 ? pick(['survived', 'escaped', 'squeaked past'], i + week) : m < 10 ? pick(['edged', 'held off', 'got past'], i + week) : m < 30 ? pick(['beat', 'handled', 'took care of'], i + week) : pick(['crushed', 'ran over', 'blew out'], i + week)
+    const verb = m < 3 ? pick(['survived', 'escaped', 'squeaked past', 'stole one from'], i + week) : m < 10 ? pick(['edged', 'held off', 'got past', 'outlasted'], i + week) : m < 30 ? pick(['beat', 'handled', 'took care of', 'comfortably dispatched'], i + week) : pick(['crushed', 'ran over', 'blew out', 'put a beating on', 'embarrassed'], i + week)
     const st = star(w)
     const o = odds.find((x) => x.g === g)
     const upset = o && o.winner === w && o.pWinner < 0.4 ? ` as a ${Math.round((1 - o.pWinner) * 100)}% underdog` : ''
     const label = g.playoff ? (g.bracket === 'winners' ? (g.place === 1 ? 'In the championship, ' : 'In the playoffs, ') : 'In the toilet bowl, ') : ''
     const after = !g.playoff && now[w] ? ` to move to ${rec(now[w].w, now[w].l, now[w].t)}` : ''
-    const text = `${label}${nm(w)} ${verb} ${nm(l)} ${f1(wp)}–${f1(lp)}${upset}${after}.${st ? ` ${playerName(pm, st.playerId)} led the way with ${f1(st.pts)}.` : ''}`
+    const benchFlip = bench(l).find((b) => b.pts > m)
+    const dud = duds(l)[0]
+    const blame = m < 1 ? ` Decided by ${f1(m)}. Somebody check the stat corrections before the group chat melts down.`
+      : benchFlip ? ` The painful part: ${playerName(pm, benchFlip.playerId)} sat on ${nm(l)}'s bench with ${f1(benchFlip.pts)}, enough to flip it alone. Lineup decisions, folks.`
+      : dud && dud.pts < 5 && m < 30 ? ` ${nm(l)} will want a word with ${playerName(pm, dud.playerId)}, who started and gave back ${f1(dud.pts)}.`
+      : m >= 40 ? ` ${pick(['This one was over by halftime of the early games.', 'Mercy rule talks have begun.', 'Thoughts and prayers to the losing side.'], i + week)}`
+      : ''
+    const text = `${label}${nm(w)} ${verb} ${nm(l)} ${f1(wp)}–${f1(lp)}${upset}${after}.${st ? ` ${playerName(pm, st.playerId)} led the way with ${f1(st.pts)}.` : ''}${blame}`
     return { winner: w, loser: l, wPts: wp, lPts: lp, text, playoff: g.playoff }
   }).sort((a, b) => (b.wPts - b.lPts) - (a.wPts - a.lPts))
 
@@ -105,13 +125,19 @@ export function currentIssue(lg: League): Issue | null {
   const upsetGame = [...odds].filter((o) => o.winner && o.pWinner < 0.4).sort((a, b) => a.pWinner - b.pWinner)[0]
   const leader = Object.entries(rNow).find(([, r]) => r === 1)?.[0]
   const headline = upsetGame
-    ? `${nm(upsetGame.winner!)} stuns ${nm(upsetGame.loser!)}`
+    ? pick([`${nm(upsetGame.winner!)} stuns ${nm(upsetGame.loser!)}`, `Upset alert: ${nm(upsetGame.winner!)} shocks ${nm(upsetGame.loser!)}`, `${nm(upsetGame.loser!)} gets got by ${nm(upsetGame.winner!)}`], week)
     : blow && blow.wPts - blow.lPts >= 40
-      ? `${nm(blow.winner)} flattens ${nm(blow.loser)}`
-      : top ? `${nm(top.id)} puts up ${f1(top.pts)} to own week ${week}` : `Week ${week} in the books`
+      ? pick([`${nm(blow.winner)} flattens ${nm(blow.loser)}`, `${nm(blow.winner)} sends ${nm(blow.loser)} to the shadow realm`, `Someone check on ${nm(blow.loser)}`], week)
+      : top ? pick([`${nm(top.id)} puts up ${f1(top.pts)} to own week ${week}`, `${f1(top.pts)}: ${nm(top.id)} was cooking`], week) : `Week ${week} in the books`
   const lede: string[] = []
-  if (top) lede.push(`${nm(top.id)} owned week ${week} with ${f1(top.pts)}, the top score in the league${top.pts > top.oppPts ? '' : ', and somehow still lost'}. At the other end, ${nm(low.id)} managed just ${f1(low.pts)}${low.pts < low.oppPts ? '' : ' and still won'}.`)
+  if (top) lede.push(`${nm(top.id)} owned week ${week} with ${f1(top.pts)}, the top score in the league${top.pts > top.oppPts ? '' : ', and somehow still lost. Fantasy football is a cruel mistress'}. At the other end, ${nm(low.id)} managed just ${f1(low.pts)}${low.pts < low.oppPts ? `, ${pick(['a performance best forgotten', 'which is less a score than a cry for help', 'and we will not be taking questions'], week)}` : ' and still won, which tells you everything about their opponent'}.`)
   if (close && blow && close !== blow) lede.push(`The tightest finish was ${nm(close.winner)} over ${nm(close.loser)} by ${f1(close.wPts - close.lPts)}, while ${nm(blow.winner)} won the biggest blowout by ${f1(blow.wPts - blow.lPts)}.`)
+  const hot = Object.entries(streak).sort(([, a], [, b]) => b - a)[0]
+  const cold = Object.entries(streak).sort(([, a], [, b]) => a - b)[0]
+  const streaks: string[] = []
+  if (hot && hot[1] >= 3) streaks.push(`${nm(hot[0])} has won ${hot[1]} straight and is starting to believe`)
+  if (cold && cold[1] <= -3) streaks.push(`${nm(cold[0])} has dropped ${-cold[1]} in a row and the trade block is looking tempting`)
+  if (streaks.length) lede.push(`On the streak watch: ${streaks.join(', while ')}.`)
   if (leader) {
     const r = now[leader]
     lede.push(rBefore[leader] === 1 ? `${nm(leader)} stays on top of the standings at ${rec(r.w, r.l, r.t)}.` : `${nm(leader)} takes over first place at ${rec(r.w, r.l, r.t)}.`)
@@ -164,7 +190,10 @@ export function currentIssue(lg: League): Issue | null {
     const fav = pA >= 0.5 ? g.a : g.b
     const series = h.w + h.l + h.t === 0 ? 'First ever meeting.' : h.w === h.l ? `The all-time series is tied ${rec(h.w, h.l, h.t)}.` : `${nm(h.w > h.l ? g.a : g.b)} leads the all-time series ${h.w > h.l ? rec(h.w, h.l, h.t) : rec(h.l, h.w, h.t)}.`
     const stakes = !g.playoff && now[g.a] && now[g.b] ? ` ${nm(g.a)} (${rec(now[g.a].w, now[g.a].l, now[g.a].t)}) vs ${nm(g.b)} (${rec(now[g.b].w, now[g.b].l, now[g.b].t)}).` : ''
-    const text = `${nm(fav)} is projected to win ${f1(Math.max(pa, pb))}–${f1(Math.min(pa, pb))} (${Math.round(Math.max(pA, 1 - pA) * 100)}%).${stakes} ${series}`
+    const p = Math.max(pA, 1 - pA)
+    const dog = fav === g.a ? g.b : g.a
+    const vibe = p >= 0.75 ? ` ${nm(dog)} will need a miracle, or at least a few injuries on the other side.` : p < 0.55 ? ' Coin flip. Set your lineups like you mean it.' : ''
+    const text = `${nm(fav)} is projected to win ${f1(Math.max(pa, pb))}–${f1(Math.min(pa, pb))} (${Math.round(p * 100)}%).${stakes} ${series}${vibe}`
     return { a: g.a, b: g.b, pA, projA: pa, projB: pb, text, playoff: g.playoff }
   })
   const gameOfWeek = [...preview].sort((x, y) => Math.abs(x.pA - 0.5) - Math.abs(y.pA - 0.5) || (y.projA + y.projB) - (x.projA + x.projB))[0] ?? null
