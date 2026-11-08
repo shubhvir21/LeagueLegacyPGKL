@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useLeague } from '../lib/data'
 import { Icon } from './Icon'
@@ -68,10 +69,50 @@ export function Stat({ label, value, icon, tip, tone }: { label: string; value: 
   )
 }
 
+/** Info icon that shows a definition bubble on hover, focus or tap. The bubble is rendered on
+ *  document.body so tables and cards that clip their overflow can't hide it. */
 export function Tip({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const bubble = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ x: number; top: number; bottom: number; below: boolean | null } | null>(null)
+  const show = () => {
+    const r = ref.current?.getBoundingClientRect()
+    if (r) setPos({ x: r.left + r.width / 2, top: r.top, bottom: r.bottom, below: null })
+  }
+  // Once the bubble's height is known, open it on whichever side it fits (above preferred).
+  useLayoutEffect(() => {
+    if (!pos || pos.below != null || !bubble.current) return
+    const h = bubble.current.scrollHeight
+    const fitsAbove = pos.top - 8 - h >= 8
+    setPos({ ...pos, below: !fitsAbove && window.innerHeight - pos.bottom > pos.top })
+  }, [pos])
+  const hide = () => setPos(null)
+  useEffect(() => {
+    if (!pos) return
+    const close = (e: Event) => { if (!ref.current?.contains(e.target as Node)) hide() }
+    window.addEventListener('scroll', hide, true)
+    window.addEventListener('pointerdown', close)
+    return () => { window.removeEventListener('scroll', hide, true); window.removeEventListener('pointerdown', close) }
+  }, [pos])
+  const W = Math.min(text.length > 240 ? 400 : 280, window.innerWidth - 24) // long definitions get a wider, shorter bubble
   return (
-    <span className="tip" tabIndex={0} aria-label={text} data-tip={text}>
+    <span
+      ref={ref} className={`tip ${pos ? 'open' : ''}`} tabIndex={0} role="button" aria-label={text}
+      onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}
+      onClick={(e) => { e.stopPropagation(); if (pos) hide(); else show() }}
+    >
       <Icon name="info" size={13} />
+      {pos && createPortal(
+        <div
+          ref={bubble} className="tip-bubble" role="tooltip"
+          style={{
+            width: W, left: Math.max(12, Math.min(window.innerWidth - W - 12, pos.x - W / 2)),
+            visibility: pos.below == null ? 'hidden' : 'visible',
+            ...(pos.below ? { top: pos.bottom + 8, maxHeight: window.innerHeight - pos.bottom - 20 } : { bottom: window.innerHeight - pos.top + 8, maxHeight: pos.top - 20 }),
+          }}
+        >{text}</div>,
+        document.body,
+      )}
     </span>
   )
 }

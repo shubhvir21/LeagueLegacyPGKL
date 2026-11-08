@@ -185,12 +185,12 @@ td b { color: var(--text); }
 tbody tr { transition: background .12s; }
 tbody tr:hover td { background: rgba(255,255,255,.025); }
 tbody tr:last-child td { border-bottom: 0; }
-.tip { display: inline-flex; color: #5c6270; cursor: help; position: relative; vertical-align: middle; }
-.tip:hover, .tip:focus { color: var(--text-2); }
-.tip:hover::after, .tip:focus::after {
-  content: attr(data-tip); position: absolute; z-index: 30; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
-  width: max-content; max-width: 260px; white-space: normal; text-transform: none; letter-spacing: 0; font-weight: 450; font-size: 12px; line-height: 1.45;
-  padding: 8px 10px; border-radius: 8px; background: #22262f; color: var(--text); border: 1px solid var(--border-strong); box-shadow: 0 10px 30px rgba(0,0,0,.5);
+.tip { display: inline-flex; color: #5c6270; cursor: pointer; position: relative; vertical-align: middle; }
+.tip:hover, .tip:focus, .tip.open { color: var(--text-2); outline: none; }
+.tip-bubble {
+  position: fixed; z-index: 1000; pointer-events: none; white-space: normal; overflow: hidden; text-transform: none; letter-spacing: 0;
+  font-weight: 450; font-size: 12.5px; line-height: 1.5; text-align: left;
+  padding: 9px 11px; border-radius: 9px; background: #22262f; color: var(--text); border: 1px solid var(--border-strong); box-shadow: 0 12px 32px rgba(0,0,0,.55);
 }
 
 /* ---------- People ---------- */
@@ -500,7 +500,6 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
   .trade-side + .trade-side { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
   .title-row .avatar { width: 52px !important; height: 52px !important; }
   .bracket-round { min-width: 230px; }
-  .tip:hover::after, .tip:focus::after { left: auto; right: -8px; transform: none; max-width: 220px; }
   td .member-link span, td .player-link span:last-child { max-width: 150px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
 }
 
@@ -737,8 +736,6 @@ tr.holder td:first-child { color: var(--gold); font-weight: 700; }
   .tabs, .rules-toc { -webkit-mask-image: linear-gradient(to right, #000 85%, transparent); mask-image: linear-gradient(to right, #000 85%, transparent); }
   .tabs { width: 100%; }
 
-  /* Tooltips stay on screen. */
-  .tip:hover::after, .tip:focus::after { position: fixed; left: 16px; right: 16px; bottom: auto; top: 30%; transform: none; max-width: none; width: auto; }
 
   /* iOS zooms into form fields under 16px; keep them at 16px. */
   select, input[type="text"], input[type="search"], input:not([type]) { font-size: 16px; }
