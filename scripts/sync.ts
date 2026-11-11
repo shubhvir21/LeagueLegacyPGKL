@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { fetchAll, type RawData } from '../src/lib/sleeper.ts'
 import { buildLeague } from '../src/lib/stats.ts'
 import { DEFAULT_MODEL, fitPlayers, type OddsModel } from '../src/lib/model.ts'
-import { backtest, fitResid } from '../src/lib/odds.ts'
+import { backtest, fitResid, freezeOdds } from '../src/lib/odds.ts'
 
 const FILE = 'public/data/league.json'
 const prev = existsSync(FILE) ? (JSON.parse(readFileSync(FILE, 'utf8')) as RawData) : undefined
@@ -23,6 +23,11 @@ raw.model = model
 console.log(`Model fit in ${Date.now() - t0}ms from ${model.samples} player-weeks: rho ${model.rho}, resid ${model.resid}, weight ${model.rosterWeight}`)
 for (const v of bt.variants) console.log(`  ${v.name.padEnd(13)} brier ${v.brier}  logloss ${v.logLoss}`)
 console.log(`  baseline      brier ${bt.baseline}`)
+
+// Re-fit the model before freezing so this week's snapshot uses the model it was published with.
+const year = Number(raw.nflState.season)
+const fw = freezeOdds(buildLeague(raw), year)
+console.log(fw == null ? 'Odds not frozen (next week already kicked off or season over).' : `Froze ${year} odds after week ${fw}.`)
 
 mkdirSync('public/data', { recursive: true })
 writeFileSync(FILE, JSON.stringify(raw))

@@ -26,7 +26,7 @@ export interface TeamOdds {
   ifLoss: number | null
 }
 
-export interface OddsRun { season: number; afterWeek: number; nextWeek: number | null; sims: number; rosterAware: boolean; teams: TeamOdds[] }
+export interface OddsRun { season: number; afterWeek: number; nextWeek: number | null; sims: number; rosterAware: boolean; teams: TeamOdds[]; frozenAt?: string }
 
 const PRIOR_WEEKS = 4 // the league mean counts as this many weeks of evidence
 const SD_PRIOR_WEEKS = 6
@@ -91,7 +91,6 @@ export function rosterPlan(lg: League, year: number, afterWeek: number, model: O
         let m = p > 0 ? (1 - a) * p + a * avg : 0 // no projection = bye / not playing
         const st = latest ? proj.status?.[pid] : undefined
         if (st && ((ahead === 0 && OUT.has(st)) || (ahead < 4 && LONG.has(st)))) m = 0
-        else if (st === 'Questionable' && ahead === 0) m *= 0.8
         return { pos, m, sd: m > 0 ? posSd(model, pos, m) : 0, nfl: nflOf(pid, pos) }
       })
       // One waiver-wire option per position, used only if it beats what's on the roster.
@@ -324,23 +323,43 @@ const modelOf = (lg: League) => lg.raw.model ?? DEFAULT_MODEL
 const optsAt = (lg: League, year: number, w: number, model = modelOf(lg), weight: number | null = model.rosterWeight): SimOpts =>
   ({ model, weight, plan: weight ? rosterPlan(lg, year, w, model) : null })
 
-/** Odds as of the latest scored regular-season week (or a chosen week). */
-export function playoffOdds(lg: League, year: number, afterWeek?: number, sims = 10000): OddsRun | null {
-  return memo(lg, `odds|${year}|${afterWeek}|${sims}`, () => {
+const frozenOf = (lg: League, year: number, w: number) => lg.raw.frozen?.[`${year}|${w}`]
+
+/** Odds as of the latest scored regular-season week (or a chosen week). A week whose odds were
+ *  frozen when published (right before the next week's first kickoff) returns that snapshot,
+ *  so rewinding shows what was shown live; pass live to re-simulate with today's data. */
+export function playoffOdds(lg: League, year: number, afterWeek?: number, sims = 10000, live = false): OddsRun | null {
+  return memo(lg, `odds|${year}|${afterWeek}|${sims}|${live}`, () => {
     const c = context(lg, year)
     if (!c) return null
     const w = Math.min(afterWeek ?? weeksScored(c), weeksScored(c))
-    return simulate(c, w, sims, year * 100 + (afterWeek ?? 99), optsAt(lg, year, w))
+    if (!live) { const f = frozenOf(lg, year, w); if (f) return f }
+    return simulate(c, w, sims, year * 100 + w, optsAt(lg, year, w))
   })
 }
 
-/** Odds re-run after every week of the season so far — the odds over time. */
+/** Odds re-run after every week of the season so far — the odds over time (frozen weeks as published). */
 export function oddsHistory(lg: League, year: number, sims = 1500): OddsRun[] {
   return memo(lg, `hist|${year}|${sims}`, () => {
     const c = context(lg, year)
     if (!c) return []
-    return Array.from({ length: weeksScored(c) + 1 }, (_, w) => simulate(c, w, sims, year * 1000 + w, optsAt(lg, year, w)))
+    return Array.from({ length: weeksScored(c) + 1 }, (_, w) => frozenOf(lg, year, w) ?? simulate(c, w, sims, year * 1000 + w, optsAt(lg, year, w)))
   })
+}
+
+/** Freeze the current week's odds unless the next week has kicked off (any points scored), so
+ *  the last sync before Thursday night's game is what sticks. Returns the frozen week or null. */
+export function freezeOdds(lg: League, year: number): number | null {
+  const raw = lg.raw.seasons.find((s) => Number(s.league.season) === year)
+  const c = context(lg, year)
+  if (!raw || !c || raw.league.status === 'complete') return null
+  const w = weeksScored(c)
+  const next = raw.matchups[w] ?? [] // week w+1
+  if (next.some((m) => Object.values(m.players_points ?? {}).some((p) => p !== 0))) return null
+  const run = playoffOdds(lg, year, w, 10000, true)
+  if (!run) return null
+  lg.raw.frozen = { ...lg.raw.frozen, [`${year}|${w}`]: { ...run, frozenAt: lg.raw.syncedAt } }
+  return w
 }
 
 /** Backtest: replay finished seasons from every week with each model variant and score the

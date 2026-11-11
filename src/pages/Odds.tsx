@@ -15,7 +15,7 @@ const heat = (x: number) => ({ background: `rgba(124, 140, 255, ${Math.min(0.85,
 
 const T = {
   rating: 'Expected points next week: the best lineup from the roster, blended with actual scoring at the weight the backtest picked. Without projections, actual scoring only.',
-  roster: 'Best possible lineup next week from the roster. Each player = Sleeper projection (bias-corrected per position) blended with his actual points this season; byes and Out/IR are zeroed, Questionable discounted, and an empty slot is filled by the best waiver-wire option.',
+  roster: 'Best possible lineup next week from the roster. Each player = Sleeper projection (bias-corrected per position) blended with his actual points this season; byes and Out/Doubtful/IR are zeroed (Questionable is left to Sleeper’s projection), and an empty slot is filled by the best waiver-wire option.',
   scoring: 'Actual points per week, recent weeks weighted more (6-week half-life), shrunk toward the league’s all-time average early in the year.',
   swing: 'Playoff odds if this team wins vs. loses its head-to-head game next week. The gap is how much the game matters.',
   model: 'Every simulation draws each team’s true scoring level (with uncertainty), plays the rest of the regular season including the median game, seeds by wins then points for, and plays the bracket.',
@@ -99,7 +99,7 @@ export function OddsSection() {
     <>
       <Card
         title="Simulation"
-        sub={`${busy ? 'Refining… ' : ''}${run.sims.toLocaleString()} simulated seasons as of ${week === 0 ? 'the preseason' : `week ${week}`}. Top ${P} make the playoffs${P === 6 ? ', top 2 get byes' : ''}. Drag to rewind the odds to any week.`}
+        sub={`${busy ? 'Refining… ' : ''}${run.sims.toLocaleString()} simulated seasons as of ${week === 0 ? 'the preseason' : `week ${week}`}${run.frozenAt ? ` (as published ${new Date(run.frozenAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })})` : ''}. Top ${P} make the playoffs${P === 6 ? ', top 2 get byes' : ''}. Drag to rewind the odds to any week.`}
         right={
           <select value={year} onChange={(e) => { setYear(Number(e.target.value)); setWeekSel(null) }}>
             {years.map((y) => <option key={y}>{y}</option>)}

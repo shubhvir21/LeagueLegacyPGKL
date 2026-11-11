@@ -1,5 +1,6 @@
 // Raw Sleeper API fetching. Shared by the browser Resync button and scripts/sync.ts.
 import type { OddsModel } from './model'
+import type { OddsRun } from './odds'
 
 export const CURRENT_LEAGUE_ID = '1362926045359013888'
 const API = 'https://api.sleeper.app/v1'
@@ -94,6 +95,8 @@ export interface RawData {
   seasons: RawSeason[] // oldest first
   players: PlayerMap
   model?: OddsModel // fitted offline by scripts/sync.ts (variance, bias, blend weight, backtest)
+  /** Odds as published, keyed "year|afterWeek", frozen right before the next week's first kickoff. */
+  frozen?: Record<string, OddsRun>
 }
 
 async function get<T>(path: string): Promise<T> {
@@ -196,7 +199,7 @@ export async function fetchAll(prev?: RawData, currentId = CURRENT_LEAGUE_ID): P
     id = s.league.previous_league_id
   }
   const nflState = await get<RawData['nflState']>('/state/nfl')
-  return { syncedAt: new Date().toISOString(), nflState, seasons, players: await fetchPlayers(seasons), model: prev?.model }
+  return { syncedAt: new Date().toISOString(), nflState, seasons, players: await fetchPlayers(seasons), model: prev?.model, frozen: prev?.frozen }
 }
 
 /** Sleeper's full player list is large; keep only players who appear in this league. */
