@@ -15,7 +15,7 @@ const heat = (x: number) => ({ background: `rgba(124, 140, 255, ${Math.min(0.85,
 
 const T = {
   rating: 'Expected points next week: the best lineup from the roster, blended with actual scoring at the weight the backtest picked. Without projections, actual scoring only.',
-  roster: 'Best possible lineup next week from the roster. Each player = Sleeper projection (bias-corrected per position) blended with his actual points this season; byes and Out/Doubtful/IR are zeroed (Questionable is left to Sleeper’s projection), and an empty slot is filled by the best waiver-wire option.',
+  roster: 'Best possible lineup next week from the roster. Each player = Sleeper projection (bias-corrected per position) blended with his actual points this season; byes are zeroed, Out/Doubtful/IR players sit out next week, and later weeks follow Sleeper’s projection (which builds in return dates), and an empty slot is filled by the best waiver-wire option.',
   scoring: 'Actual points per week, recent weeks weighted more (6-week half-life), shrunk toward the league’s all-time average early in the year.',
   swing: 'Playoff odds if this team wins vs. loses its head-to-head game next week. The gap is how much the game matters.',
   model: 'Every simulation draws each team’s true scoring level (with uncertainty), plays the rest of the regular season including the median game, seeds by wins then points for, and plays the bracket.',

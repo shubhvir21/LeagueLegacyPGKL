@@ -32,7 +32,6 @@ const PRIOR_WEEKS = 4 // the league mean counts as this many weeks of evidence
 const SD_PRIOR_WEEKS = 6
 const HALF_LIFE = 6 // weeks: recent scores count more
 const OUT = new Set(['Out', 'Doubtful', 'IR', 'PUP', 'NA', 'Sus', 'DNR', 'COV'])
-const LONG = new Set(['IR', 'PUP', 'NA'])
 
 interface Starter { m: number; sd: number; nfl: number } // nfl: index for correlated draws, -1 = independent
 interface WeekPlan { R: number; starters: Starter[] }
@@ -90,7 +89,9 @@ export function rosterPlan(lg: League, year: number, afterWeek: number, model: O
         const a = xs.length ? (0.5 * xs.length) / (xs.length + 6) : 0
         let m = p > 0 ? (1 - a) * p + a * avg : 0 // no projection = bye / not playing
         const st = latest ? proj.status?.[pid] : undefined
-        if (st && ((ahead === 0 && OUT.has(st)) || (ahead < 4 && LONG.has(st)))) m = 0
+        // Status is the freshest news for next week; later weeks trust Sleeper's projection,
+        // which already builds in the expected return date.
+        if (st && ahead === 0 && OUT.has(st)) m = 0
         return { pos, m, sd: m > 0 ? posSd(model, pos, m) : 0, nfl: nflOf(pid, pos) }
       })
       // One waiver-wire option per position, used only if it beats what's on the roster.
