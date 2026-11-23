@@ -20,13 +20,13 @@ export interface TeamOdds {
   bye: number
   final: number
   title: number
-  last: number // finish last in the regular season
+  last: number // lose the toilet bowl (losers bracket, lower score advances)
   seeds: number[] // probability of each seed, index 0 = 1 seed
   ifWin: number | null // playoff odds if they win next week's head-to-head
   ifLoss: number | null
 }
 
-export interface OddsRun { season: number; afterWeek: number; nextWeek: number | null; sims: number; rosterAware: boolean; teams: TeamOdds[]; frozenAt?: string }
+export interface OddsRun { season: number; afterWeek: number; nextWeek: number | null; sims: number; rosterAware: boolean; teams: TeamOdds[]; frozenAt?: string; toiletLast?: boolean }
 
 const PRIOR_WEEKS = 4 // the league mean counts as this many weeks of evidence
 const SD_PRIOR_WEEKS = 6
@@ -269,13 +269,26 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
     }
     const order = ids.map((_, i) => i).sort((a, b) => W[b] - W[a] || PF[b] - PF[a])
     order.forEach((t, place) => { seeds[t][place]++ })
-    acc.last[order[n - 1]]++
     for (let i = 0; i < n; i++) acc.wins[i] += W[i]
     const field = order.slice(0, P)
     field.forEach((t, k) => { acc.po[t]++; if (k < byes) acc.bye[t]++ })
     if (nextWeek) for (let i = 0; i < n; i++) if (nextOpp[i] >= 0) {
       const made = field.includes(i) ? 1 : 0
       if (nextWon[i]) { winN[i]++; winPo[i] += made } else { lossN[i]++; lossPo[i] += made }
+    }
+    // Toilet bowl: non-playoff teams, best vs worst each round, the lower score advances;
+    // whoever 'wins' the last round finishes last.
+    let tb = order.slice(P), tr = season.playoffStart
+    if (tb.length) {
+      while (tb.length > 1) {
+        newWeek()
+        const adv: number[] = []
+        for (let k = 0; k < Math.floor(tb.length / 2); k++) { const a = tb[k], b = tb[tb.length - 1 - k]; adv.push(play(a, tr) < play(b, tr) ? a : b) }
+        if (tb.length % 2) adv.push(tb[Math.floor(tb.length / 2)])
+        tb = adv.sort((a, b) => order.indexOf(a) - order.indexOf(b))
+        tr++
+      }
+      acc.last[tb[0]]++
     }
     // Bracket: higher seed plays lowest remaining seed each round.
     let round = season.playoffStart
@@ -310,7 +323,7 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
     ifWin: nextWeek && winN[i] ? winPo[i] / winN[i] : null,
     ifLoss: nextWeek && lossN[i] ? lossPo[i] / lossN[i] : null,
   })).sort((a, b) => b.playoff - a.playoff || b.title - a.title)
-  return { season: season.year, afterWeek, nextWeek, sims, rosterAware, teams }
+  return { season: season.year, afterWeek, nextWeek, sims, rosterAware, teams, toiletLast: true }
 }
 
 const cache = new WeakMap<League, Record<string, unknown>>()
@@ -324,7 +337,14 @@ const modelOf = (lg: League) => lg.raw.model ?? DEFAULT_MODEL
 const optsAt = (lg: League, year: number, w: number, model = modelOf(lg), weight: number | null = model.rosterWeight): SimOpts =>
   ({ model, weight, plan: weight ? rosterPlan(lg, year, w, model) : null })
 
-const frozenOf = (lg: League, year: number, w: number) => lg.raw.frozen?.[`${year}|${w}`]
+// Snapshots frozen before 'last' meant losing the toilet bowl stored standings-last odds; keep
+// everything else as published and fill in toilet-bowl odds from a fresh run.
+const frozenOf = (lg: League, year: number, w: number, c: Ctx): OddsRun | undefined => {
+  const f = lg.raw.frozen?.[`${year}|${w}`]
+  if (!f || f.toiletLast) return f
+  const fresh = Object.fromEntries(simulate(c, w, 10000, year * 100 + w, optsAt(lg, year, w)).teams.map((t) => [t.memberId, t.last]))
+  return { ...f, toiletLast: true, teams: f.teams.map((t) => ({ ...t, last: fresh[t.memberId] ?? t.last })) }
+}
 
 /** Odds as of the latest scored regular-season week (or a chosen week). A week whose odds were
  *  frozen when published (right before the next week's first kickoff) returns that snapshot,
@@ -334,7 +354,7 @@ export function playoffOdds(lg: League, year: number, afterWeek?: number, sims =
     const c = context(lg, year)
     if (!c) return null
     const w = Math.min(afterWeek ?? weeksScored(c), weeksScored(c))
-    if (!live) { const f = frozenOf(lg, year, w); if (f) return f }
+    if (!live) { const f = frozenOf(lg, year, w, c); if (f) return f }
     return simulate(c, w, sims, year * 100 + w, optsAt(lg, year, w))
   })
 }
@@ -344,7 +364,7 @@ export function oddsHistory(lg: League, year: number, sims = 1500): OddsRun[] {
   return memo(lg, `hist|${year}|${sims}`, () => {
     const c = context(lg, year)
     if (!c) return []
-    return Array.from({ length: weeksScored(c) + 1 }, (_, w) => frozenOf(lg, year, w) ?? simulate(c, w, sims, year * 1000 + w, optsAt(lg, year, w)))
+    return Array.from({ length: weeksScored(c) + 1 }, (_, w) => frozenOf(lg, year, w, c) ?? simulate(c, w, sims, year * 1000 + w, optsAt(lg, year, w)))
   })
 }
 

@@ -87,7 +87,7 @@ export function OddsSection() {
     { key: 'by', label: 'Bye', render: (t) => p(t.bye), sort: (t) => t.bye, align: 'right' },
     { key: 'f', label: 'Final', render: (t) => p(t.final), sort: (t) => t.final, align: 'right' },
     { key: 't', label: 'Title', render: (t) => <b className="pos">{p(t.title)}</b>, sort: (t) => t.title, align: 'right' },
-    { key: 'l', label: 'Last', render: (t) => <span className="neg">{p(t.last)}</span>, sort: (t) => t.last, align: 'right' },
+    { key: 'l', label: 'Toilet Bowl', tip: 'Odds of losing the toilet bowl (finishing last)', render: (t) => <span className="neg">{p(t.last)}</span>, sort: (t) => t.last, align: 'right' },
     ...(run.nextWeek ? [{
       key: 'sw', label: `W${run.nextWeek} Win / Loss`, tip: T.swing, align: 'right' as const,
       sort: (t: TeamOdds) => (t.ifWin ?? 0) - (t.ifLoss ?? 0),
