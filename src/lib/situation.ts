@@ -1,6 +1,7 @@
 // Live game situation (clock, possession, down & distance) from ESPN's public scoreboard, which allows browser CORS.
 // The odds Worker only knows score and quarter, so this is a separate, display-only feed keyed by NFL team.
 import { normalizeTeam, type LiveFeed } from './live'
+import { etDate } from './scope'
 
 const SCOREBOARD_URL = 'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard'
 
@@ -14,7 +15,8 @@ export interface GameSituation {
 }
 
 interface EspnCompetitor { id: string; team: { abbreviation: string } }
-interface EspnEvent {
+export interface EspnEvent {
+  date: string
   status: { displayClock: string; period: number; type: { state: string; name: string } }
   competitions: {
     competitors: EspnCompetitor[]
@@ -22,8 +24,12 @@ interface EspnEvent {
   }[]
 }
 
-export function parseFinishedTeams(events: EspnEvent[]): Set<string> {
-  const teams = events.filter((e) => e.status.type.state === 'post').flatMap((e) => e.competitions[0].competitors.map((c) => normalizeTeam(c.team.abbreviation)))
+/**
+ * The teams whose game on one of the given dates is over. A team that finished last week says nothing
+ * about this week's games, which are still to be played.
+ */
+export function parseFinishedTeams(events: EspnEvent[], dates: Set<string>): Set<string> {
+  const teams = events.filter((e) => e.status.type.state === 'post' && dates.has(etDate(e.date))).flatMap((e) => e.competitions[0].competitors.map((c) => normalizeTeam(c.team.abbreviation)))
   return new Set(teams)
 }
 
@@ -63,11 +69,11 @@ export function applyFinals(feed: LiveFeed | null, finishedTeams: Set<string>): 
   return { ...feed, games }
 }
 
-export interface EspnSnapshot { situations: Map<string, GameSituation>; finishedTeams: Set<string> }
+export interface EspnSnapshot { events: EspnEvent[]; situations: Map<string, GameSituation> }
 
 export async function fetchEspnSnapshot(): Promise<EspnSnapshot> {
   const res = await fetch(SCOREBOARD_URL)
   if (!res.ok) throw new Error(`ESPN scoreboard returned ${res.status}, expected 200`)
   const body = (await res.json()) as { events: EspnEvent[] }
-  return { situations: parseSituations(body.events), finishedTeams: parseFinishedTeams(body.events) }
+  return { events: body.events, situations: parseSituations(body.events) }
 }

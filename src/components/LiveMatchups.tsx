@@ -7,7 +7,8 @@ import {
 import { DEFAULT_MODEL } from '../lib/model'
 import { lineupSlots } from '../lib/lineup'
 import { playersOf, type PlayerInfo } from '../lib/players'
-import { applyFinals, fetchEspnSnapshot, type EspnSnapshot, type GameSituation } from '../lib/situation'
+import { selectWeekGames } from '../lib/scope'
+import { applyFinals, fetchEspnSnapshot, parseFinishedTeams, type EspnSnapshot, type GameSituation } from '../lib/situation'
 import type { SleeperMatchup, SleeperRoster } from '../lib/sleeper'
 import { fmt, type League } from '../lib/stats'
 import { currentEra } from '../lib/tenure'
@@ -15,7 +16,7 @@ import { Avatar, TeamName } from './ui'
 
 const REFRESH_MS = 60_000
 const SITUATION_REFRESH_MS = 15_000
-const EMPTY_ESPN: EspnSnapshot = { situations: new Map(), finishedTeams: new Set() }
+const EMPTY_ESPN: EspnSnapshot = { events: [], situations: new Map() }
 const STALE_MINUTES = 15
 const SLOT_LABEL: Record<string, string> = { SUPER_FLEX: 'SF', FLEX: 'FLX', REC_FLEX: 'FLX', WRRB_FLEX: 'FLX' }
 
@@ -67,6 +68,7 @@ export function LiveMatchups() {
   const [matchups, setMatchups] = useState<SleeperMatchup[]>([])
   const [rosters, setRosters] = useState<SleeperRoster[]>([])
   const [freshProjections, setFreshProjections] = useState<Record<string, number>>({})
+  const [gameDates, setGameDates] = useState<string[]>([])
   const [rawFeed, setFeed] = useState<LiveFeed | null>(null)
   const [feedError, setFeedError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -79,7 +81,9 @@ export function LiveMatchups() {
       setWeek(w)
       setMatchups(await fetchMatchups(w))
       setRosters(await fetchRosters())
-      setFreshProjections(await fetchSleeperProjections(w))
+      const projections = await fetchSleeperProjections(w)
+      setFreshProjections(projections.points)
+      setGameDates(projections.gameDates)
       setError(null)
     } catch (e) {
       setError(`Could not load matchups from Sleeper: ${(e as Error).message}`)
@@ -105,8 +109,11 @@ export function LiveMatchups() {
     return () => clearInterval(id)
   }, [])
 
-  const { situations, finishedTeams } = espn
-  const feed = useMemo(() => applyFinals(rawFeed, finishedTeams), [rawFeed, finishedTeams])
+  const { situations } = espn
+  // The feed carries other weeks' games; only this week's count towards a starter's projection.
+  const dates = useMemo(() => new Set(gameDates), [gameDates])
+  const finishedTeams = useMemo(() => parseFinishedTeams(espn.events, dates), [espn, dates])
+  const feed = useMemo(() => applyFinals(selectWeekGames(rawFeed, dates), finishedTeams), [rawFeed, finishedTeams, dates])
   const live = useMemo(() => indexBySleeperId(feed), [feed])
   // Fresh Sleeper numbers win; the nightly snapshot only fills gaps if the live fetch returned nothing for a player.
   const snapshot = week ? raw?.projections?.weeks[String(week)] : undefined
