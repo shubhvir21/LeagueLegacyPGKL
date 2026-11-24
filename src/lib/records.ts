@@ -60,7 +60,7 @@ export function buildRecords(lg: League): RecordDef[] {
   const regTw = tw.filter((t) => !t.playoff)
   const defs: RecordDef[] = []
   // Postseason records live in their own chapter, whichever helper builds them.
-  const PLAYOFF_IDS = new Set(['titles', 'podiums', 'playoffs', 'semis', 'pwins', 'popct', 'popct-low', 'toilet', 's-run', 's-miss', 'st-nopo'])
+  const PLAYOFF_IDS = new Set(['titles', 'podiums', 'playoffs', 'semis', 'byes', 'pwins', 'popct', 'popct-low', 'toilet', 's-run', 's-miss'])
   const add = (category: Category, id: string, title: string, desc: string, positive: boolean, rows: RecordRow[]) =>
     defs.push({ id, category: PLAYOFF_IDS.has(id) ? 'Playoffs' : category, title, desc, positive, rows })
 
@@ -133,6 +133,10 @@ export function buildRecords(lg: League): RecordDef[] {
   detail.semis = (r) => years(semisSeasons(r.member.id))
   career('playoffs', 'Most Playoff Appearances', 'Seasons reaching the winners bracket.', true, (r) => r.playoffs, (r) => String(r.playoffs))
   career('semis', 'Most Semifinal Appearances', 'Seasons reaching the semifinals (byes count).', true, (r) => semisOf(r.member.id), (r) => String(semisOf(r.member.id)))
+  // Byes: a top-2 regular-season finish in a season with a 6-team bracket.
+  const byeSeasons = (id: string) => tsDone.filter((t) => t.memberId === id && t.madePlayoffs && t.regRank <= 2 && lg.seasons.find((x) => x.year === t.season)?.playoffTeams === 6).map((t) => t.season)
+  detail.byes = (r) => years(byeSeasons(r.member.id))
+  career('byes', 'Most Playoff Byes', 'Seasons earning a first-round bye (top-2 regular-season finish).', true, (r) => byeSeasons(r.member.id).length, (r) => String(byeSeasons(r.member.id).length))
   career('pwins', 'Most Playoff Wins', 'Winners-bracket games won.', true, (r) => r.playoffW, (r) => String(r.playoffW))
   careerOf(cr.filter((r) => r.avgFinish != null), 'avgfinish', 'Best Average Finish', 'Average final place across completed seasons.', true, (r) => r.avgFinish!, (r) => r.avgFinish!.toFixed(1), true)
   career('coach', 'Best Career Coach Score', 'All-time points ÷ max possible points from your rosters.', true, (r) => coachOf(r.member.id), (r) => coachOf(r.member.id).toFixed(1))
@@ -199,6 +203,13 @@ export function buildRecords(lg: League): RecordDef[] {
   weekly('m-close', 'Closest Win', 'Smallest margin of victory.', true, realTw.filter((t) => t.pts > t.oppPts), (t) => t.pts - t.oppPts, true)
   weekly('m-hiloss', 'Highest Score in a Loss', 'Most points while losing.', false, realTw.filter((t) => t.pts < t.oppPts), (t) => t.pts)
   weekly('m-lowin', 'Lowest Score in a Win', 'Fewest points while winning.', false, realTw.filter((t) => t.pts > t.oppPts), (t) => t.pts, true)
+  const weekMedian: Record<string, number> = {}
+  for (const key of new Set(regTw.map((t) => `${t.season}-${t.week}`))) {
+    const ps = regTw.filter((t) => `${t.season}-${t.week}` === key && t.pts > 0).map((t) => t.pts).sort((a, b) => a - b)
+    if (ps.length) weekMedian[key] = (ps[Math.floor((ps.length - 1) / 2)] + ps[Math.ceil((ps.length - 1) / 2)]) / 2
+  }
+  weekly('m-himed', 'Highest Score Below the Median', 'Most points in a regular-season week that still lost the median game.', false,
+    realTw.filter((t) => !t.playoff && t.pts <= (weekMedian[`${t.season}-${t.week}`] ?? -1)), (t) => t.pts)
   const games = lg.games.filter((g) => g.aPts > 0 && g.bPts > 0)
   const gameRow = (g: Game, v: number): RecordRow => {
     const [w, l] = g.aPts >= g.bPts ? [g.a, g.b] : [g.b, g.a]
@@ -334,6 +345,24 @@ export function buildRecords(lg: League): RecordDef[] {
   const waiverNet = (id: string) => pm.moves.filter((m) => m.memberId === id).reduce((a, m) => a + m.value, 0)
   add('Front Office', 'fo-waiver', 'Best Waiver Wire Career', 'Total lineup points gained from pickups.', true,
     top(ids, waiverNet).map((id) => ({ memberId: id, value: waiverNet(id), display: signed(waiverNet(id)), context: `${pm.moves.filter((m) => m.memberId === id).length} adds`, link: `/member/${id}` })))
+  const haul: Record<string, number> = {}
+  for (const m of pm.moves) haul[`${m.season}|${m.memberId}`] = (haul[`${m.season}|${m.memberId}`] ?? 0) + m.value
+  const haulOf = (t: TeamSeason) => haul[`${t.season}|${t.memberId}`] ?? 0
+  add('Front Office', 'fo-haul', 'Best Single-Season Waiver Haul', 'Lineup points gained from pickups in one season.', true,
+    top(tsAll, haulOf).filter((t) => haulOf(t) > 0).map((t) => ({ memberId: t.memberId, value: haulOf(t), display: signed(haulOf(t)), context: `${ctx(t)} · ${movesOf(t)} adds`, link: `/season/${t.season}/team/${t.memberId}` })))
+  // Churn: distinct players on the roster in any scored week (drafted, added or traded for).
+  const rostered: Record<string, Set<string>> = {}
+  for (const w of pm.weeks) (rostered[`${w.season}|${w.memberId}`] ??= new Set()).add(w.playerId)
+  const churnOf = (t: TeamSeason) => rostered[`${t.season}|${t.memberId}`]?.size ?? 0
+  add('Front Office', 'fo-churn', 'Most Players Rostered in a Season', 'Different players on your roster in any week: drafted, added or traded for.', true,
+    top(tsAll, churnOf).map((t) => ({ memberId: t.memberId, value: churnOf(t), display: String(churnOf(t)), context: ctx(t), link: `/season/${t.season}/team/${t.memberId}` })))
+  const pairTrades: Record<string, number> = {}
+  for (const t of pm.trades) {
+    const ms = [...new Set(t.sides.map((sd) => sd.memberId))].sort()
+    for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) pairTrades[`${ms[i]}|${ms[j]}`] = (pairTrades[`${ms[i]}|${ms[j]}`] ?? 0) + 1
+  }
+  add('Front Office', 'fo-partners', 'Most Trades Between Two Teams', "The league's favorite trading partners.", true,
+    top(Object.entries(pairTrades), ([, n]) => n).map(([k, n]) => { const [a, b] = k.split('|'); return { memberId: a, memberId2: b, value: n, display: String(n), context: `${name(a)} ↔ ${name(b)}`, link: `/versus/${a}/${b}` } }))
 
   // ---------- Streaks & droughts ----------
   const members = cr.map((r) => r.member.id)
