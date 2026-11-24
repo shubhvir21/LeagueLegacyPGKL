@@ -1,6 +1,7 @@
-import { useId } from 'react'
+import { useId, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useLeague } from '../lib/data'
+import { buildRecords } from '../lib/records'
 import { fmt, record, type League } from '../lib/stats'
 import { Card } from './ui'
 
@@ -38,10 +39,17 @@ export function TrophyRoom({ id }: { id: string }) {
   const champs = awards.filter((a) => a.kind === 'champ')
   const rest = awards.filter((a) => a.kind !== 'champ')
   const count = (k: Kind) => awards.filter((a) => a.kind === k).length
-  const sub = ORDER.filter((k) => count(k)).map((k) => `${count(k)} × ${LABEL[k]}`).join(' · ')
+  const defs = useMemo(() => buildRecords(lg), [lg])
+  // Record Book entries where this member holds #1 (ties count), records before chud-cords.
+  const held = defs.flatMap((d) => {
+    const r = d.rows.find((x) => x.value === d.rows[0]?.value && (x.memberId === id || x.memberId2 === id))
+    return r ? [{ d, r }] : []
+  }).sort((a, b) => Number(b.d.positive) - Number(a.d.positive))
+  const sub = [...ORDER.filter((k) => count(k)).map((k) => `${count(k)} × ${LABEL[k]}`),
+    ...(held.length ? [`${held.filter((x) => x.d.positive).length} records · ${held.filter((x) => !x.d.positive).length} chud-cords`] : [])].join(' · ')
   return (
     <Card title="Trophy Room" sub={sub || undefined}>
-      {!awards.length && <p className="muted">The shelf is empty… for now.</p>}
+      {!awards.length && !held.length && <p className="muted">The shelf is empty… for now.</p>}
       {champs.length > 0 && (
         <div className="trophy-shelf champ">
           {champs.map((a, i) => <TrophyItem key={a.kind + a.year} a={a} nth={i + 1} />)}
@@ -50,6 +58,22 @@ export function TrophyRoom({ id }: { id: string }) {
       {rest.length > 0 && (
         <div className="trophy-shelf">
           {rest.map((a) => <TrophyItem key={a.kind + a.year} a={a} />)}
+        </div>
+      )}
+      {held.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Record Book</th><th className="right">Mark</th><th>When</th></tr></thead>
+            <tbody>
+              {held.map(({ d, r }) => (
+                <tr key={d.id}>
+                  <td title={d.desc}><span className={d.positive ? 'pos' : 'neg'}>{d.positive ? '★' : '✗'}</span> <Link to="/records">{d.title}</Link> <span className="muted small">{d.category}</span></td>
+                  <td className="right"><b>{r.display}</b></td>
+                  <td className="muted small">{r.link ? <Link to={r.link}>{r.context}</Link> : r.context}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </Card>
