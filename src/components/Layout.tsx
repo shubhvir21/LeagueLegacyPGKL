@@ -4,8 +4,8 @@ import { useData } from '../lib/data'
 import { Icon } from './Icon'
 import { SearchPalette } from './Search'
 
-type NavItem = { to: string; label: string; icon: string; end?: boolean; also?: string }
-const NAV: { group: string; items: NavItem[] }[] = [
+export type NavItem = { to: string; label: string; icon: string; end?: boolean; also?: string }
+export const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'League',
     items: [
@@ -54,10 +54,10 @@ const TABS: NavItem[] = [
   { to: '/playoffs', label: 'Playoffs', icon: 'trophy' },
 ]
 const TAB_PATHS = new Set(TABS.map((t) => t.to))
-const MORE = NAV.map((g) => ({ ...g, items: g.items.filter((n) => !TAB_PATHS.has(n.to)) })).filter((g) => g.items.length)
-const isOn = (n: NavItem, path: string) => (n.end ? path === n.to : path === n.to || path.startsWith(n.to + '/')) || (!!n.also && path.startsWith(n.also))
+export const MORE = NAV.map((g) => ({ ...g, items: g.items.filter((n) => !TAB_PATHS.has(n.to)) })).filter((g) => g.items.length)
+export const isOn = (n: NavItem, path: string) => (n.end ? path === n.to : path === n.to || path.startsWith(n.to + '/')) || (!!n.also && path.startsWith(n.also))
 
-function ago(iso: string) {
+export function ago(iso: string) {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
   if (m < 1) return 'just now'
   if (m < 60) return `${m}m ago`
@@ -69,7 +69,6 @@ export default function Layout() {
   const { league, error, syncing, resync } = useData()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState(false)
-  const [more, setMore] = useState(false)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing = e.target instanceof HTMLElement && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')
@@ -79,8 +78,8 @@ export default function Layout() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const loc = useLocation()
-  useEffect(() => { setOpen(false); setMore(false); window.scrollTo(0, 0) }, [loc.pathname])
-  useEffect(() => { document.body.classList.toggle('no-scroll', open || more) }, [open, more])
+  useEffect(() => { setOpen(false); window.scrollTo(0, 0) }, [loc.pathname])
+  useEffect(() => { document.body.classList.toggle('no-scroll', open) }, [open])
   const moreActive = !TABS.some((t) => isOn(t, loc.pathname))
 
   const brand = (
@@ -133,42 +132,17 @@ export default function Layout() {
         </div>
       </aside>
 
-      <div className={`scrim more-scrim ${more ? 'show' : ''}`} onClick={() => setMore(false)} />
-      <div className={`more-sheet ${more ? 'open' : ''}`} role="dialog" aria-label="More pages" aria-hidden={!more}>
-        <div className="more-grab" />
-        {MORE.map((g) => (
-          <div key={g.group} className="more-group">
-            <div className="nav-label">{g.group}</div>
-            <div className="more-grid">
-              {g.items.map((n) => (
-                <NavLink key={n.to} to={n.to} end={n.end} tabIndex={more ? 0 : -1} className={() => (isOn(n, loc.pathname) ? 'more-item active' : 'more-item')}>
-                  <Icon name={n.icon} size={20} />
-                  <span>{n.label}</span>
-                </NavLink>
-              ))}
-            </div>
-          </div>
-        ))}
-        <div className="more-sync">
-          <button className="btn" onClick={resync} disabled={syncing} tabIndex={more ? 0 : -1}>
-            <Icon name="refresh" size={15} className={syncing ? 'spin' : ''} />
-            {syncing ? 'Syncing…' : 'Resync from Sleeper'}
-          </button>
-          {league && <div className="sync-meta"><span className="dot" /> Synced {ago(league.syncedAt)}</div>}
-        </div>
-      </div>
-
       <nav className="tabbar" aria-label="Main">
         {TABS.map((t) => (
-          <NavLink key={t.to} to={t.to} end={t.end} className={() => (!more && isOn(t, loc.pathname) ? 'tabbar-item active' : 'tabbar-item')} onClick={() => setMore(false)}>
+          <NavLink key={t.to} to={t.to} end={t.end} className={() => (isOn(t, loc.pathname) ? 'tabbar-item active' : 'tabbar-item')}>
             <Icon name={t.icon} size={22} />
             <span>{t.label}</span>
           </NavLink>
         ))}
-        <button className={more || moreActive ? 'tabbar-item active' : 'tabbar-item'} onClick={() => setMore((m) => !m)} aria-expanded={more}>
+        <NavLink to="/more" className={() => (moreActive ? 'tabbar-item active' : 'tabbar-item')}>
           <Icon name="menu" size={22} />
           <span>More</span>
-        </button>
+        </NavLink>
       </nav>
 
       {league && <SearchPalette lg={league} pages={PAGES} open={search} onClose={() => setSearch(false)} />}
