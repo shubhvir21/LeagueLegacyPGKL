@@ -14,7 +14,7 @@
     { "src": "icons/maskable-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Playoff Odds", "url": "./#/odds", "icons": [{ "src": "icons/icon-192.png?v=2", "sizes": "192x192" }] },
-    { "name": "Power Rankings", "url": "./#/power", "icons": [{ "src": "icons/icon-192.png?v=2", "sizes": "192x192" }] }
+    { "name": "Playoffs", "url": "./#/playoffs", "icons": [{ "src": "icons/icon-192.png?v=2", "sizes": "192x192" }] },
+    { "name": "Matchups", "url": "./#/matchups", "icons": [{ "src": "icons/icon-192.png?v=2", "sizes": "192x192" }] }
   ]
 }
