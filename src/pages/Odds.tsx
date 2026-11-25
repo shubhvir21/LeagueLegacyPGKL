@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CartesianGrid, Legend, Line, ReferenceLine, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
-import type { GameSwing, OddsRun, ScenarioRun, TeamOdds, TeamScenario } from '../lib/odds'
+import type { GameSwing, OddsRun, ScenarioRun, TeamOdds, TeamScenario, Threshold } from '../lib/odds'
 import type { League } from '../lib/stats'
 import type { OddsRequest } from '../lib/odds.worker'
 import { fmt, record } from '../lib/stats'
@@ -187,53 +187,56 @@ const better = (k: number, g: number) => (k === g ? `${rec(k, g)}` : `${rec(k, g
 const worse = (k: number, g: number) => (k === 0 ? `${rec(k, g)}` : `${rec(k, g)} or worse`)
 
 /** Plain statements from the simulations: what happened in every simulated finish, or in none. */
-function clinchLines(t: TeamScenario, byes: boolean): { tone: 'pos' | 'neg' | 'gold' | 'muted'; text: string }[] {
+function clinchLines(t: TeamScenario, byes: boolean, name: (id: string) => string): { tone: 'pos' | 'neg' | 'gold' | 'muted'; text: string }[] {
   const g = t.games
   const out: { tone: 'pos' | 'neg' | 'gold' | 'muted'; text: string }[] = []
+  const list = (ids: string[]) => ids.length < 3 ? ids.map(name).join(' and ') : `${ids.slice(0, -1).map(name).join(', ')} and ${name(ids[ids.length - 1])}`
+  const tie = (T: Threshold, what: string, tone: 'pos' | 'gold') => {
+    if (T.tiebreak) out.push({ tone, text: `clinches ${what} at ${better(T.tiebreak.at, g)}${T.tiebreak.rivals.length ? `, as long as they finish ahead of ${list(T.tiebreak.rivals)} on points for if tied` : ', as long as they win any points-for tiebreak'}` })
+  }
   const P = t.playoffT
   if (P.all) out.push({ tone: 'pos', text: 'has clinched a playoff spot' })
   else if (P.never) { out.push({ tone: 'neg', text: 'is eliminated' }); return out }
   else {
     if (P.clinchAt != null) out.push({ tone: 'pos', text: `clinches a playoff spot at ${better(P.clinchAt, g)}` })
-    else out.push({ tone: 'muted', text: `can’t clinch on their own, even at ${rec(g, g)}: they need help` })
+    tie(P, 'a playoff spot', 'pos')
+    if (P.clinchAt == null && !P.tiebreak) out.push({ tone: 'muted', text: `can’t clinch on their own, even at ${rec(g, g)}: they need help` })
     if (P.outAt != null) out.push({ tone: 'neg', text: `is eliminated at ${worse(P.outAt, g)}` })
   }
-  const step = (T: typeof P, what: string) => {
+  const step = (T: Threshold, what: string) => {
     if (T.never) return
     if (T.all) out.push({ tone: 'gold', text: `has clinched ${what}` })
-    else if (T.clinchAt != null) out.push({ tone: 'gold', text: `clinches ${what} at ${better(T.clinchAt, g)}` })
-    else out.push({ tone: 'muted', text: `can still get ${what}, but only with help` })
+    else {
+      if (T.clinchAt != null) out.push({ tone: 'gold', text: `clinches ${what} at ${better(T.clinchAt, g)}` })
+      tie(T, what, 'gold')
+      if (T.clinchAt == null && !T.tiebreak) out.push({ tone: 'muted', text: `can still get ${what}, but only with help` })
+    }
   }
   if (byes) step(t.byeT, 'a bye')
   step(t.topT, 'the 1 seed')
   return out
 }
 
-/** Above the simulation: plain-language clinch and elimination scenarios for every team. */
+/** Above the simulation: what can be clinched or lost next week. Hidden when nothing can. */
 export function ClinchSection() {
   const lg = useLeague()
   const season = lg.seasons[0]
   const run = useScenarios(lg, season.year, !season.complete)
-  if (season.complete) return null
-  if (!run) return <Card title="Clinch Scenarios"><p className="muted">Working out every team’s path…</p></Card>
-  const g = run.teams[0]?.games ?? 0
-  if (!g) return null
+  if (season.complete || !run || !run.nextWeek || !run.weekLines.length) return null
+  const byTeam = new Map<string, typeof run.weekLines>()
+  for (const l of run.weekLines) byTeam.set(l.memberId, [...(byTeam.get(l.memberId) ?? []), l])
   return (
     <Card
-      title="Clinch Scenarios"
-      sub={`Records are over the last ${g} games (${run.teams[0].weeks} week${run.teams[0].weeks > 1 ? 's' : ''}${run.median ? ', head-to-head plus the median game each week' : ''}), from ${run.sims.toLocaleString()} simulated finishes after week ${run.afterWeek}.`}
+      title={`Week ${run.nextWeek} Clinch Scenarios`}
+      sub={`What can be locked up or lost this week${run.median ? ' (each week is two games: the matchup and the median game)' : ''}. “Clinches” means no result in the remaining weeks can take it away.`}
     >
       <ul className="clinch-list">
-        {run.teams.map((t) => {
-          const lines = clinchLines(t, run.byes)
-          const done = t.playoffT.never
-          return (
-            <li key={t.memberId} className={done ? 'clinch-row done' : 'clinch-row'}>
-              <span className="clinch-who"><MemberLink id={t.memberId} />{t.playoffT.all && <span className="clinch-badge pos">In</span>}{t.playoffT.never && <span className="clinch-badge neg">Out</span>}</span>
-              <ul className="clinch-lines">{lines.map((l, k) => <li key={k} className={`tone-${l.tone}`}>{l.text}</li>)}</ul>
-            </li>
-          )
-        })}
+        {[...byTeam.entries()].map(([id, ls]) => (
+          <li key={id} className="clinch-row">
+            <span className="clinch-who"><MemberLink id={id} /></span>
+            <ul className="clinch-lines">{ls.map((l, k) => <li key={k} className={l.kind === 'out' ? 'tone-neg' : l.what === 'a playoff spot' ? 'tone-pos' : 'tone-gold'}>{l.text}</li>)}</ul>
+          </li>
+        ))}
       </ul>
     </Card>
   )
@@ -265,7 +268,7 @@ export function ScenariosSection() {
       <div className="scen">
         <div className="scen-head">
           <Avatar id={t.memberId} size={40} />
-          <ul className="clinch-lines">{clinchLines(t, run.byes).map((l, k) => <li key={k} className={`tone-${l.tone}`}><b>{name(t.memberId)}</b> {l.text}</li>)}</ul>
+          <ul className="clinch-lines">{clinchLines(t, run.byes, name).map((l, k) => <li key={k} className={`tone-${l.tone}`}><b>{name(t.memberId)}</b> {l.text}</li>)}</ul>
         </div>
         <div className="stat-grid scen-stats">
           <Stat label="Playoff odds" value={p(t.playoff)} />

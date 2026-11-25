@@ -174,7 +174,7 @@ function weeksScored(c: Ctx) {
 
 export interface SimOpts { plan?: Plan | null; weight?: number | null; model?: OddsModel; record?: SimRecord }
 /** Filled per simulation when scenarios are wanted: who won each remaining game, who made it. */
-export interface SimRecord { games: { week: number; a: number; b: number }[]; winners: Uint8Array; made: Uint8Array; bye: Uint8Array; seed: Uint8Array; remW: Uint8Array; nextW: Uint8Array }
+export interface SimRecord { games: { week: number; a: number; b: number }[]; winners: Uint8Array; made: Uint8Array; bye: Uint8Array; seed: Uint8Array; remW: Uint8Array; nextW: Uint8Array; finalW: Uint8Array }
 function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: SimOpts = {}): OddsRun {
   const model = opts.model ?? DEFAULT_MODEL
   const { ids, scores, pairings, lastReg, median, season } = c
@@ -245,7 +245,7 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
   if (rec) {
     for (let w = afterWeek + 1; w <= lastReg; w++) for (const [a, b] of pairings[w] ?? []) { gameIdx[`${w}|${a}`] = rec.games.length; rec.games.push({ week: w, a: idx[a], b: idx[b] }) }
     rec.winners = new Uint8Array(sims * rec.games.length); rec.made = new Uint8Array(sims * n); rec.bye = new Uint8Array(sims * n)
-    rec.seed = new Uint8Array(sims * n); rec.remW = new Uint8Array(sims * n); rec.nextW = new Uint8Array(sims * n)
+    rec.seed = new Uint8Array(sims * n); rec.remW = new Uint8Array(sims * n); rec.nextW = new Uint8Array(sims * n); rec.finalW = new Uint8Array(sims * n)
   }
   const G = rec ? rec.games.length : 0
   const r = rng(seed)
@@ -279,7 +279,7 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
       }
     }
     const order = ids.map((_, i) => i).sort((a, b) => W[b] - W[a] || PF[b] - PF[a])
-    order.forEach((t, place) => { seeds[t][place]++; if (rec) { rec.seed[s * n + t] = place; rec.remW[s * n + t] = W[t] - baseW[t] } })
+    order.forEach((t, place) => { seeds[t][place]++; if (rec) { rec.seed[s * n + t] = place; rec.remW[s * n + t] = W[t] - baseW[t]; rec.finalW[s * n + t] = W[t] } })
     for (let i = 0; i < n; i++) acc.wins[i] += W[i]
     const field = order.slice(0, P)
     field.forEach((t, k) => { acc.po[t]++; if (k < byes) acc.bye[t]++; if (rec) { rec.made[s * n + t] = 1; if (k < byes) rec.bye[s * n + t] = 1 } })
@@ -460,6 +460,8 @@ export interface Threshold {
   never: boolean // happened in none
   clinchAt: number | null // lowest remaining-win total at which it happened in every simulation (and every better total)
   outAt: number | null // highest remaining-win total at which it never happened (and every worse total)
+  // Lower record that also works whenever they win the points-for tiebreak against these teams.
+  tiebreak: { at: number; rivals: string[] } | null
 }
 export interface TeamScenario {
   memberId: string
@@ -478,7 +480,8 @@ export interface TeamScenario {
   ownGames: GameSwing[] // their own head-to-head games: odds if they win (ifA) / lose (ifB), a = them
   rootFor: GameSwing[] // other games that move their odds most, a = the side to root for
 }
-export interface ScenarioRun { season: number; afterWeek: number; sims: number; byes: boolean; median: boolean; teams: TeamScenario[] }
+export interface WeekLine { memberId: string; kind: 'clinch' | 'out'; what: string; text: string }
+export interface ScenarioRun { season: number; afterWeek: number; sims: number; byes: boolean; median: boolean; teams: TeamScenario[]; nextWeek: number | null; weekLines: WeekLine[] }
 
 /** Playoff scenarios for the rest of the regular season, from one recorded simulation run. */
 export function scenarios(lg: League, year: number, sims = 10000): ScenarioRun | null {
@@ -486,12 +489,17 @@ export function scenarios(lg: League, year: number, sims = 10000): ScenarioRun |
     const c = context(lg, year)
     if (!c) return null
     const w = weeksScored(c)
-    const rec: SimRecord = { games: [], winners: new Uint8Array(), made: new Uint8Array(), bye: new Uint8Array(), seed: new Uint8Array(), remW: new Uint8Array(), nextW: new Uint8Array() }
+    const rec: SimRecord = { games: [], winners: new Uint8Array(), made: new Uint8Array(), bye: new Uint8Array(), seed: new Uint8Array(), remW: new Uint8Array(), nextW: new Uint8Array(), finalW: new Uint8Array() }
     simulate(c, w, sims, year * 100 + w, { ...optsAt(lg, year, w), record: rec })
     const n = c.ids.length, G = rec.games.length
     const weeks = Math.max(0, c.lastReg - w), per = c.median ? 2 : 1, games = weeks * per
     const nextWeek = weeks ? w + 1 : null
     const rate = (a: number, b: number) => (b ? a / b : 0)
+    const base0 = Array.from({ length: n }, (_, i) => rec.finalW[i] - rec.remW[i])
+    const allPairs = rec.games.map((g) => [g.a, g.b] as [number, number])
+    const Ks = [...new Set([1, ...(c.season.playoffTeams === 6 ? [2] : []), c.season.playoffTeams])]
+    const half = c.median ? Math.floor(n / 2) : 0
+    const exact = { strict: exactByRecord(base0, allPairs, c.median ? weeks : 0, half, Ks, true), fav: exactByRecord(base0, allPairs, c.median ? weeks : 0, half, Ks, false) }
     const teams: TeamScenario[] = c.ids.map((id, i) => {
       const N = new Float64Array(games + 1), Po = new Float64Array(games + 1), By = new Float64Array(games + 1), Tp = new Float64Array(games + 1)
       const nx = [0, 0, 0], nxPo = [0, 0, 0]
@@ -504,11 +512,54 @@ export function scenarios(lg: League, year: number, sims = 10000): ScenarioRun |
         const nw = Math.min(2, rec.nextW[s * n + i]); nx[nw]++; nxPo[nw] += made
         for (let gi = 0; gi < G; gi++) { const o = rec.winners[s * G + gi] * 2; perGame[gi][o]++; perGame[gi][o + 1] += made }
       }
-      const thr = (hit: Float64Array, total: number): Threshold => {
+      // Misses at each record for a cutoff (top K seeds): were they all lost on the points-for
+      // tiebreak, and to whom (teams level on wins that finished inside the cutoff)?
+      const tieInfo = (K: number) => {
+        const hard = new Uint8Array(games + 1)
+        const rivals: Set<number>[] = Array.from({ length: games + 1 }, () => new Set())
+        const bySeed = new Int32Array(n)
+        for (let s = 0; s < sims; s++) {
+          const seed = rec.seed[s * n + i]
+          if (seed < K) continue
+          const k = Math.min(games, rec.remW[s * n + i])
+          if (hard[k]) continue
+          for (let j = 0; j < n; j++) bySeed[rec.seed[s * n + j]] = j
+          const mine = rec.finalW[s * n + i]
+          if (rec.finalW[s * n + bySeed[K - 1]] !== mine) { hard[k] = 1; continue }
+          for (let q = 0; q < K; q++) if (rec.finalW[s * n + bySeed[q]] === mine) rivals[k].add(bySeed[q])
+        }
+        return { hard, rivals }
+      }
+      const thr = (hit: Float64Array, total: number, K: number): Threshold => {
         let clinchAt: number | null = null, outAt: number | null = null
         for (let k = games; k >= 0; k--) { if (!N[k]) continue; if (hit[k] === N[k]) clinchAt = k; else break }
         for (let k = 0; k <= games; k++) { if (!N[k]) continue; if (hit[k] === 0) outAt = k; else break }
-        return { all: total === sims, never: total === 0, clinchAt, outAt }
+        let tiebreak: Threshold['tiebreak'] = null
+        if (total > 0 && total < sims && K > 0) {
+          const { hard, rivals } = tieInfo(K)
+          let at: number | null = null
+          const who = new Set<number>()
+          for (let k = games; k >= 0; k--) {
+            if (!N[k]) continue
+            if (hit[k] === N[k] || !hard[k]) { at = k; rivals[k].forEach((x) => who.add(x)) } else break
+          }
+          who.delete(i)
+          if (at != null && (clinchAt == null || at < clinchAt) && who.size && who.size <= 3) tiebreak = { at, rivals: [...who].map((x) => c.ids[x]) }
+        }
+        // Exact override: clinch / elimination by record from every remaining result.
+        const ex = exact.strict, fav = exact.fav
+        if (K > 0 && ex.lock[K]) {
+          const L = ex.lock[K][i], S = ex.shut[K][i], F = fav.lock[K][i], seenK = ex.seen[i]
+          let cA: number | null = null, oA: number | null = null, fA: number | null = null
+          for (let k = ex.maxK; k >= 0; k--) { if (!seenK[k]) continue; if (L[k]) cA = k; else break }
+          for (let k = ex.maxK; k >= 0; k--) { if (!seenK[k]) continue; if (F[k]) fA = k; else break }
+          for (let k = 0; k <= ex.maxK; k++) { if (!seenK[k]) continue; if (S[k]) oA = k; else break }
+          const reach = seenK.map((v, k) => (v ? k : -1)).filter((k) => k >= 0)
+          const all = reach.every((k) => L[k]), never = reach.every((k) => S[k])
+          const tb = fA != null && (cA == null || fA < cA) ? { at: fA, rivals: tiebreak?.rivals ?? [] } : null
+          return { all, never, clinchAt: all ? 0 : cA, outAt: never ? null : oA, tiebreak: tb }
+        }
+        return { all: total === sims, never: total === 0, clinchAt, outAt, tiebreak }
       }
       const swing = (gi: number, flip: boolean): GameSwing => {
         const g = rec.games[gi], [na, pa, nb, pb] = perGame[gi]
@@ -523,13 +574,235 @@ export function scenarios(lg: League, year: number, sims = 10000): ScenarioRun |
         .sort((p, q) => (q.ifA - q.ifB) - (p.ifA - p.ifB)).slice(0, 5)
       return {
         memberId: id, playoff: po / sims, bye: by / sims, top: tp / sims, weeks, games,
-        playoffT: thr(Po, po), byeT: thr(By, by), topT: thr(Tp, tp),
+        playoffT: thr(Po, po, c.season.playoffTeams), byeT: thr(By, by, c.season.playoffTeams === 6 ? 2 : 0), topT: thr(Tp, tp, 1),
         winOut: games && N[games] ? Po[games] / N[games] : null, loseOut: games && N[0] ? Po[0] / N[0] : null,
         byWins: Array.from({ length: games + 1 }, (_, k) => ({ wins: k, odds: rate(Po[k], N[k]), share: N[k] / sims })),
         next: nextWeek ? { week: nextWeek, median: c.median, both: nx[per] ? nxPo[per] / nx[per] : null, split: c.median && nx[1] ? nxPo[1] / nx[1] : null, none: nx[0] ? nxPo[0] / nx[0] : null } : null,
         ownGames: mine.map(({ g, k }) => swing(k, g.b === i)), rootFor,
       }
     }).sort((a, b) => b.playoff - a.playoff || b.bye - a.bye)
-    return { season: year, afterWeek: w, sims, byes: c.season.playoffTeams === 6, median: c.median, teams }
+    return { season: year, afterWeek: w, sims, byes: c.season.playoffTeams === 6, median: c.median, teams, nextWeek, weekLines: nextWeek ? weekLines(lg, c, rec, sims, weeks, per) : [] }
   })
+}
+
+/** Exact clinch / elimination by final record for every team, from the current standings:
+ *  for each result of the remaining head-to-head games and each record a team can still
+ *  reach, the median wins (half the league each week) go to rivals as harmfully as possible
+ *  (clinch) or as kindly as possible (elimination). With tiesLose, a tie on wins counts
+ *  against the team; otherwise in its favor (it wins the points-for tiebreak). */
+function exactByRecord(W0: ArrayLike<number>, pairs: [number, number][], mw: number, perWeek: number, Ks: number[], tiesLose: boolean) {
+  const n = W0.length, m = pairs.length, maxK = m ? Math.max(...Array.from({ length: n }, (_, i) => pairs.filter((p) => p[0] === i || p[1] === i).length)) + mw : mw
+  const mk = (v: boolean) => Array.from({ length: n }, () => Array<boolean>(maxK + 1).fill(v))
+  const lock: Record<number, boolean[][]> = {}, shut: Record<number, boolean[][]> = {}
+  for (const K of Ks) { lock[K] = mk(true); shut[K] = mk(true) }
+  const seen = mk(false)
+  const hw = new Int32Array(n), h = new Int32Array(n)
+  const short: number[] = [], gain: number[] = []
+  for (let mask = 0; mask < 1 << m; mask++) {
+    for (let j = 0; j < n; j++) { hw[j] = W0[j]; h[j] = 0 }
+    for (let g = 0; g < m; g++) { const w = (mask >> g) & 1 ? pairs[g][1] : pairs[g][0]; hw[w]++; h[w]++ }
+    for (let i = 0; i < n; i++) for (let mi = 0; mi <= mw; mi++) {
+      const k = h[i] + mi, mine = hw[i] + mi
+      seen[i][k] = true
+      const budget0 = perWeek * mw - mi // median wins left for rivals
+      // Clinch test: how many rivals can reach (or pass) this team?
+      let level = 0
+      short.length = 0
+      for (let j = 0; j < n; j++) if (j !== i) {
+        const d = (tiesLose ? mine : mine + 1) - hw[j]
+        if (d <= 0) level++; else if (d <= mw) short.push(d)
+      }
+      short.sort((x, y) => x - y)
+      let budget = budget0
+      for (const d of short) { if (d > budget) break; budget -= d; level++ }
+      // Elimination test: how many rivals must finish ahead, placing median wins kindly?
+      let ahead = 0, room = 0
+      gain.length = 0
+      for (let j = 0; j < n; j++) if (j !== i) {
+        const cap = tiesLose ? mine - hw[j] : mine - 1 - hw[j] // wins j can add and still not pass
+        if (cap < 0) { ahead++; room += mw; continue }
+        const safe = Math.min(mw, cap); room += safe; gain.push(mw - safe)
+      }
+      let need = budget0 - room
+      gain.sort((x, y) => y - x)
+      for (const g of gain) { if (need <= 0) break; need -= g; ahead++ }
+      for (const K of Ks) { if (level >= K) lock[K][i][k] = false; if (ahead < K) shut[K][i][k] = false }
+    }
+  }
+  return { lock, shut, seen, maxK }
+}
+
+/** Exact lock check from a standings state: goes through every result of the remaining
+ *  head-to-head games, with the median wins (half the league each week) handed out as
+ *  harmfully (for clinches) or as kindly (for eliminations) as possible. Ties on wins count
+ *  against the team, since points for could go either way. */
+function lockState(W0: ArrayLike<number>, pairs: [number, number][], mw: number, perWeek: number, Ks: number[]) {
+  const n = W0.length, m = pairs.length
+  const lock: Record<number, boolean[]> = {}, shut: Record<number, boolean[]> = {}
+  for (const K of Ks) { lock[K] = Array(n).fill(true); shut[K] = Array(n).fill(true) }
+  const hw = new Int32Array(n)
+  const others = perWeek - 1 // median wins left for everyone else each week once i takes or skips one
+  for (let mask = 0; mask < 1 << m; mask++) {
+    for (let j = 0; j < n; j++) hw[j] = W0[j]
+    for (let g = 0; g < m; g++) hw[(mask >> g) & 1 ? pairs[g][1] : pairs[g][0]]++
+    for (let i = 0; i < n; i++) {
+      // Worst case for i: no median wins; perWeek a week go to rivals just short of i.
+      let level = 0
+      const short: number[] = []
+      for (let j = 0; j < n; j++) if (j !== i) { const d = hw[i] - hw[j]; if (d <= 0) level++; else if (d <= mw) short.push(d) }
+      short.sort((x, y) => x - y)
+      let budget = perWeek * mw
+      for (const d of short) { if (d > budget) break; budget -= d; level++ }
+      // Best case for i: every median win; the rest go where they push nobody past i.
+      const top = hw[i] + mw
+      let ahead = 0, room = 0
+      const gain: number[] = []
+      for (let j = 0; j < n; j++) if (j !== i) {
+        if (hw[j] > top) { ahead++; room += mw; continue }
+        const safe = Math.min(mw, top - hw[j]); room += safe; gain.push(mw - safe)
+      }
+      let need = others * mw - room
+      gain.sort((x, y) => y - x)
+      for (const g of gain) { if (need <= 0) break; need -= g; ahead++ }
+      for (const K of Ks) { if (level >= K) lock[K][i] = false; if (ahead < K) shut[K][i] = false }
+    }
+  }
+  return { lock, shut }
+}
+
+/** Clinch and elimination scenarios for next week only: results locked once next week is
+ *  played, whatever happens after (exact over the remaining schedule). */
+function weekLines(lg: League, c: Ctx, rec: SimRecord, sims: number, weeks: number, per: number): WeekLine[] {
+  const n = c.ids.length, G = rec.games.length
+  const P = c.season.playoffTeams, byes = P === 6 ? 2 : 0
+  const half = c.median ? Math.floor(n / 2) : 0
+  const base = Array.from({ length: n }, (_, i) => rec.finalW[i] - rec.remW[i])
+  const wk = rec.games[0]?.week
+  const nextGames = rec.games.map((g, gi) => ({ g, gi })).filter(({ g }) => g.week === wk)
+  const later = rec.games.filter((g) => g.week !== wk).map((g) => [g.a, g.b] as [number, number])
+  const all = rec.games.map((g) => [g.a, g.b] as [number, number])
+  const Ks = [...new Set([1, ...(byes ? [2, 3] : []), P])]
+  const name = (i: number) => lg.memberById[c.ids[i]]?.name ?? c.ids[i]
+  const mwAfter = c.median ? weeks - 1 : 0
+  const now = lockState(base, all, c.median ? weeks : 0, half, Ks)
+  const cache = new Map<string, ReturnType<typeof lockState>>()
+  const stateOf = (W: Int32Array) => {
+    const key = W.join(',')
+    let v = cache.get(key)
+    if (!v) { v = lockState(W, later, mwAfter, half, Ks); cache.set(key, v) }
+    return v
+  }
+  type St = ReturnType<typeof lockState>
+  type Ev = { what: string; kind: 'clinch' | 'out'; test: (st: St, i: number) => boolean }
+  const evs: Ev[] = [
+    { what: 'the 1 seed', kind: 'clinch', test: (st, i) => st.lock[1][i] },
+    ...(byes ? [{ what: 'a bye', kind: 'clinch' as const, test: (st: St, i: number) => st.lock[2][i] }] : []),
+    ...(byes ? [{ what: 'the 3 seed', kind: 'clinch' as const, test: (st: St, i: number) => st.lock[3][i] && st.shut[2][i] }] : []),
+    { what: 'a playoff spot', kind: 'clinch', test: (st, i) => st.lock[P][i] },
+    { what: 'the playoffs', kind: 'out', test: (st, i) => st.shut[P][i] },
+  ]
+  // Phrases for this team's own result next week: "full" = enough on its own at this result and
+  // every better one; "part" = needs the extra condition that follows.
+  const two = per === 2
+  const r = (w: number) => `${w}–${per - w}`
+  const fullC = (k: number) => k === 0 ? 'no matter what' : k === per ? `by going ${r(k)}` : `by going ${r(k)} or better`
+  const partC = (k: number) => k === per ? `by going ${r(k)}` : `at ${r(k)}`
+  const fullO = (k: number) => k === per ? 'no matter what' : k === 0 ? `by going ${r(0)}` : `at ${r(k)} or worse`
+  const partO = (k: number) => k === 0 ? `by going ${r(0)}` : `at ${r(k)}`
+  // Conditions on other teams' results next week, used to spell out "with help".
+  type Cond = { text: string; ok: (s: number) => boolean }
+  const conds = (i: number): Cond[] => {
+    const out: Cond[] = []
+    for (let j = 0; j < n; j++) if (j !== i) {
+      const nw = (s: number) => rec.nextW[s * n + j]
+      out.push({ text: `${name(j)} goes ${r(0)}`, ok: (s) => nw(s) === 0 })
+      if (two) out.push({ text: `${name(j)} loses at least once`, ok: (s) => nw(s) <= 1 })
+      out.push({ text: `${name(j)} goes ${r(per)}`, ok: (s) => nw(s) === per })
+      if (two) out.push({ text: `${name(j)} wins at least once`, ok: (s) => nw(s) >= 1 })
+    }
+    for (const { g, gi } of nextGames) if (g.a !== i && g.b !== i) {
+      out.push({ text: `${name(g.a)} beats ${name(g.b)}`, ok: (s) => rec.winners[s * G + gi] === 0 })
+      out.push({ text: `${name(g.b)} beats ${name(g.a)}`, ok: (s) => rec.winners[s * G + gi] === 1 })
+    }
+    return out
+  }
+  const join = (xs: string[]) => xs.length < 3 ? xs.join(' and ') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
+  /** Scenarios (each a set of other results) that together cover every way it happens: built
+   *  greedily, adding the result that most narrows things down until it's certain. */
+  const scenariosFor = (i: number, idx: number[], ok: (s: number) => boolean): { list: string[]; rest: boolean } => {
+    const cs = conds(i)
+    let left = idx.filter(ok) // ways it happens not yet explained
+    const found: { conds: Cond[]; set: Set<number> }[] = []
+    while (left.length && found.length < 8) {
+      let pool = idx, picked: Cond[] = []
+      while (!pool.every(ok) && picked.length < 5) {
+        let best: { cd: Cond; m: number[]; score: number } | null = null
+        for (const cd of cs) {
+          if (picked.includes(cd)) continue
+          const m = pool.filter(cd.ok)
+          const good = m.filter(ok).length, cover = left.filter((s) => m.includes(s)).length
+          if (!good || !cover) continue
+          const score = good / m.length + cover / (left.length * 50)
+          if (!best || score > best.score) best = { cd, m, score }
+        }
+        if (!best) break
+        picked.push(best.cd); pool = best.m
+      }
+      if (!picked.length || !pool.every(ok)) break
+      // Drop conditions that don't narrow anything (implied by the others).
+      picked = picked.filter((cd, k) => { const rest = picked.filter((_, q) => q !== k); return !idx.filter((s) => rest.every((x) => x.ok(s))).every(ok) })
+      const set = new Set(idx.filter((s) => picked.every((x) => x.ok(s))))
+      found.push({ conds: picked, set })
+      left = left.filter((s) => !set.has(s))
+    }
+    // Drop scenarios fully inside another (e.g. "A beats B" inside "B loses at least once").
+    const keep = found.filter((x, k) => !found.some((y, q) => q !== k && y.set.size >= x.set.size && [...x.set].every((s) => y.set.has(s)) && (y.set.size > x.set.size || q < k)))
+    if (!keep.length) return { list: [], rest: left.length > 0 }
+    // Pull out conditions every scenario shares: "if A, and B or C".
+    const common = keep[0].conds.filter((cd) => keep.every((x) => x.conds.some((y) => y.text === cd.text)))
+    const restOf = keep.map((x) => x.conds.filter((cd) => !common.some((y) => y.text === cd.text)))
+    let text: string
+    if (keep.length === 1) text = join(keep[0].conds.map((x) => x.text))
+    else if (common.length && restOf.every((r) => r.length === 1)) text = `${join(common.map((x) => x.text))}, and ${restOf.map((r) => r[0].text).join(' or ')}`
+    else if (common.length && restOf.every((r) => r.length >= 1)) text = `${join(common.map((x) => x.text))}, and either ${restOf.map((r) => join(r.map((x) => x.text))).join('; or ')}`
+    else return { list: keep.map((x) => join(x.conds.map((y) => y.text))), rest: left.length > 0 }
+    return { list: [text], rest: left.length > 0 }
+  }
+  const W = new Int32Array(n)
+  const states: St[] = []
+  for (let s = 0; s < sims; s++) { for (let j = 0; j < n; j++) W[j] = base[j] + rec.nextW[s * n + j]; states.push(stateOf(W)) }
+  const lines: WeekLine[] = []
+  for (let i = 0; i < n; i++) {
+    for (const ev of evs) {
+      if (ev.test(now, i)) continue // already locked before next week
+      const seen = new Float64Array(per + 1), hit = new Float64Array(per + 1)
+      let any = 0
+      for (let s = 0; s < sims; s++) {
+        const k = Math.min(per, rec.nextW[s * n + i])
+        const ok = ev.test(states[s], i)
+        seen[k]++; if (ok) { hit[k]++; any++ }
+      }
+      if (!any) continue
+      const order = ev.kind === 'clinch' ? Array.from({ length: per + 1 }, (_, k) => per - k) : Array.from({ length: per + 1 }, (_, k) => k)
+      let full: string | null = null, extra: string | null = null
+      for (const k of order) {
+        if (!seen[k]) continue
+        if (hit[k] === seen[k]) { full = ev.kind === 'clinch' ? fullC(k) : fullO(k); continue }
+        if (hit[k] > 0) {
+          const say = ev.kind === 'clinch' ? partC(k) : partO(k)
+          const idx: number[] = []
+          for (let s = 0; s < sims; s++) if (Math.min(per, rec.nextW[s * n + i]) === k) idx.push(s)
+          const sc = scenariosFor(i, idx, (s) => ev.test(states[s], i))
+          extra = sc.list.length ? `${say} if ${sc.list.join('; or if ')}${sc.rest ? '; or in a few other rare combinations' : ''}` : `${say} only in rare combinations of other results`
+        }
+        break
+      }
+      const parts = [full, extra].filter((x): x is string => !!x)
+      if (!parts.length) continue
+      const how = parts.join(', or ')
+      if (lines.some((l) => l.memberId === c.ids[i] && l.kind === ev.kind && l.text.endsWith(` ${how}`))) continue // same path as a bigger prize
+      lines.push({ memberId: c.ids[i], kind: ev.kind, what: ev.what, text: `${ev.kind === 'clinch' ? `clinches ${ev.what}` : 'is eliminated from the playoffs'} ${how}` })
+    }
+  }
+  return lines
 }
