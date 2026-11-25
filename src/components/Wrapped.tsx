@@ -1,56 +1,83 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useLeague } from '../lib/data'
 import { fmt, ordinal, record } from '../lib/stats'
 import { seasonWrapped, type Wrapped } from '../lib/wrapped'
 import { playersOf } from '../lib/players'
-import { Avatar, Card } from './ui'
+import { Avatar } from './ui'
 import { Icon } from './Icon'
 
 type Slide = { key: string; tone: string; kicker: string; big: ReactNode; caption: ReactNode; extra?: ReactNode }
 
-/** Spotify Wrapped–style story of one member's season: swipe (or tap the arrows) through it. */
+/** Button that opens a member's Season Wrapped in a pop-up story. */
 export function SeasonWrapped({ year }: { year: number }) {
   const lg = useLeague()
   const s = lg.seasons.find((x) => x.year === year)!
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button className="wrapped-open" onClick={() => setOpen(true)}>
+        <span className="wrapped-open-icon"><Icon name="star" size={18} /></span>
+        <span className="wrapped-open-text"><b>{year} Wrapped</b><span className="muted small">{s.complete ? 'Every member’s season, as a story' : `The season so far, through week ${s.weeksPlayed}`}</span></span>
+        <Icon name="chevronRight" size={18} />
+      </button>
+      {open && createPortal(<WrappedModal year={year} onClose={() => setOpen(false)} />, document.body)}
+    </>
+  )
+}
+
+function WrappedModal({ year, onClose }: { year: number; onClose: () => void }) {
+  const lg = useLeague()
+  const s = lg.seasons.find((x) => x.year === year)!
   const ids = s.teamSeasons.map((t) => t.memberId)
-  const [who, setWho] = useState(ids[0])
-  const member = ids.includes(who) ? who : ids[0]
+  const [member, setMember] = useState(ids[0])
   const w = seasonWrapped(lg, year, member)
   const track = useRef<HTMLDivElement>(null)
   const [at, setAt] = useState(0)
-  useEffect(() => { track.current?.scrollTo({ left: 0 }); setAt(0) }, [member, year])
-  if (!w) return null
-  const slides = buildSlides(lg, w)
+  useEffect(() => { track.current?.scrollTo({ left: 0 }); setAt(0) }, [member])
+  useEffect(() => {
+    document.body.classList.add('no-scroll')
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => { document.body.classList.remove('no-scroll'); window.removeEventListener('keydown', onKey) }
+  }, [onClose])
+  const slides = w ? buildSlides(lg, w) : []
   const go = (k: number) => {
     const el = track.current
     if (!el) return
-    const i = Math.max(0, Math.min(slides.length - 1, k))
-    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+    el.scrollTo({ left: Math.max(0, Math.min(slides.length - 1, k)) * el.clientWidth, behavior: 'smooth' })
   }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'ArrowRight') go(at + 1); if (e.key === 'ArrowLeft') go(at - 1) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
   const onScroll = () => { const el = track.current; if (el) setAt(Math.round(el.scrollLeft / el.clientWidth)) }
 
   return (
-    <Card
-      title={`${year} Wrapped`}
-      sub={s.complete ? 'Every member’s season, as a story. Swipe through it.' : `The season so far, through week ${s.weeksPlayed}. Swipe through it.`}
-      right={<select value={member} onChange={(e) => setWho(e.target.value)} aria-label="Member">{ids.map((id) => <option key={id} value={id}>{lg.memberById[id]?.name ?? id}</option>)}</select>}
-    >
-      <div className="wrapped">
-        <div className="wrapped-track" ref={track} onScroll={onScroll}>
-          {slides.map((sl, i) => (
-            <section key={sl.key} className={`wrapped-slide tone-${sl.tone}`} aria-label={`Slide ${i + 1} of ${slides.length}`}>
-              <div className="wrapped-kicker">{sl.kicker}</div>
-              <div className="wrapped-big">{sl.big}</div>
-              <div className="wrapped-caption">{sl.caption}</div>
-              {sl.extra}
-            </section>
-          ))}
+    <div className="wrapped-modal" role="dialog" aria-modal="true" aria-label={`${year} Wrapped`} onClick={onClose}>
+      <div className="wrapped-box" onClick={(e) => e.stopPropagation()}>
+        <div className="wrapped-bar">
+          <select value={member} onChange={(e) => setMember(e.target.value)} aria-label="Member">{ids.map((id) => <option key={id} value={id}>{lg.memberById[id]?.name ?? id}</option>)}</select>
+          <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="x" size={20} /></button>
         </div>
-        <button className="wrapped-nav prev" onClick={() => go(at - 1)} disabled={at === 0} aria-label="Previous"><Icon name="chevronLeft" size={18} /></button>
-        <button className="wrapped-nav next" onClick={() => go(at + 1)} disabled={at >= slides.length - 1} aria-label="Next"><Icon name="chevronRight" size={18} /></button>
-        <div className="wrapped-dots">{slides.map((sl, i) => <button key={sl.key} className={i === at ? 'on' : ''} onClick={() => go(i)} aria-label={`Go to slide ${i + 1}`} />)}</div>
+        <div className="wrapped">
+          <div className="wrapped-track" ref={track} onScroll={onScroll}>
+            {slides.map((sl, i) => (
+              <section key={sl.key} className={`wrapped-slide tone-${sl.tone}`} aria-label={`Slide ${i + 1} of ${slides.length}`}>
+                <div className="wrapped-kicker">{sl.kicker}</div>
+                <div className="wrapped-big">{sl.big}</div>
+                <div className="wrapped-caption">{sl.caption}</div>
+                {sl.extra}
+              </section>
+            ))}
+          </div>
+          <button className="wrapped-nav prev" onClick={() => go(at - 1)} disabled={at === 0} aria-label="Previous"><Icon name="chevronLeft" size={18} /></button>
+          <button className="wrapped-nav next" onClick={() => go(at + 1)} disabled={at >= slides.length - 1} aria-label="Next"><Icon name="chevronRight" size={18} /></button>
+          <div className="wrapped-dots">{slides.map((sl, i) => <button key={sl.key} className={i === at ? 'on' : ''} onClick={() => go(i)} aria-label={`Go to slide ${i + 1}`} />)}</div>
+        </div>
       </div>
-    </Card>
+    </div>
   )
 }
 
