@@ -1322,7 +1322,7 @@ a, button { -webkit-tap-highlight-color: transparent; }
 /* Playoff scenarios */
 .scen { display: flex; flex-direction: column; gap: 16px; }
 .scen-head { display: flex; gap: 12px; align-items: center; }
-.scen-head b { font-family: var(--display); font-size: 16px; letter-spacing: -0.01em; }
+.scen-head .clinch-lines { font-size: 15px; }
 .scen-stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .scen-block h3 { margin: 0 0 8px; font-size: 12px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .scen-wins { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; max-width: 420px; }
@@ -1405,4 +1405,24 @@ a, button { -webkit-tap-highlight-color: transparent; }
   .wrapped-box .wrapped { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .wrapped-box .wrapped-track { flex: 1; }
   .wrapped-box .wrapped-slide { min-height: 0; height: 100%; }
+}
+
+/* Clinch scenarios */
+.clinch-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.clinch-row { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 6px 16px; padding: 11px 0; border-top: 1px solid var(--border); }
+.clinch-row:first-child { border-top: 0; }
+.clinch-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; font-weight: 600; }
+.clinch-badge { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; }
+.clinch-badge.pos { background: rgba(61, 220, 151, .14); color: var(--pos); }
+.clinch-badge.neg { background: rgba(255, 107, 122, .14); color: var(--neg); }
+.clinch-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.clinch-lines li { position: relative; padding-left: 14px; line-height: 1.45; }
+.clinch-lines li::before { content: ''; position: absolute; left: 0; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.clinch-lines .tone-pos::before { background: var(--pos); }
+.clinch-lines .tone-neg::before { background: var(--neg); }
+.clinch-lines .tone-gold::before { background: var(--gold); }
+.clinch-lines .tone-muted { color: var(--text-2); }
+.clinch-row.done .clinch-lines { color: var(--muted); }
+@media (max-width: 640px) {
+  .clinch-row { grid-template-columns: minmax(0, 1fr); }
 }

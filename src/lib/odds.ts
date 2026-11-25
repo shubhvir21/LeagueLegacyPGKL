@@ -174,7 +174,7 @@ function weeksScored(c: Ctx) {
 
 export interface SimOpts { plan?: Plan | null; weight?: number | null; model?: OddsModel; record?: SimRecord }
 /** Filled per simulation when scenarios are wanted: who won each remaining game, who made it. */
-export interface SimRecord { games: { week: number; a: number; b: number }[]; winners: Uint8Array; made: Uint8Array; bye: Uint8Array }
+export interface SimRecord { games: { week: number; a: number; b: number }[]; winners: Uint8Array; made: Uint8Array; bye: Uint8Array; seed: Uint8Array; remW: Uint8Array; nextW: Uint8Array }
 function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: SimOpts = {}): OddsRun {
   const model = opts.model ?? DEFAULT_MODEL
   const { ids, scores, pairings, lastReg, median, season } = c
@@ -245,6 +245,7 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
   if (rec) {
     for (let w = afterWeek + 1; w <= lastReg; w++) for (const [a, b] of pairings[w] ?? []) { gameIdx[`${w}|${a}`] = rec.games.length; rec.games.push({ week: w, a: idx[a], b: idx[b] }) }
     rec.winners = new Uint8Array(sims * rec.games.length); rec.made = new Uint8Array(sims * n); rec.bye = new Uint8Array(sims * n)
+    rec.seed = new Uint8Array(sims * n); rec.remW = new Uint8Array(sims * n); rec.nextW = new Uint8Array(sims * n)
   }
   const G = rec ? rec.games.length : 0
   const r = rng(seed)
@@ -270,15 +271,15 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
         const winner = wk[x] >= wk[y] ? x : y
         W[winner]++
         if (w === nextWeek) nextWon[winner] = 1
-        if (rec) rec.winners[s * G + gameIdx[`${w}|${a}`]] = winner === x ? 0 : 1
+        if (rec) { rec.winners[s * G + gameIdx[`${w}|${a}`]] = winner === x ? 0 : 1; if (w === nextWeek) rec.nextW[s * n + winner]++ }
       }
       if (median) {
         const sorted = wk.slice().sort().reverse(), line = (sorted[Math.floor(n / 2) - 1] + sorted[Math.floor(n / 2)]) / 2
-        for (let i = 0; i < n; i++) if (wk[i] > line) W[i]++
+        for (let i = 0; i < n; i++) if (wk[i] > line) { W[i]++; if (rec && w === nextWeek) rec.nextW[s * n + i]++ }
       }
     }
     const order = ids.map((_, i) => i).sort((a, b) => W[b] - W[a] || PF[b] - PF[a])
-    order.forEach((t, place) => { seeds[t][place]++ })
+    order.forEach((t, place) => { seeds[t][place]++; if (rec) { rec.seed[s * n + t] = place; rec.remW[s * n + t] = W[t] - baseW[t] } })
     for (let i = 0; i < n; i++) acc.wins[i] += W[i]
     const field = order.slice(0, P)
     field.forEach((t, k) => { acc.po[t]++; if (k < byes) acc.bye[t]++; if (rec) { rec.made[s * n + t] = 1; if (k < byes) rec.bye[s * n + t] = 1 } })
@@ -453,19 +454,31 @@ export function fitResid(lg: League, model: OddsModel): number {
 }
 
 export interface GameSwing { week: number; a: string; b: string; ifA: number; ifB: number }
+/** One outcome (playoffs, bye, 1 seed) measured against the record over the remaining games. */
+export interface Threshold {
+  all: boolean // happened in every simulation
+  never: boolean // happened in none
+  clinchAt: number | null // lowest remaining-win total at which it happened in every simulation (and every better total)
+  outAt: number | null // highest remaining-win total at which it never happened (and every worse total)
+}
 export interface TeamScenario {
   memberId: string
   playoff: number
   bye: number
-  remaining: number // head-to-head games left
-  winOut: number | null // playoff odds if they win every remaining head-to-head game
+  top: number // 1 seed
+  weeks: number // regular-season weeks left
+  games: number // games left, counting the median game
+  playoffT: Threshold
+  byeT: Threshold
+  topT: Threshold
+  winOut: number | null
   loseOut: number | null
-  byWins: { wins: number; odds: number; share: number }[] // playoff odds by remaining h2h wins
-  clinchAt: number | null // fewest remaining h2h wins that made the playoffs in every simulation
-  ownGames: GameSwing[] // their own games: odds if they win (ifA) / lose (ifB), a = them
+  byWins: { wins: number; odds: number; share: number }[] // playoff odds by wins over the remaining games
+  next: { week: number; both: number | null; split: number | null; none: number | null; median: boolean } | null
+  ownGames: GameSwing[] // their own head-to-head games: odds if they win (ifA) / lose (ifB), a = them
   rootFor: GameSwing[] // other games that move their odds most, a = the side to root for
 }
-export interface ScenarioRun { season: number; afterWeek: number; sims: number; byes: boolean; teams: TeamScenario[] }
+export interface ScenarioRun { season: number; afterWeek: number; sims: number; byes: boolean; median: boolean; teams: TeamScenario[] }
 
 /** Playoff scenarios for the rest of the regular season, from one recorded simulation run. */
 export function scenarios(lg: League, year: number, sims = 10000): ScenarioRun | null {
@@ -473,45 +486,50 @@ export function scenarios(lg: League, year: number, sims = 10000): ScenarioRun |
     const c = context(lg, year)
     if (!c) return null
     const w = weeksScored(c)
-    const rec: SimRecord = { games: [], winners: new Uint8Array(), made: new Uint8Array(), bye: new Uint8Array() }
+    const rec: SimRecord = { games: [], winners: new Uint8Array(), made: new Uint8Array(), bye: new Uint8Array(), seed: new Uint8Array(), remW: new Uint8Array(), nextW: new Uint8Array() }
     simulate(c, w, sims, year * 100 + w, { ...optsAt(lg, year, w), record: rec })
     const n = c.ids.length, G = rec.games.length
+    const weeks = Math.max(0, c.lastReg - w), per = c.median ? 2 : 1, games = weeks * per
+    const nextWeek = weeks ? w + 1 : null
+    const rate = (a: number, b: number) => (b ? a / b : 0)
     const teams: TeamScenario[] = c.ids.map((id, i) => {
-      let po = 0, by = 0
-      const mine = rec.games.map((g, k) => ({ g, k })).filter(({ g }) => g.a === i || g.b === i)
-      const winsN = new Float64Array(mine.length + 1), winsPo = new Float64Array(mine.length + 1)
-      // Per game: [sims where side a won, playoffs among them, sims where b won, playoffs among them]
-      const per = rec.games.map(() => [0, 0, 0, 0])
+      const N = new Float64Array(games + 1), Po = new Float64Array(games + 1), By = new Float64Array(games + 1), Tp = new Float64Array(games + 1)
+      const nx = [0, 0, 0], nxPo = [0, 0, 0]
+      const perGame = rec.games.map(() => [0, 0, 0, 0]) // [a won, playoffs | a won, b won, playoffs | b won]
+      let po = 0, by = 0, tp = 0
       for (let s = 0; s < sims; s++) {
-        const made = rec.made[s * n + i]
-        po += made; by += rec.bye[s * n + i]
-        let k = 0
-        for (const { g, k: gi } of mine) if ((rec.winners[s * G + gi] === 0 ? g.a : g.b) === i) k++
-        winsN[k]++; winsPo[k] += made
-        for (let gi = 0; gi < G; gi++) { const o = rec.winners[s * G + gi] * 2; per[gi][o]++; per[gi][o + 1] += made }
+        const k = Math.min(games, rec.remW[s * n + i]), made = rec.made[s * n + i], bye = rec.bye[s * n + i], top = rec.seed[s * n + i] === 0 ? 1 : 0
+        N[k]++; Po[k] += made; By[k] += bye; Tp[k] += top
+        po += made; by += bye; tp += top
+        const nw = Math.min(2, rec.nextW[s * n + i]); nx[nw]++; nxPo[nw] += made
+        for (let gi = 0; gi < G; gi++) { const o = rec.winners[s * G + gi] * 2; perGame[gi][o]++; perGame[gi][o + 1] += made }
       }
-      const rate = (a: number, b: number) => (b ? a / b : 0)
+      const thr = (hit: Float64Array, total: number): Threshold => {
+        let clinchAt: number | null = null, outAt: number | null = null
+        for (let k = games; k >= 0; k--) { if (!N[k]) continue; if (hit[k] === N[k]) clinchAt = k; else break }
+        for (let k = 0; k <= games; k++) { if (!N[k]) continue; if (hit[k] === 0) outAt = k; else break }
+        return { all: total === sims, never: total === 0, clinchAt, outAt }
+      }
       const swing = (gi: number, flip: boolean): GameSwing => {
-        const g = rec.games[gi], [na, pa, nb, pb] = per[gi]
+        const g = rec.games[gi], [na, pa, nb, pb] = perGame[gi]
         const A = { id: c.ids[g.a], o: rate(pa, na) }, B = { id: c.ids[g.b], o: rate(pb, nb) }
         const [x, y] = flip ? [B, A] : [A, B]
         return { week: g.week, a: x.id, b: y.id, ifA: x.o, ifB: y.o }
       }
-      const ownGames = mine.map(({ g, k }) => swing(k, g.b === i))
+      const mine = rec.games.map((g, k) => ({ g, k })).filter(({ g }) => g.a === i || g.b === i)
       const rootFor = rec.games.map((g, gi) => ({ g, gi })).filter(({ g }) => g.a !== i && g.b !== i)
         .map(({ gi }) => { const sw = swing(gi, false); return sw.ifB > sw.ifA ? swing(gi, true) : sw })
         .filter((sw) => sw.ifA - sw.ifB >= 0.01)
         .sort((p, q) => (q.ifA - q.ifB) - (p.ifA - p.ifB)).slice(0, 5)
-      const m = mine.length
-      const byWins = Array.from({ length: m + 1 }, (_, k) => ({ wins: k, odds: rate(winsPo[k], winsN[k]), share: winsN[k] / sims }))
-      let clinchAt: number | null = null
-      for (let k = m; k >= 0; k--) { if (winsN[k] && winsPo[k] === winsN[k]) clinchAt = k; else if (winsN[k]) break }
       return {
-        memberId: id, playoff: po / sims, bye: by / sims, remaining: m,
-        winOut: m && winsN[m] ? winsPo[m] / winsN[m] : null, loseOut: m && winsN[0] ? winsPo[0] / winsN[0] : null,
-        byWins, clinchAt, ownGames, rootFor,
+        memberId: id, playoff: po / sims, bye: by / sims, top: tp / sims, weeks, games,
+        playoffT: thr(Po, po), byeT: thr(By, by), topT: thr(Tp, tp),
+        winOut: games && N[games] ? Po[games] / N[games] : null, loseOut: games && N[0] ? Po[0] / N[0] : null,
+        byWins: Array.from({ length: games + 1 }, (_, k) => ({ wins: k, odds: rate(Po[k], N[k]), share: N[k] / sims })),
+        next: nextWeek ? { week: nextWeek, median: c.median, both: nx[per] ? nxPo[per] / nx[per] : null, split: c.median && nx[1] ? nxPo[1] / nx[1] : null, none: nx[0] ? nxPo[0] / nx[0] : null } : null,
+        ownGames: mine.map(({ g, k }) => swing(k, g.b === i)), rootFor,
       }
-    }).sort((a, b) => b.playoff - a.playoff)
-    return { season: year, afterWeek: w, sims, byes: c.season.playoffTeams === 6, teams }
+    }).sort((a, b) => b.playoff - a.playoff || b.bye - a.bye)
+    return { season: year, afterWeek: w, sims, byes: c.season.playoffTeams === 6, median: c.median, teams }
   })
 }

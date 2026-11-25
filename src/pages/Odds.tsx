@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CartesianGrid, Legend, Line, ReferenceLine, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
-import type { GameSwing, OddsRun, ScenarioRun, TeamOdds } from '../lib/odds'
+import type { GameSwing, OddsRun, ScenarioRun, TeamOdds, TeamScenario } from '../lib/odds'
 import type { League } from '../lib/stats'
 import type { OddsRequest } from '../lib/odds.worker'
 import { fmt, record } from '../lib/stats'
@@ -163,61 +163,137 @@ const OddsChart = memo(function OddsChart({ history, metric, marker }: { history
   )
 })
 
-/** "What does my team need?": playoff paths for the rest of the regular season. */
+// One scenarios run per league + season, shared by both sections.
+const scenCache = new WeakMap<League, Record<number, ScenarioRun | Promise<ScenarioRun | null>>>()
+function useScenarios(lg: League, year: number, enabled: boolean) {
+  const [run, setRun] = useState<ScenarioRun | null>(() => { const v = scenCache.get(lg)?.[year]; return v && !(v instanceof Promise) ? v : null })
+  useEffect(() => {
+    if (!enabled) return
+    let m = scenCache.get(lg)
+    if (!m) scenCache.set(lg, (m = {}))
+    const hit = m[year]
+    if (hit && !(hit instanceof Promise)) { setRun(hit); return }
+    let live = true
+    const pr = hit ?? new Promise<ScenarioRun | null>((res) => send(lg, { kind: 'scen', year }, (r) => res(r as ScenarioRun | null)))
+    m[year] = pr as Promise<ScenarioRun | null>
+    pr.then((r) => { if (r) m![year] = r; if (live) setRun(r) })
+    return () => { live = false }
+  }, [lg, year, enabled])
+  return run
+}
+
+const rec = (k: number, g: number) => `${k}–${g - k}`
+const better = (k: number, g: number) => (k === g ? `${rec(k, g)}` : `${rec(k, g)} or better`)
+const worse = (k: number, g: number) => (k === 0 ? `${rec(k, g)}` : `${rec(k, g)} or worse`)
+
+/** Plain statements from the simulations: what happened in every simulated finish, or in none. */
+function clinchLines(t: TeamScenario, byes: boolean): { tone: 'pos' | 'neg' | 'gold' | 'muted'; text: string }[] {
+  const g = t.games
+  const out: { tone: 'pos' | 'neg' | 'gold' | 'muted'; text: string }[] = []
+  const P = t.playoffT
+  if (P.all) out.push({ tone: 'pos', text: 'has clinched a playoff spot' })
+  else if (P.never) { out.push({ tone: 'neg', text: 'is eliminated' }); return out }
+  else {
+    if (P.clinchAt != null) out.push({ tone: 'pos', text: `clinches a playoff spot at ${better(P.clinchAt, g)}` })
+    else out.push({ tone: 'muted', text: `can’t clinch on their own, even at ${rec(g, g)}: they need help` })
+    if (P.outAt != null) out.push({ tone: 'neg', text: `is eliminated at ${worse(P.outAt, g)}` })
+  }
+  const step = (T: typeof P, what: string) => {
+    if (T.never) return
+    if (T.all) out.push({ tone: 'gold', text: `has clinched ${what}` })
+    else if (T.clinchAt != null) out.push({ tone: 'gold', text: `clinches ${what} at ${better(T.clinchAt, g)}` })
+    else out.push({ tone: 'muted', text: `can still get ${what}, but only with help` })
+  }
+  if (byes) step(t.byeT, 'a bye')
+  step(t.topT, 'the 1 seed')
+  return out
+}
+
+/** Above the simulation: plain-language clinch and elimination scenarios for every team. */
+export function ClinchSection() {
+  const lg = useLeague()
+  const season = lg.seasons[0]
+  const run = useScenarios(lg, season.year, !season.complete)
+  if (season.complete) return null
+  if (!run) return <Card title="Clinch Scenarios"><p className="muted">Working out every team’s path…</p></Card>
+  const g = run.teams[0]?.games ?? 0
+  if (!g) return null
+  return (
+    <Card
+      title="Clinch Scenarios"
+      sub={`Records are over the last ${g} games (${run.teams[0].weeks} week${run.teams[0].weeks > 1 ? 's' : ''}${run.median ? ', head-to-head plus the median game each week' : ''}), from ${run.sims.toLocaleString()} simulated finishes after week ${run.afterWeek}.`}
+    >
+      <ul className="clinch-list">
+        {run.teams.map((t) => {
+          const lines = clinchLines(t, run.byes)
+          const done = t.playoffT.never
+          return (
+            <li key={t.memberId} className={done ? 'clinch-row done' : 'clinch-row'}>
+              <span className="clinch-who"><MemberLink id={t.memberId} />{t.playoffT.all && <span className="clinch-badge pos">In</span>}{t.playoffT.never && <span className="clinch-badge neg">Out</span>}</span>
+              <ul className="clinch-lines">{lines.map((l, k) => <li key={k} className={`tone-${l.tone}`}>{l.text}</li>)}</ul>
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
+  )
+}
+
+/** Below the simulation: one team's paths in detail. */
 export function ScenariosSection() {
   const lg = useLeague()
   const season = lg.seasons[0]
-  const [run, setRun] = useState<ScenarioRun | null>(null)
+  const run = useScenarios(lg, season.year, !season.complete)
   const [pick, setPick] = useState<string | null>(null)
-  useEffect(() => {
-    setRun(null)
-    if (season.complete) return
-    send(lg, { kind: 'scen', year: season.year }, (res) => setRun(res as ScenarioRun))
-  }, [lg, season.year, season.complete])
   if (season.complete) return null
-  if (!run) return <Card title="Playoff Scenarios"><p className="muted">Working out every team’s path…</p></Card>
-  if (!run.teams.some((t) => t.remaining)) return null
+  if (!run) return <Card title="Team Scenarios"><p className="muted">Working out every team’s path…</p></Card>
+  if (!run.teams.some((t) => t.games)) return null
 
   const name = (id: string) => lg.memberById[id]?.name ?? id
   // Default to the most interesting team: the one closest to a coin flip.
   const fallback = [...run.teams].sort((a, b) => Math.abs(a.playoff - 0.5) - Math.abs(b.playoff - 0.5))[0].memberId
   const t = run.teams.find((x) => x.memberId === (pick ?? fallback))!
-  const clinched = t.playoff >= 0.9995 && (t.loseOut == null || t.loseOut >= 0.9995)
-  const out = t.playoff < 0.0005 && (t.winOut == null || t.winOut < 0.0005)
-  const headline = clinched ? `${name(t.memberId)} has clinched a playoff spot.`
-    : out ? `${name(t.memberId)} is out of the playoff race.`
-    : t.clinchAt != null && t.clinchAt > 0 ? `${name(t.memberId)} clinches with ${t.clinchAt} more win${t.clinchAt > 1 ? 's' : ''}${t.clinchAt < t.remaining ? ` in the last ${t.remaining}` : ''}.`
-    : t.clinchAt === 0 ? `${name(t.memberId)} is in, whatever happens in head-to-head games.`
-    : t.winOut != null && t.winOut < 0.9995 ? `Even winning out isn’t enough on its own: ${name(t.memberId)} needs help.`
-    : `${name(t.memberId)} controls their own fate.`
+  const g = t.games
+  const nx = t.next
 
   return (
     <Card
-      title="Playoff Scenarios"
-      sub={`What each team needs over the last ${t.remaining || 'few'} week${t.remaining === 1 ? '' : 's'}, from ${run.sims.toLocaleString()} simulated finishes after week ${run.afterWeek}.`}
+      title="Team Scenarios"
+      sub={`One team’s paths over the last ${g} games${run.median ? ', counting the median game' : ''}.`}
       right={<select value={t.memberId} onChange={(e) => setPick(e.target.value)} aria-label="Team">{run.teams.map((x) => <option key={x.memberId} value={x.memberId}>{name(x.memberId)}</option>)}</select>}
     >
       <div className="scen">
         <div className="scen-head">
           <Avatar id={t.memberId} size={40} />
-          <div><b>{headline}</b><div className="muted small">Head-to-head games only; the weekly median game is played out in every simulation too.</div></div>
+          <ul className="clinch-lines">{clinchLines(t, run.byes).map((l, k) => <li key={k} className={`tone-${l.tone}`}><b>{name(t.memberId)}</b> {l.text}</li>)}</ul>
         </div>
         <div className="stat-grid scen-stats">
           <Stat label="Playoff odds" value={p(t.playoff)} />
           {run.byes && <Stat label="Bye odds" value={p(t.bye)} />}
-          {t.winOut != null && <Stat label="If they win out" value={<span className="pos">{p(t.winOut)}</span>} />}
-          {t.loseOut != null && <Stat label="If they lose out" value={<span className="neg">{p(t.loseOut)}</span>} />}
+          {t.winOut != null && <Stat label={`At ${rec(g, g)}`} value={<span className="pos">{p(t.winOut)}</span>} />}
+          {t.loseOut != null && <Stat label={`At ${rec(0, g)}`} value={<span className="neg">{p(t.loseOut)}</span>} />}
         </div>
+
+        {nx && (
+          <div className="scen-block">
+            <h3>Week {nx.week}</h3>
+            <div className="stat-grid scen-stats">
+              {nx.both != null && <Stat label={nx.median ? 'Win both' : 'Win'} value={<span className="pos">{p(nx.both)}</span>} />}
+              {nx.split != null && <Stat label="Split" value={p(nx.split)} />}
+              {nx.none != null && <Stat label={nx.median ? 'Lose both' : 'Lose'} value={<span className="neg">{p(nx.none)}</span>} />}
+            </div>
+          </div>
+        )}
 
         {t.byWins.length > 1 && (
           <div className="scen-block">
-            <h3>By wins in the last {t.remaining}</h3>
+            <h3>Playoff odds by record over the last {g}</h3>
             <div className="scen-wins">
               {t.byWins.map((b) => (
                 <div key={b.wins} className="scen-win">
                   <div className="scen-win-bar"><span style={{ height: `${Math.max(2, b.odds * 100)}%` }} /></div>
                   <b>{b.share ? p(b.odds) : '—'}</b>
-                  <span className="muted small">{b.wins}–{t.remaining - b.wins}</span>
+                  <span className="muted small">{rec(b.wins, g)}</span>
                 </div>
               ))}
             </div>
@@ -226,12 +302,12 @@ export function ScenariosSection() {
 
         {t.ownGames.length > 0 && (
           <div className="scen-block">
-            <h3>Their games</h3>
-            <ul className="scen-list">{t.ownGames.map((g) => (
-              <li key={g.week}>
-                <span className="scen-wk">W{g.week}</span>
-                <span className="scen-who">vs <MemberLink id={g.b} /></span>
-                <span className="scen-odds"><span className="pos">Win {p(g.ifA)}</span><span className="neg">Lose {p(g.ifB)}</span></span>
+            <h3>Their head-to-head games</h3>
+            <ul className="scen-list">{t.ownGames.map((x) => (
+              <li key={x.week}>
+                <span className="scen-wk">W{x.week}</span>
+                <span className="scen-who">vs <MemberLink id={x.b} /></span>
+                <span className="scen-odds"><span className="pos">Win {p(x.ifA)}</span><span className="neg">Lose {p(x.ifB)}</span></span>
               </li>
             ))}</ul>
           </div>
@@ -239,11 +315,11 @@ export function ScenariosSection() {
 
         <div className="scen-block">
           <h3>Root for</h3>
-          {t.rootFor.length ? <ul className="scen-list">{t.rootFor.map((g: GameSwing) => (
-            <li key={`${g.week}${g.a}`}>
-              <span className="scen-wk">W{g.week}</span>
-              <span className="scen-who"><MemberLink id={g.a} /> <span className="muted">over</span> <MemberLink id={g.b} /></span>
-              <span className="scen-odds"><span className="pos">If so {p(g.ifA)}</span><span className="neg">If not {p(g.ifB)}</span></span>
+          {t.rootFor.length ? <ul className="scen-list">{t.rootFor.map((x: GameSwing) => (
+            <li key={`${x.week}${x.a}`}>
+              <span className="scen-wk">W{x.week}</span>
+              <span className="scen-who"><MemberLink id={x.a} /> <span className="muted">over</span> <MemberLink id={x.b} /></span>
+              <span className="scen-odds"><span className="pos">If so {p(x.ifA)}</span><span className="neg">If not {p(x.ifB)}</span></span>
             </li>
           ))}</ul> : <p className="muted">No other game moves their odds by more than a point.</p>}
         </div>
