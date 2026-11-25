@@ -1,11 +1,11 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CartesianGrid, Legend, Line, ReferenceLine, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
-import type { OddsRun, TeamOdds } from '../lib/odds'
+import type { GameSwing, OddsRun, ScenarioRun, TeamOdds } from '../lib/odds'
 import type { League } from '../lib/stats'
 import type { OddsRequest } from '../lib/odds.worker'
 import { fmt, record } from '../lib/stats'
-import { Card, MemberLink, Table, Tabs, type Col } from '../components/ui'
+import { Avatar, Card, MemberLink, Stat, Table, Tabs, type Col } from '../components/ui'
 import { PALETTE } from './History'
 
 const METRICS = { Playoffs: 'playoff', Bye: 'bye', Title: 'title' } as const
@@ -25,7 +25,7 @@ const T = {
 let worker: Worker | null = null
 let sentRaw: unknown = null
 let nextId = 0
-function send(lg: League, req: Omit<OddsRequest, 'id' | 'raw'>, cb: (res: OddsRun | OddsRun[] | null) => void) {
+function send(lg: League, req: Omit<OddsRequest, 'id' | 'raw'>, cb: (res: OddsRun | OddsRun[] | ScenarioRun | null) => void) {
   worker ??= new Worker(new URL('../lib/odds.worker.ts', import.meta.url), { type: 'module' })
   const id = ++nextId
   const raw = sentRaw === lg.raw ? undefined : lg.raw
@@ -162,3 +162,92 @@ const OddsChart = memo(function OddsChart({ history, metric, marker }: { history
     </ResponsiveContainer>
   )
 })
+
+/** "What does my team need?": playoff paths for the rest of the regular season. */
+export function ScenariosSection() {
+  const lg = useLeague()
+  const season = lg.seasons[0]
+  const [run, setRun] = useState<ScenarioRun | null>(null)
+  const [pick, setPick] = useState<string | null>(null)
+  useEffect(() => {
+    setRun(null)
+    if (season.complete) return
+    send(lg, { kind: 'scen', year: season.year }, (res) => setRun(res as ScenarioRun))
+  }, [lg, season.year, season.complete])
+  if (season.complete) return null
+  if (!run) return <Card title="Playoff Scenarios"><p className="muted">Working out every team’s path…</p></Card>
+  if (!run.teams.some((t) => t.remaining)) return null
+
+  const name = (id: string) => lg.memberById[id]?.name ?? id
+  // Default to the most interesting team: the one closest to a coin flip.
+  const fallback = [...run.teams].sort((a, b) => Math.abs(a.playoff - 0.5) - Math.abs(b.playoff - 0.5))[0].memberId
+  const t = run.teams.find((x) => x.memberId === (pick ?? fallback))!
+  const clinched = t.playoff >= 0.9995 && (t.loseOut == null || t.loseOut >= 0.9995)
+  const out = t.playoff < 0.0005 && (t.winOut == null || t.winOut < 0.0005)
+  const headline = clinched ? `${name(t.memberId)} has clinched a playoff spot.`
+    : out ? `${name(t.memberId)} is out of the playoff race.`
+    : t.clinchAt != null && t.clinchAt > 0 ? `${name(t.memberId)} clinches with ${t.clinchAt} more win${t.clinchAt > 1 ? 's' : ''}${t.clinchAt < t.remaining ? ` in the last ${t.remaining}` : ''}.`
+    : t.clinchAt === 0 ? `${name(t.memberId)} is in, whatever happens in head-to-head games.`
+    : t.winOut != null && t.winOut < 0.9995 ? `Even winning out isn’t enough on its own: ${name(t.memberId)} needs help.`
+    : `${name(t.memberId)} controls their own fate.`
+
+  return (
+    <Card
+      title="Playoff Scenarios"
+      sub={`What each team needs over the last ${t.remaining || 'few'} week${t.remaining === 1 ? '' : 's'}, from ${run.sims.toLocaleString()} simulated finishes after week ${run.afterWeek}.`}
+      right={<select value={t.memberId} onChange={(e) => setPick(e.target.value)} aria-label="Team">{run.teams.map((x) => <option key={x.memberId} value={x.memberId}>{name(x.memberId)}</option>)}</select>}
+    >
+      <div className="scen">
+        <div className="scen-head">
+          <Avatar id={t.memberId} size={40} />
+          <div><b>{headline}</b><div className="muted small">Head-to-head games only; the weekly median game is played out in every simulation too.</div></div>
+        </div>
+        <div className="stat-grid scen-stats">
+          <Stat label="Playoff odds" value={p(t.playoff)} />
+          {run.byes && <Stat label="Bye odds" value={p(t.bye)} />}
+          {t.winOut != null && <Stat label="If they win out" value={<span className="pos">{p(t.winOut)}</span>} />}
+          {t.loseOut != null && <Stat label="If they lose out" value={<span className="neg">{p(t.loseOut)}</span>} />}
+        </div>
+
+        {t.byWins.length > 1 && (
+          <div className="scen-block">
+            <h3>By wins in the last {t.remaining}</h3>
+            <div className="scen-wins">
+              {t.byWins.map((b) => (
+                <div key={b.wins} className="scen-win">
+                  <div className="scen-win-bar"><span style={{ height: `${Math.max(2, b.odds * 100)}%` }} /></div>
+                  <b>{b.share ? p(b.odds) : '—'}</b>
+                  <span className="muted small">{b.wins}–{t.remaining - b.wins}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {t.ownGames.length > 0 && (
+          <div className="scen-block">
+            <h3>Their games</h3>
+            <ul className="scen-list">{t.ownGames.map((g) => (
+              <li key={g.week}>
+                <span className="scen-wk">W{g.week}</span>
+                <span className="scen-who">vs <MemberLink id={g.b} /></span>
+                <span className="scen-odds"><span className="pos">Win {p(g.ifA)}</span><span className="neg">Lose {p(g.ifB)}</span></span>
+              </li>
+            ))}</ul>
+          </div>
+        )}
+
+        <div className="scen-block">
+          <h3>Root for</h3>
+          {t.rootFor.length ? <ul className="scen-list">{t.rootFor.map((g: GameSwing) => (
+            <li key={`${g.week}${g.a}`}>
+              <span className="scen-wk">W{g.week}</span>
+              <span className="scen-who"><MemberLink id={g.a} /> <span className="muted">over</span> <MemberLink id={g.b} /></span>
+              <span className="scen-odds"><span className="pos">If so {p(g.ifA)}</span><span className="neg">If not {p(g.ifB)}</span></span>
+            </li>
+          ))}</ul> : <p className="muted">No other game moves their odds by more than a point.</p>}
+        </div>
+      </div>
+    </Card>
+  )
+}
