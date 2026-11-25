@@ -22,8 +22,9 @@ export interface TeamOdds {
   title: number
   last: number // lose the toilet bowl (losers bracket, lower score advances)
   seeds: number[] // probability of each seed, index 0 = 1 seed
-  ifWin: number | null // playoff odds if they win next week's head-to-head
-  ifLoss: number | null
+  ifWin: number | null // playoff odds if they go 2–0 next week (win, with the median game when the league has one)
+  ifSplit?: number | null // 1–1 next week (median leagues only)
+  ifLoss: number | null // 0–2 next week
 }
 
 export interface OddsRun { season: number; afterWeek: number; nextWeek: number | null; sims: number; rosterAware: boolean; teams: TeamOdds[]; frozenAt?: string; toiletLast?: boolean }
@@ -94,10 +95,13 @@ export function rosterPlan(lg: League, year: number, afterWeek: number, model: O
         if (st && ahead === 0 && OUT.has(st)) m = 0
         return { pos, m, sd: m > 0 ? posSd(model, pos, m) : 0, nfl: nflOf(pid, pos) }
       })
-      // One waiver-wire option per position, used only if it beats what's on the roster.
+      // Waiver-wire fill-ins (the position's 3rd-best free agent): one for every lineup slot the
+      // position can play, so a missing QB, RB, WR, TE, K or DEF is always replaced, used only
+      // where it beats what's on the roster.
       for (const [pos, v] of Object.entries(proj.repl?.[w] ?? {})) {
         const m = v * (model.pos[pos]?.bias ?? 1)
-        if (m > 0) pool.push({ pos, m, sd: posSd(model, pos, m), nfl: -1 })
+        const fits = slots.filter((x) => x === pos || FLEX[x]?.includes(pos)).length
+        if (m > 0) for (let k = 0; k < fits; k++) pool.push({ pos, m, sd: posSd(model, pos, m), nfl: -1 })
       }
       const starters = pickLineup(slots, pool).filter((s) => s.m > 0)
       out[id][w] = { R: starters.reduce((a, s) => a + s.m, 0), starters }
@@ -239,7 +243,8 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
   const P = season.playoffTeams, byes = P === 6 ? 2 : 0
   const acc = { wins: new Float64Array(n), po: new Float64Array(n), bye: new Float64Array(n), fin: new Float64Array(n), title: new Float64Array(n), last: new Float64Array(n) }
   const seeds = ids.map(() => new Float64Array(n))
-  const winN = new Float64Array(n), winPo = new Float64Array(n), lossN = new Float64Array(n), lossPo = new Float64Array(n)
+  const per = median ? 2 : 1
+  const nxN = ids.map(() => new Float64Array(3)), nxPo = ids.map(() => new Float64Array(3))
   const rec = opts.record
   const gameIdx: Record<string, number> = {}
   if (rec) {
@@ -250,7 +255,7 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
   const G = rec ? rec.games.length : 0
   const r = rng(seed)
   const W = new Float64Array(n), PF = new Float64Array(n), str = new Float64Array(n), wk = new Float64Array(n)
-  const nextWon = new Int8Array(n)
+  const nextWon = new Int8Array(n) // wins next week, counting the median game
   const newWeek = () => { for (let k = 0; k < nflN; k++) zN[k] = gauss(r) }
   const play = (i: number, w: number) => {
     const k = slot(i, w > lastWeek ? lastWeek : w)
@@ -270,12 +275,12 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
         const x = idx[a], y = idx[b]
         const winner = wk[x] >= wk[y] ? x : y
         W[winner]++
-        if (w === nextWeek) nextWon[winner] = 1
+        if (w === nextWeek) nextWon[winner]++
         if (rec) { rec.winners[s * G + gameIdx[`${w}|${a}`]] = winner === x ? 0 : 1; if (w === nextWeek) rec.nextW[s * n + winner]++ }
       }
       if (median) {
         const sorted = wk.slice().sort().reverse(), line = (sorted[Math.floor(n / 2) - 1] + sorted[Math.floor(n / 2)]) / 2
-        for (let i = 0; i < n; i++) if (wk[i] > line) { W[i]++; if (rec && w === nextWeek) rec.nextW[s * n + i]++ }
+        for (let i = 0; i < n; i++) if (wk[i] > line) { W[i]++; if (w === nextWeek) nextWon[i]++; if (rec && w === nextWeek) rec.nextW[s * n + i]++ }
       }
     }
     const order = ids.map((_, i) => i).sort((a, b) => W[b] - W[a] || PF[b] - PF[a])
@@ -284,8 +289,8 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
     const field = order.slice(0, P)
     field.forEach((t, k) => { acc.po[t]++; if (k < byes) acc.bye[t]++; if (rec) { rec.made[s * n + t] = 1; if (k < byes) rec.bye[s * n + t] = 1 } })
     if (nextWeek) for (let i = 0; i < n; i++) if (nextOpp[i] >= 0) {
-      const made = field.includes(i) ? 1 : 0
-      if (nextWon[i]) { winN[i]++; winPo[i] += made } else { lossN[i]++; lossPo[i] += made }
+      const made = field.includes(i) ? 1 : 0, k = Math.min(per, nextWon[i])
+      nxN[i][k]++; nxPo[i][k] += made
     }
     // Toilet bowl: non-playoff teams, best vs worst each round, the lower score advances;
     // whoever 'wins' the last round finishes last.
@@ -331,8 +336,9 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
     projWins: acc.wins[i] / sims, playoff: acc.po[i] / sims, bye: acc.bye[i] / sims,
     final: acc.fin[i] / sims, title: acc.title[i] / sims, last: acc.last[i] / sims,
     seeds: Array.from(seeds[i], (x) => x / sims),
-    ifWin: nextWeek && winN[i] ? winPo[i] / winN[i] : null,
-    ifLoss: nextWeek && lossN[i] ? lossPo[i] / lossN[i] : null,
+    ifWin: nextWeek && nxN[i][per] ? nxPo[i][per] / nxN[i][per] : null,
+    ifSplit: nextWeek && median && nxN[i][1] ? nxPo[i][1] / nxN[i][1] : null,
+    ifLoss: nextWeek && nxN[i][0] ? nxPo[i][0] / nxN[i][0] : null,
   })).sort((a, b) => b.playoff - a.playoff || b.title - a.title)
   return { season: season.year, afterWeek, nextWeek, sims, rosterAware, teams, toiletLast: true }
 }
@@ -350,11 +356,19 @@ const optsAt = (lg: League, year: number, w: number, model = modelOf(lg), weight
 
 // Snapshots frozen before 'last' meant losing the toilet bowl stored standings-last odds; keep
 // everything else as published and fill in toilet-bowl odds from a fresh run.
-const frozenOf = (lg: League, year: number, w: number, c: Ctx): OddsRun | undefined => {
+const frozenOf = (lg: League, year: number, w: number, c: Ctx, split = false): OddsRun | undefined => {
   const f = lg.raw.frozen?.[`${year}|${w}`]
-  if (!f || f.toiletLast) return f
-  const fresh = Object.fromEntries(simulate(c, w, 10000, year * 100 + w, optsAt(lg, year, w)).teams.map((t) => [t.memberId, t.last]))
-  return { ...f, toiletLast: true, teams: f.teams.map((t) => ({ ...t, last: fresh[t.memberId] ?? t.last })) }
+  const needSplit = split && !!f?.nextWeek && c.median && f.teams.every((t) => t.ifSplit === undefined)
+  if (!f || (f.toiletLast && !needSplit)) return f
+  // Older snapshots: next-week odds were head-to-head only (no 2–0 / 1–1 / 0–2), and 'last' meant standings-last.
+  const fresh = Object.fromEntries(simulate(c, w, 10000, year * 100 + w, optsAt(lg, year, w)).teams.map((t) => [t.memberId, t]))
+  return {
+    ...f, toiletLast: true,
+    teams: f.teams.map((t) => {
+      const x = fresh[t.memberId]
+      return { ...t, last: f.toiletLast ? t.last : x?.last ?? t.last, ...(needSplit && x ? { ifWin: x.ifWin, ifSplit: x.ifSplit, ifLoss: x.ifLoss } : {}) }
+    }),
+  }
 }
 
 /** Odds as of the latest scored regular-season week (or a chosen week). A week whose odds were
@@ -365,7 +379,7 @@ export function playoffOdds(lg: League, year: number, afterWeek?: number, sims =
     const c = context(lg, year)
     if (!c) return null
     const w = Math.min(afterWeek ?? weeksScored(c), weeksScored(c))
-    if (!live) { const f = frozenOf(lg, year, w, c); if (f) return f }
+    if (!live) { const f = frozenOf(lg, year, w, c, true); if (f) return f }
     return simulate(c, w, sims, year * 100 + w, optsAt(lg, year, w))
   })
 }

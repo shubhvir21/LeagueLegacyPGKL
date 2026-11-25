@@ -18,6 +18,7 @@ const T = {
   roster: 'Best possible lineup next week from the roster. Each player = Sleeper projection (bias-corrected per position) blended with his actual points this season; byes are zeroed, Out/Doubtful/IR players sit out next week, and later weeks follow Sleeper’s projection (which builds in return dates), and an empty slot is filled by the best waiver-wire option.',
   scoring: 'Actual points per week, recent weeks weighted more (6-week half-life), shrunk toward the league’s all-time average early in the year.',
   swing: 'Playoff odds if this team wins vs. loses its head-to-head game next week. The gap is how much the game matters.',
+  swing3: 'Playoff odds next week if this team goes 2–0 (wins its matchup and the median game), splits 1–1, or goes 0–2.',
   model: 'Every simulation draws each team’s true scoring level (with uncertainty), plays the rest of the regular season including the median game, seeds by wins then points for, and plays the bracket.',
 }
 
@@ -76,6 +77,7 @@ export function OddsSection() {
   if (!run) return <Card title="Simulation"><p className="muted">Simulating the season…</p></Card>
 
   const P = season.playoffTeams
+  const hasSplit = run.teams.some((t) => t.ifSplit != null)
   const cols: Col<TeamOdds>[] = [
     { key: 'm', label: 'Team', render: (t) => <MemberLink id={t.memberId} /> },
     { key: 'r', label: 'Record', render: (t) => record(t.wins, t.losses), sort: (t) => t.wins - t.losses / 100, align: 'right' },
@@ -89,9 +91,15 @@ export function OddsSection() {
     { key: 't', label: 'Title', render: (t) => <b className="pos">{p(t.title)}</b>, sort: (t) => t.title, align: 'right' },
     { key: 'l', label: 'Toilet Bowl', tip: 'Odds of losing the toilet bowl (finishing last)', render: (t) => <span className="neg">{p(t.last)}</span>, sort: (t) => t.last, align: 'right' },
     ...(run.nextWeek ? [{
-      key: 'sw', label: `W${run.nextWeek} Win / Loss`, tip: T.swing, align: 'right' as const,
+      key: 'sw', label: hasSplit ? `W${run.nextWeek} Win / Split / Loss` : `W${run.nextWeek} Win / Loss`, tip: hasSplit ? T.swing3 : T.swing, align: 'right' as const,
       sort: (t: TeamOdds) => (t.ifWin ?? 0) - (t.ifLoss ?? 0),
-      render: (t: TeamOdds) => t.ifWin == null ? '—' : <span><span className="pos">{p(t.ifWin)}</span> / <span className="neg">{p(t.ifLoss ?? 0)}</span></span>,
+      render: (t: TeamOdds) => t.ifWin == null && t.ifLoss == null ? '—' : (
+        <span style={{ whiteSpace: 'nowrap' }}>
+          <span className="pos">{t.ifWin == null ? '—' : p(t.ifWin)}</span>
+          {hasSplit && <> / <span>{t.ifSplit == null ? '—' : p(t.ifSplit)}</span></>}
+          {' / '}<span className="neg">{t.ifLoss == null ? '—' : p(t.ifLoss)}</span>
+        </span>
+      ),
     }] : []),
   ]
 
