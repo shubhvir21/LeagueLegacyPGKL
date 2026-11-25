@@ -178,7 +178,7 @@ function weeksScored(c: Ctx) {
 
 export interface SimOpts { plan?: Plan | null; weight?: number | null; model?: OddsModel; record?: SimRecord }
 /** Filled per simulation when scenarios are wanted: who won each remaining game, who made it. */
-export interface SimRecord { games: { week: number; a: number; b: number }[]; winners: Uint8Array; made: Uint8Array; bye: Uint8Array; seed: Uint8Array; remW: Uint8Array; nextW: Uint8Array; finalW: Uint8Array }
+export interface SimRecord { games: { week: number; a: number; b: number }[]; winners: Uint8Array; made: Uint8Array; bye: Uint8Array; seed: Uint8Array; remW: Uint8Array; nextW: Uint8Array; finalW: Uint8Array; weekW: Uint8Array; weeks: number }
 function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: SimOpts = {}): OddsRun {
   const model = opts.model ?? DEFAULT_MODEL
   const { ids, scores, pairings, lastReg, median, season } = c
@@ -251,6 +251,7 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
     for (let w = afterWeek + 1; w <= lastReg; w++) for (const [a, b] of pairings[w] ?? []) { gameIdx[`${w}|${a}`] = rec.games.length; rec.games.push({ week: w, a: idx[a], b: idx[b] }) }
     rec.winners = new Uint8Array(sims * rec.games.length); rec.made = new Uint8Array(sims * n); rec.bye = new Uint8Array(sims * n)
     rec.seed = new Uint8Array(sims * n); rec.remW = new Uint8Array(sims * n); rec.nextW = new Uint8Array(sims * n); rec.finalW = new Uint8Array(sims * n)
+    rec.weeks = lastReg - afterWeek; rec.weekW = new Uint8Array(sims * n * Math.max(1, rec.weeks))
   }
   const G = rec ? rec.games.length : 0
   const r = rng(seed)
@@ -276,11 +277,11 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
         const winner = wk[x] >= wk[y] ? x : y
         W[winner]++
         if (w === nextWeek) nextWon[winner]++
-        if (rec) { rec.winners[s * G + gameIdx[`${w}|${a}`]] = winner === x ? 0 : 1; if (w === nextWeek) rec.nextW[s * n + winner]++ }
+        if (rec) { rec.winners[s * G + gameIdx[`${w}|${a}`]] = winner === x ? 0 : 1; if (w === nextWeek) rec.nextW[s * n + winner]++; rec.weekW[(s * n + winner) * rec.weeks + (w - afterWeek - 1)]++ }
       }
       if (median) {
         const sorted = wk.slice().sort().reverse(), line = (sorted[Math.floor(n / 2) - 1] + sorted[Math.floor(n / 2)]) / 2
-        for (let i = 0; i < n; i++) if (wk[i] > line) { W[i]++; if (w === nextWeek) nextWon[i]++; if (rec && w === nextWeek) rec.nextW[s * n + i]++ }
+        for (let i = 0; i < n; i++) if (wk[i] > line) { W[i]++; if (w === nextWeek) nextWon[i]++; if (rec) { if (w === nextWeek) rec.nextW[s * n + i]++; rec.weekW[(s * n + i) * rec.weeks + (w - afterWeek - 1)]++ } }
       }
     }
     const order = ids.map((_, i) => i).sort((a, b) => W[b] - W[a] || PF[b] - PF[a])
@@ -467,7 +468,7 @@ export function fitResid(lg: League, model: OddsModel): number {
   return k ? +Math.sqrt(Math.max(0, (ss - pv) / k)).toFixed(2) : DEFAULT_MODEL.resid
 }
 
-export interface GameSwing { week: number; a: string; b: string; ifA: number; ifB: number }
+export interface GameSwing { week: number; a: string; b: string; ifA: number; ifB: number; ifSplit?: number | null } // ownGames: ifA = 2–0, ifSplit = 1–1, ifB = 0–2 (median leagues)
 /** One outcome (playoffs, bye, 1 seed) measured against the record over the remaining games. */
 export interface Threshold {
   all: boolean // happened in every simulation
@@ -503,7 +504,7 @@ export function scenarios(lg: League, year: number, sims = 10000): ScenarioRun |
     const c = context(lg, year)
     if (!c) return null
     const w = weeksScored(c)
-    const rec: SimRecord = { games: [], winners: new Uint8Array(), made: new Uint8Array(), bye: new Uint8Array(), seed: new Uint8Array(), remW: new Uint8Array(), nextW: new Uint8Array(), finalW: new Uint8Array() }
+    const rec: SimRecord = { games: [], winners: new Uint8Array(), made: new Uint8Array(), bye: new Uint8Array(), seed: new Uint8Array(), remW: new Uint8Array(), nextW: new Uint8Array(), finalW: new Uint8Array(), weekW: new Uint8Array(), weeks: 0 }
     simulate(c, w, sims, year * 100 + w, { ...optsAt(lg, year, w), record: rec })
     const n = c.ids.length, G = rec.games.length
     const weeks = Math.max(0, c.lastReg - w), per = c.median ? 2 : 1, games = weeks * per
@@ -592,7 +593,14 @@ export function scenarios(lg: League, year: number, sims = 10000): ScenarioRun |
         winOut: games && N[games] ? Po[games] / N[games] : null, loseOut: games && N[0] ? Po[0] / N[0] : null,
         byWins: Array.from({ length: games + 1 }, (_, k) => ({ wins: k, odds: rate(Po[k], N[k]), share: N[k] / sims })),
         next: nextWeek ? { week: nextWeek, median: c.median, both: nx[per] ? nxPo[per] / nx[per] : null, split: c.median && nx[1] ? nxPo[1] / nx[1] : null, none: nx[0] ? nxPo[0] / nx[0] : null } : null,
-        ownGames: mine.map(({ g, k }) => swing(k, g.b === i)), rootFor,
+        ownGames: mine.map(({ g, k }) => {
+          const sw = swing(k, g.b === i)
+          if (!c.median) return sw
+          // Their whole week: matchup plus median game.
+          const wi = g.week - w - 1, cnt = [0, 0, 0], made = [0, 0, 0]
+          for (let s = 0; s < sims; s++) { const x = Math.min(2, rec.weekW[(s * n + i) * rec.weeks + wi]); cnt[x]++; made[x] += rec.made[s * n + i] }
+          return { ...sw, ifA: rate(made[2], cnt[2]), ifSplit: cnt[1] ? made[1] / cnt[1] : null, ifB: rate(made[0], cnt[0]) }
+        }), rootFor,
       }
     }).sort((a, b) => b.playoff - a.playoff || b.bye - a.bye)
     return { season: year, afterWeek: w, sims, byes: c.season.playoffTeams === 6, median: c.median, teams, nextWeek, weekLines: nextWeek ? weekLines(lg, c, rec, sims, weeks, per) : [] }

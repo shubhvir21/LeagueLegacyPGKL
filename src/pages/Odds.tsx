@@ -318,12 +318,14 @@ export function ScenariosSection() {
 
         {t.ownGames.length > 0 && (
           <div className="scen-block">
-            <h3>Their head-to-head games</h3>
+            <h3>{run.median ? 'Their games · win = 2–0, split = 1–1, loss = 0–2' : 'Their games'}</h3>
             <ul className="scen-list">{t.ownGames.map((x) => (
               <li key={x.week}>
                 <span className="scen-wk">W{x.week}</span>
                 <span className="scen-who">vs <MemberLink id={x.b} /></span>
-                <span className="scen-odds"><span className="pos">Win {p(x.ifA)}</span><span className="neg">Lose {p(x.ifB)}</span></span>
+                <span className="scen-odds">{run.median
+                  ? <><span className="pos">Win {p(x.ifA)}</span><span>Split {x.ifSplit == null ? '—' : p(x.ifSplit)}</span><span className="neg">Loss {p(x.ifB)}</span></>
+                  : <><span className="pos">Win {p(x.ifA)}</span><span className="neg">Lose {p(x.ifB)}</span></>}</span>
               </li>
             ))}</ul>
           </div>
