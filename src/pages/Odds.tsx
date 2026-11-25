@@ -182,6 +182,11 @@ function useScenarios(lg: League, year: number, enabled: boolean) {
   return run
 }
 
+/** Scenario text with the joining words (and / or) bold and capitalized so the logic stands out. */
+function logic(text: string) {
+  return text.split(/\b(and|or)\b(?! (?:better|worse)\b)/).map((part, k) => (k % 2 ? <b key={k} className="logic">{part.toUpperCase()}</b> : part))
+}
+
 const rec = (k: number, g: number) => `${k}–${g - k}`
 const better = (k: number, g: number) => (k === g ? `${rec(k, g)}` : `${rec(k, g)} or better`)
 const worse = (k: number, g: number) => (k === 0 ? `${rec(k, g)}` : `${rec(k, g)} or worse`)
@@ -234,7 +239,7 @@ export function ClinchSection() {
         {[...byTeam.entries()].map(([id, ls]) => (
           <li key={id} className="clinch-row">
             <span className="clinch-who"><MemberLink id={id} /></span>
-            <ul className="clinch-lines">{ls.map((l, k) => <li key={k} className={l.kind === 'out' ? 'tone-neg' : l.what === 'a playoff spot' ? 'tone-pos' : 'tone-gold'}>{l.text}</li>)}</ul>
+            <ul className="clinch-lines">{ls.map((l, k) => <li key={k} className={l.kind === 'out' ? 'tone-neg' : l.what === 'a playoff spot' ? 'tone-pos' : 'tone-gold'}>{logic(l.text)}</li>)}</ul>
           </li>
         ))}
       </ul>
@@ -268,7 +273,7 @@ export function ScenariosSection() {
       <div className="scen">
         <div className="scen-head">
           <Avatar id={t.memberId} size={40} />
-          <ul className="clinch-lines">{clinchLines(t, run.byes, name).map((l, k) => <li key={k} className={`tone-${l.tone}`}><b>{name(t.memberId)}</b> {l.text}</li>)}</ul>
+          <ul className="clinch-lines">{clinchLines(t, run.byes, name).map((l, k) => <li key={k} className={`tone-${l.tone}`}><b>{name(t.memberId)}</b> {logic(l.text)}</li>)}</ul>
         </div>
         <div className="stat-grid scen-stats">
           <Stat label="Playoff odds" value={p(t.playoff)} />
