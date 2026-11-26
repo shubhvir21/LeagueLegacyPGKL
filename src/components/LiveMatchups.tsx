@@ -12,6 +12,7 @@ import { applyFinals, fetchEspnSnapshot, parseFinishedTeams, type EspnSnapshot, 
 import type { SleeperMatchup, SleeperRoster } from '../lib/sleeper'
 import { fmt, type League } from '../lib/stats'
 import { currentEra } from '../lib/tenure'
+import { Icon } from './Icon'
 import { Avatar, TeamName } from './ui'
 
 const REFRESH_MS = 60_000
@@ -102,12 +103,21 @@ export function LiveMatchups() {
     return () => clearInterval(id)
   }, [load])
 
+  const loadEspn = useCallback(() => fetchEspnSnapshot().then(setEspn).catch(() => setEspn(EMPTY_ESPN)), []) // display-only extra: on failure the cell just shows the score line
+
+  const [isRefreshing, setRefreshing] = useState(false)
+  const refresh = async () => {
+    setRefreshing(true)
+    await Promise.all([load(), loadEspn()])
+    setRefreshing(false)
+  }
+
   useEffect(() => {
-    const poll = () => { if (!document.hidden) fetchEspnSnapshot().then(setEspn).catch(() => setEspn(EMPTY_ESPN)) } // display-only extra: on failure the cell just shows the score line
+    const poll = () => { if (!document.hidden) loadEspn() }
     poll()
     const id = setInterval(poll, SITUATION_REFRESH_MS)
     return () => clearInterval(id)
-  }, [])
+  }, [loadEspn])
 
   const { situations } = espn
   // The feed carries other weeks' games; only this week's count towards a starter's projection.
@@ -138,11 +148,17 @@ export function LiveMatchups() {
   const game = games[Math.min(selected, games.length - 1)]
   const stale = feed && minutesAgo(feed.generatedAt) > STALE_MINUTES
 
-  if (error) return <p className="error">{error}</p>
+  const refreshButton = (
+    <button className="icon-btn" onClick={refresh} disabled={isRefreshing} aria-label="Refresh matchups">
+      <Icon name="refresh" className={isRefreshing ? 'spin' : ''} />
+    </button>
+  )
+
+  if (error) return <div className="lm"><div className="lm-head"><p className="error">{error}</p>{refreshButton}</div></div>
   if (!game) return null
   return (
     <div className="lm">
-      <div className="lm-head"><h2>Week {week}</h2></div>
+      <div className="lm-head"><h2>Week {week}</h2>{refreshButton}</div>
       {feedError && <p className="error">Live odds unavailable ({feedError}); showing Sleeper's static projections.</p>}
       {stale && <p className="error">Odds feed last updated {minutesAgo(feed.generatedAt)} minutes ago.</p>}
       <div className="lm-chips" role="tablist">

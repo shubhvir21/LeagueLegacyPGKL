@@ -901,7 +901,8 @@ button.elo-chip { font: inherit; }
 
 /* Live matchups */
 .error { color: #ff9b9b; }
-.lm-head h2 { margin: 0 0 6px; font-size: 16px; }
+.lm-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.lm-head h2 { margin: 0; font-size: 16px; }
 .lm-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: thin; }
 .lm-chip { flex: none; display: flex; flex-direction: column; gap: 3px; padding: 6px 10px; min-width: 138px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; color: var(--text-2); cursor: pointer; text-align: left; }
 .lm-chip:hover { border-color: var(--border-strong); }
@@ -959,7 +960,7 @@ button.elo-chip { font: inherit; }
 .lm-cell.right .lm-ast { left: auto; right: 100%; margin: 0 2px 0 0; }
 @media (max-width: 760px) {
   .gc-title { font-size: 18px; margin: 0 0 2px; }
-  .lm-head h2 { font-size: 11px; font-weight: 600; color: var(--muted); margin: 0 0 4px; text-transform: uppercase; letter-spacing: .08em; }
+  .lm-head h2 { font-size: 11px; font-weight: 600; color: var(--muted); margin: 0; text-transform: uppercase; letter-spacing: .08em; }
   .lm-board { padding: 10px; gap: 6px 8px; }
   .lm-top .avatar { width: 30px !important; height: 30px !important; }
   .lm-top { gap: 8px; }
