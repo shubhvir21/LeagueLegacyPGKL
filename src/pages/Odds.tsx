@@ -1,7 +1,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CartesianGrid, Legend, Line, ReferenceLine, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLeague } from '../lib/data'
-import type { GameSwing, OddsRun, ScenarioRun, TeamOdds, TeamScenario, Threshold } from '../lib/odds'
+import type { GameSwing, OddsRun, PartialWeek, ScenarioRun, TeamOdds, TeamScenario, Threshold } from '../lib/odds'
+import { usePartialWeek } from '../lib/usePartialWeek'
 import type { League } from '../lib/stats'
 import type { OddsRequest } from '../lib/odds.worker'
 import { fmt, record } from '../lib/stats'
@@ -38,7 +39,7 @@ function send(lg: League, req: Omit<OddsRequest, 'id' | 'raw'>, cb: (res: OddsRu
   return id
 }
 
-export function useOdds(lg: League, year: number, week: number | null, dragging: boolean, withHistory = true) {
+export function useOdds(lg: League, year: number, week: number | null, dragging: boolean, withHistory = true, partial: PartialWeek | null = null) {
   const [history, setHistory] = useState<OddsRun[] | null>(null)
   const [full, setFull] = useState<OddsRun | null>(null)
   const [busy, setBusy] = useState(false)
@@ -50,6 +51,12 @@ export function useOdds(lg: League, year: number, week: number | null, dragging:
     send(lg, { kind: 'odds', year }, (res) => setFull((f) => f ?? (res as OddsRun)))
     if (withHistory) send(lg, { kind: 'hist', year }, (res) => setHistory(res as OddsRun[]))
   }, [lg, year, withHistory])
+  // A week in progress: re-run today's odds with what has happened so far. Rewinding to an earlier week leaves it out.
+  useEffect(() => {
+    if (!partial || week != null) return
+    const id = send(lg, { kind: 'odds', year, partial }, (res) => { if (latest.current === id || latest.current === 0) setFull(res as OddsRun) })
+    latest.current = id
+  }, [lg, year, partial, week])
   useEffect(() => {
     if (dragging || !history || week == null) return
     const w = Math.min(week, history.length - 1)
@@ -70,7 +77,8 @@ export function OddsSection() {
   const [weekSel, setWeekSel] = useState<number | null>(null)
   // While dragging, show the cached per-week runs (instant); the full 10k run happens on release.
   const [dragging, setDragging] = useState(false)
-  const { history, full, busy } = useOdds(lg, year, weekSel, dragging)
+  const partial = usePartialWeek(year === lg.seasons[0]?.year && !season.complete)
+  const { history, full, busy } = useOdds(lg, year, weekSel, dragging, true, partial)
   const last = history ? history.length - 1 : full?.afterWeek ?? 0
   const week = weekSel == null || weekSel > last ? last : weekSel
   const run = (full && full.afterWeek === week && full.season === year ? full : null) ?? history?.[week]
@@ -107,7 +115,7 @@ export function OddsSection() {
     <>
       <Card
         title="Simulation"
-        sub={`${busy ? 'Refining… ' : ''}${run.sims.toLocaleString()} simulated seasons as of ${week === 0 ? 'the preseason' : `week ${week}`}${run.frozenAt ? ` (as published ${new Date(run.frozenAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })})` : ''}. Top ${P} make the playoffs${P === 6 ? ', top 2 get byes' : ''}. Drag to rewind the odds to any week.`}
+        sub={`${busy ? 'Refining… ' : ''}${run.sims.toLocaleString()} simulated seasons as of ${week === 0 ? 'the preseason' : `week ${week}`}${run.partial ? ` plus week ${run.nextWeek}: games played so far and Vegas player props for the rest` : ''}${run.frozenAt ? ` (as published ${new Date(run.frozenAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })})` : ''}. Top ${P} make the playoffs${P === 6 ? ', top 2 get byes' : ''}. Drag to rewind the odds to any week.`}
         right={
           <select value={year} onChange={(e) => { setYear(Number(e.target.value)); setWeekSel(null) }}>
             {years.map((y) => <option key={y}>{y}</option>)}

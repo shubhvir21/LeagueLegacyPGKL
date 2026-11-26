@@ -1,15 +1,15 @@
 // Runs playoff simulations off the main thread so the page stays responsive.
 import { buildLeague, type League } from './stats'
-import { oddsHistory, playoffOdds, scenarios } from './odds'
+import { oddsHistory, playoffOdds, scenarios, type PartialWeek } from './odds'
 import type { RawData } from './sleeper'
 
 let lg: League | null = null
-export type OddsRequest = { id: number; raw?: RawData; kind: 'hist' | 'odds' | 'scen'; year: number; week?: number }
+export type OddsRequest = { id: number; raw?: RawData; kind: 'hist' | 'odds' | 'scen'; year: number; week?: number; partial?: PartialWeek }
 
 self.onmessage = (e: MessageEvent<OddsRequest>) => {
-  const { id, raw, kind, year, week } = e.data
+  const { id, raw, kind, year, week, partial } = e.data
   if (raw) lg = buildLeague(raw)
   if (!lg) return
-  const res = kind === 'hist' ? oddsHistory(lg, year) : kind === 'scen' ? scenarios(lg, year) : playoffOdds(lg, year, week)
+  const res = kind === 'hist' ? oddsHistory(lg, year) : kind === 'scen' ? scenarios(lg, year) : playoffOdds(lg, year, week, 10000, false, partial ?? null)
   self.postMessage({ id, kind, year, week, res })
 }
