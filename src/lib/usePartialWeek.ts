@@ -1,0 +1,63 @@
+// The week in progress as the playoff simulation needs it, kept fresh while the page is open. It reads the same
+// sources as the Live page (Sleeper matchups, the odds feed, ESPN's list of finished games) and stays null until
+// somebody has scored, so a quiet week leaves the published odds alone.
+import { useEffect, useRef, useState } from 'react'
+import { useLeague } from './data'
+import { buildTeamLines, fetchLiveFeed, fetchMatchups, fetchSleeperProjections, fetchWeek, indexBySleeperId, indexGamesByTeam, normalizeTeam, pairMatchups } from './live'
+import { DEFAULT_MODEL } from './model'
+import type { PartialWeek } from './odds'
+import { buildPartialWeek } from './partial'
+import { playersOf } from './players'
+import { selectWeekGames } from './scope'
+import { applyFinals, fetchEspnSnapshot, parseFinishedTeams } from './situation'
+
+const REFRESH_MS = 60_000
+
+export function usePartialWeek(enabled: boolean): PartialWeek | null {
+  const lg = useLeague()
+  const [partial, setPartial] = useState<PartialWeek | null>(null)
+  const lastKey = useRef('')
+
+  useEffect(() => {
+    if (!enabled) { setPartial(null); return }
+    let alive = true
+    const season = lg.seasons[0]
+    const info = playersOf(lg).info
+    const model = lg.raw.model ?? DEFAULT_MODEL
+    const load = async () => {
+      const week = await fetchWeek()
+      const [matchups, projections, rawFeed, espn] = await Promise.all([
+        fetchMatchups(week), fetchSleeperProjections(week), fetchLiveFeed(), fetchEspnSnapshot().catch(() => null),
+      ])
+      const started = matchups.some((m) => m.starters_points.some((p) => p !== 0))
+      if (!alive || !season || !started) return
+      const dates = new Set(projections.gameDates)
+      const feed = applyFinals(selectWeekGames(rawFeed, dates), espn ? parseFinishedTeams(espn.events, dates) : new Set())
+      const live = indexBySleeperId(feed)
+      const teamGames = indexGamesByTeam(feed)
+      const ctx = {
+        live, sleeperProjections: projections.points,
+        gameOf: (id: string) => live.get(id)?.game ?? teamGames.get(normalizeTeam(info[id]?.team ?? '')) ?? null,
+      }
+      const sides = pairMatchups(matchups).flatMap(([a, b]) => [a, ...(b ? [b] : [])]).flatMap((m) => {
+        const memberId = season.teamSeasons.find((t) => t.rosterId === m.roster_id)?.memberId
+        return memberId ? [{
+          memberId, lines: buildTeamLines(m, ctx), pos: (id: string) => info[id]?.pos ?? 'WR',
+          nflOf: (id: string) => { const t = live.get(id)?.row.team ?? info[id]?.team; return t ? normalizeTeam(t) : null },
+        }] : []
+      })
+      const next = buildPartialWeek(week, sides, model)
+      // The simulation is not cheap: only run it again when the week has moved by a point or more.
+      const key = JSON.stringify(next, (_k, v) => (typeof v === 'number' ? Math.round(v) : v))
+      if (key === lastKey.current) return
+      lastKey.current = key
+      setPartial(next)
+    }
+    const tick = () => { if (!document.hidden) load().catch(() => undefined) } // an extra on top of the published odds: if it fails the table stays as it was
+    tick()
+    const id = setInterval(tick, REFRESH_MS)
+    return () => { alive = false; clearInterval(id) }
+  }, [lg, enabled])
+
+  return partial
+}

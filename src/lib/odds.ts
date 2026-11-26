@@ -26,14 +26,24 @@ export interface TeamOdds {
   ifLoss: number | null
 }
 
-export interface OddsRun { season: number; afterWeek: number; nextWeek: number | null; sims: number; rosterAware: boolean; teams: TeamOdds[]; frozenAt?: string; toiletLast?: boolean }
+/** A week in progress, per team: points already scored plus the starters whose games are not over. */
+export interface PartialTeam {
+  fixed: number
+  /** Expected remaining points and spread (already scaled to what is left of the game) for each starter still to play. */
+  starters: Starter[]
+  /** Share of the lineup still to be played, 0 to 1: scales the leftover team-level noise. */
+  open?: number
+}
+export interface PartialWeek { week: number; teams: Record<string, PartialTeam> }
+
+export interface OddsRun { partial?: boolean; season: number; afterWeek: number; nextWeek: number | null; sims: number; rosterAware: boolean; teams: TeamOdds[]; frozenAt?: string; toiletLast?: boolean }
 
 const PRIOR_WEEKS = 4 // the league mean counts as this many weeks of evidence
 const SD_PRIOR_WEEKS = 6
 const HALF_LIFE = 6 // weeks: recent scores count more
 const OUT = new Set(['Out', 'Doubtful', 'IR', 'PUP', 'NA', 'Sus', 'DNR', 'COV'])
 
-interface Starter { m: number; sd: number; nfl: number } // nfl: index for correlated draws, -1 = independent
+export interface Starter { m: number; sd: number; nfl: number } // nfl: index for correlated draws, -1 = independent
 interface WeekPlan { R: number; starters: Starter[] }
 type Plan = Record<string, Record<number, WeekPlan>> // member -> week -> lineup
 
@@ -129,7 +139,7 @@ const NORMALS = (() => {
 })()
 const gauss = (r: () => number) => NORMALS[(r() * NT) | 0]
 
-interface Ctx {
+export interface Ctx {
   season: Season
   ids: string[]
   scores: Record<string, number[]> // regular-season week -> points, index week-1
@@ -172,8 +182,8 @@ function weeksScored(c: Ctx) {
   return w
 }
 
-export interface SimOpts { plan?: Plan | null; weight?: number | null; model?: OddsModel }
-function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: SimOpts = {}): OddsRun {
+export interface SimOpts { plan?: Plan | null; weight?: number | null; model?: OddsModel; partial?: PartialWeek | null }
+export function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: SimOpts = {}): OddsRun {
   const model = opts.model ?? DEFAULT_MODEL
   const { ids, scores, pairings, lastReg, median, season } = c
   const n = ids.length
@@ -234,6 +244,16 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
   const nextOpp = new Int32Array(n).fill(-1)
   for (const [a, b] of nextWeek ? pairings[nextWeek] ?? [] : []) { nextOpp[idx[a]] = idx[b]; nextOpp[idx[b]] = idx[a] }
 
+  // The week in progress is played from what has happened: banked points plus each unplayed starter's own draw.
+  const part = opts.partial && nextWeek !== null && opts.partial.week === nextWeek ? opts.partial : null
+  const partTeam = ids.map((id) => part?.teams[id] ?? null)
+  const playPartial = (t: PartialTeam) => {
+    let S = t.fixed
+    for (const st of t.starters) S += st.m + st.sd * (st.nfl >= 0 ? sr * zN[st.nfl % nflN] + sr1 * gauss(r) : gauss(r))
+    if (t.open) S += model.resid * Math.sqrt(t.open) * gauss(r)
+    return S
+  }
+
   const P = season.playoffTeams, byes = P === 6 ? 2 : 0
   const acc = { wins: new Float64Array(n), po: new Float64Array(n), bye: new Float64Array(n), fin: new Float64Array(n), title: new Float64Array(n), last: new Float64Array(n) }
   const seeds = ids.map(() => new Float64Array(n))
@@ -255,7 +275,7 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
     for (let i = 0; i < n; i++) { W[i] = baseW[i]; PF[i] = basePf[i]; str[i] = muSd[i] * gauss(r); nextWon[i] = 0 }
     for (let w = afterWeek + 1; w <= lastReg; w++) {
       newWeek()
-      for (let i = 0; i < n; i++) { wk[i] = play(i, w); PF[i] += wk[i] }
+      for (let i = 0; i < n; i++) { const t = w === nextWeek ? partTeam[i] : null; wk[i] = t ? playPartial(t) : play(i, w); PF[i] += wk[i] }
       for (const [a, b] of pairings[w] ?? []) {
         const x = idx[a], y = idx[b]
         const winner = wk[x] >= wk[y] ? x : y
@@ -316,14 +336,14 @@ function simulate(c: Ctx, afterWeek: number, sims: number, seed: number, opts: S
 
   const teams: TeamOdds[] = ids.map((id, i) => ({
     memberId: id, wins: baseW[i], losses: baseL[i], pf: basePf[i],
-    rating: meanOf(i, afterWeek + 1), scoreRating: mu[i], rosterRating: weekPlan(i, afterWeek + 1)?.R ?? null,
+    rating: partTeam[i] ? partTeam[i]!.fixed + partTeam[i]!.starters.reduce((a, x) => a + x.m, 0) : meanOf(i, afterWeek + 1), scoreRating: mu[i], rosterRating: weekPlan(i, afterWeek + 1)?.R ?? null,
     projWins: acc.wins[i] / sims, playoff: acc.po[i] / sims, bye: acc.bye[i] / sims,
     final: acc.fin[i] / sims, title: acc.title[i] / sims, last: acc.last[i] / sims,
     seeds: Array.from(seeds[i], (x) => x / sims),
     ifWin: nextWeek && winN[i] ? winPo[i] / winN[i] : null,
     ifLoss: nextWeek && lossN[i] ? lossPo[i] / lossN[i] : null,
   })).sort((a, b) => b.playoff - a.playoff || b.title - a.title)
-  return { season: season.year, afterWeek, nextWeek, sims, rosterAware, teams, toiletLast: true }
+  return { season: season.year, afterWeek, nextWeek, sims, rosterAware, teams, toiletLast: true, ...(part ? { partial: true } : {}) }
 }
 
 const cache = new WeakMap<League, Record<string, unknown>>()
@@ -349,13 +369,13 @@ const frozenOf = (lg: League, year: number, w: number, c: Ctx): OddsRun | undefi
 /** Odds as of the latest scored regular-season week (or a chosen week). A week whose odds were
  *  frozen when published (right before the next week's first kickoff) returns that snapshot,
  *  so rewinding shows what was shown live; pass live to re-simulate with today's data. */
-export function playoffOdds(lg: League, year: number, afterWeek?: number, sims = 10000, live = false): OddsRun | null {
-  return memo(lg, `odds|${year}|${afterWeek}|${sims}|${live}`, () => {
+export function playoffOdds(lg: League, year: number, afterWeek?: number, sims = 10000, live = false, partial: PartialWeek | null = null): OddsRun | null {
+  return memo(lg, `odds|${year}|${afterWeek}|${sims}|${live}|${partial ? JSON.stringify(partial) : ''}`, () => {
     const c = context(lg, year)
     if (!c) return null
     const w = Math.min(afterWeek ?? weeksScored(c), weeksScored(c))
-    if (!live) { const f = frozenOf(lg, year, w, c); if (f) return f }
-    return simulate(c, w, sims, year * 100 + w, optsAt(lg, year, w))
+    if (!live && !partial) { const f = frozenOf(lg, year, w, c); if (f) return f }
+    return simulate(c, w, sims, year * 100 + w, { ...optsAt(lg, year, w), partial })
   })
 }
 
