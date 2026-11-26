@@ -107,7 +107,7 @@ export function OddsSection() {
     <>
       <Card
         title="Simulation"
-        sub={`${busy ? 'Refining… ' : ''}${run.sims.toLocaleString()} simulated seasons as of ${week === 0 ? 'the preseason' : `week ${week}`}${run.partial ? ` plus the week ${run.nextWeek} games played so far` : ''}${run.frozenAt ? ` (as published ${new Date(run.frozenAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })})` : ''}. Top ${P} make the playoffs${P === 6 ? ', top 2 get byes' : ''}. Drag to rewind the odds to any week.`}
+        sub={`${busy ? 'Refining… ' : ''}${run.sims.toLocaleString()} simulated seasons as of ${week === 0 ? 'the preseason' : `week ${week}`}${run.partial ? ` plus week ${run.nextWeek}: games played so far and Vegas player props for the rest` : ''}${run.frozenAt ? ` (as published ${new Date(run.frozenAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })})` : ''}. Top ${P} make the playoffs${P === 6 ? ', top 2 get byes' : ''}. Drag to rewind the odds to any week.`}
         right={
           <select value={year} onChange={(e) => { setYear(Number(e.target.value)); setWeekSel(null) }}>
             {years.map((y) => <option key={y}>{y}</option>)}

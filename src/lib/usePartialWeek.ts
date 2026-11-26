@@ -1,6 +1,7 @@
-// The week in progress as the playoff simulation needs it, kept fresh while the page is open. It reads the same
-// sources as the Live page (Sleeper matchups, the odds feed, ESPN's list of finished games) and stays null until
-// somebody has scored, so a quiet week leaves the published odds alone.
+// The current week as the playoff simulation needs it, kept fresh while the page is open. It reads the same sources
+// as the Live page (Sleeper matchups, the odds feed of Vegas player props, ESPN's list of finished games), so the week
+// is projected from Vegas wherever the feed has a player and from Sleeper only for the rest. If any source fails it
+// stays null and the simulation falls back to Sleeper's roster plan.
 import { useEffect, useRef, useState } from 'react'
 import { useLeague } from './data'
 import { buildBenchLines, buildStarterLine, EMPTY_SLOT, fetchLiveFeed, fetchMatchups, fetchSleeperProjections, fetchRosters, fetchWeek, indexBySleeperId, indexGamesByTeam, normalizeTeam, pairMatchups } from './live'
@@ -32,8 +33,7 @@ export function usePartialWeek(enabled: boolean): PartialWeek | null {
       const [matchups, rosters, projections, rawFeed, espn] = await Promise.all([
         fetchMatchups(week), fetchRosters(), fetchSleeperProjections(week), fetchLiveFeed(), fetchEspnSnapshot().catch(() => null),
       ])
-      const started = matchups.some((m) => m.starters_points.some((p) => p !== 0))
-      if (!alive || !season || !started) return
+      if (!alive || !season) return
       const dates = new Set(projections.gameDates)
       const feed = applyFinals(selectWeekGames(rawFeed, dates), espn ? parseFinishedTeams(espn.events, dates) : new Set())
       const live = indexBySleeperId(feed)
