@@ -4,8 +4,8 @@ import { useData } from '../lib/data'
 import { Icon } from './Icon'
 import { SearchPalette } from './Search'
 
-type NavItem = { to: string; label: string; icon: string; end?: boolean; also?: string }
-const NAV: { group: string; items: NavItem[] }[] = [
+export type NavItem = { to: string; label: string; icon: string; end?: boolean; also?: string }
+export const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'League',
     items: [
@@ -46,7 +46,18 @@ const NAV: { group: string; items: NavItem[] }[] = [
 
 const PAGES = NAV.flatMap((g) => g.items)
 
-function ago(iso: string) {
+// Phone bottom tab bar: four pinned tabs, everything else lives under More.
+const TABS: NavItem[] = [
+  { to: '/', label: 'Home', icon: 'home', end: true },
+  { to: '/history', label: 'History', icon: 'history' },
+  { to: '/seasons', label: 'Seasons', icon: 'calendar', also: '/season/' },
+  { to: '/playoffs', label: 'Playoffs', icon: 'trophy' },
+]
+const TAB_PATHS = new Set(TABS.map((t) => t.to))
+export const MORE = NAV.map((g) => ({ ...g, items: g.items.filter((n) => !TAB_PATHS.has(n.to)) })).filter((g) => g.items.length)
+export const isOn = (n: NavItem, path: string) => (n.end ? path === n.to : path === n.to || path.startsWith(n.to + '/')) || (!!n.also && path.startsWith(n.also))
+
+export function ago(iso: string) {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
   if (m < 1) return 'just now'
   if (m < 60) return `${m}m ago`
@@ -69,10 +80,11 @@ export default function Layout() {
   const loc = useLocation()
   useEffect(() => { setOpen(false); window.scrollTo(0, 0) }, [loc.pathname])
   useEffect(() => { document.body.classList.toggle('no-scroll', open) }, [open])
+  const moreActive = !TABS.some((t) => isOn(t, loc.pathname))
 
   const brand = (
     <div className="brand">
-      <span className="brand-mark">PGKL</span>
+      <img className="brand-mark" src={`${import.meta.env.BASE_URL}icons/icon-192.png?v=2`} alt="PGKL" width={36} height={36} />
       <div className="brand-text">
         <div className="brand-name">League Dashboard</div>
         <div className="brand-sub">{league?.seasons[0]?.name ?? 'Keeper League'}</div>
@@ -83,7 +95,6 @@ export default function Layout() {
   return (
     <div className="shell">
       <header className="topbar">
-        <button className="icon-btn" onClick={() => setOpen(true)} aria-label="Open menu"><Icon name="menu" size={20} /></button>
         {brand}
         <button className="icon-btn" onClick={() => setSearch(true)} aria-label="Search"><Icon name="search" size={18} /></button>
       </header>
@@ -120,6 +131,19 @@ export default function Layout() {
           {league && <div className="sync-meta"><span className="dot" /> Synced {ago(league.syncedAt)}</div>}
         </div>
       </aside>
+
+      <nav className="tabbar" aria-label="Main">
+        {TABS.map((t) => (
+          <NavLink key={t.to} to={t.to} end={t.end} className={() => (isOn(t, loc.pathname) ? 'tabbar-item active' : 'tabbar-item')}>
+            <Icon name={t.icon} size={22} />
+            <span>{t.label}</span>
+          </NavLink>
+        ))}
+        <NavLink to="/more" className={() => (moreActive ? 'tabbar-item active' : 'tabbar-item')}>
+          <Icon name="menu" size={22} />
+          <span>More</span>
+        </NavLink>
+      </nav>
 
       {league && <SearchPalette lg={league} pages={PAGES} open={search} onClose={() => setSearch(false)} />}
       <main className="content">

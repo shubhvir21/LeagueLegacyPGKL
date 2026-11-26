@@ -20,6 +20,7 @@ import Draft from './pages/Draft'
 import { RecapRedirect } from './pages/Recap'
 import AllTime from './pages/AllTime'
 import Butterfly from './pages/Butterfly'
+import More from './pages/More'
 import './styles.css'
 
 // Installable app + offline support (production only, so dev hot reload isn't cached).
@@ -67,6 +68,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="butterfly" element={<Butterfly />} />
             <Route path="whatif" element={<Navigate to="/butterfly" replace />} />
             <Route path="records" element={<RecordBook />} />
+            <Route path="more" element={<More />} />
           </Route>
         </Routes>
       </HashRouter>

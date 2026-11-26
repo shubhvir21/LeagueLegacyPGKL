@@ -1,5 +1,7 @@
 // Minimal stroke icon set (24×24, 1.75 stroke) so the UI doesn't lean on emoji.
 const P: Record<string, string> = {
+  chevronLeft: 'M15 6l-6 6 6 6',
+  chevronRight: 'M9 6l6 6-6 6',
   home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',
   history: 'M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 7v5l3 2',
   calendar: 'M4 6h16v14H4zM4 10h16M9 3v4M15 3v4',

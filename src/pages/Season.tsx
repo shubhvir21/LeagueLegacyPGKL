@@ -6,6 +6,7 @@ import { Avatar, Card, MemberLink, RankBadge, Stat, Table, TeamName, TIPS, type 
 import { signed } from './History'
 import { UpcomingSchedule } from './Home'
 import { RecapSection } from './Recap'
+import { SeasonWrapped } from '../components/Wrapped'
 
 export function SeasonIndex() {
   const lg = useLeague()
@@ -78,6 +79,8 @@ export default function Season() {
           <Stat icon="trendDown" label={`Lowest scorer · ${fmt(lowest.pf)}`} value={name(lowest)} />
         </div>
       </Card>
+
+      <SeasonWrapped key={year} year={year} />
 
       <Card title="Standings" sub="Regular-season standings. Record includes median games.">
         <StandingsTable s={s} />

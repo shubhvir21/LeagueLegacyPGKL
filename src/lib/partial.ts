@@ -3,6 +3,7 @@
 //
 // A player's slot is locked once his game starts. Everyone else is still movable, so the open slots are refilled with
 // the best unplayed players on the roster (starters and bench), the way the roster plan does for future weeks.
+import { FLEX } from './lineup'
 import { unknownShare, type StarterLine } from './live'
 import { posSd, type OddsModel } from './model'
 import { pickLineup, type PartialTeam, type PartialWeek } from './odds'
@@ -33,7 +34,11 @@ export function buildPartialWeek(week: number, sides: PartialSide[], model: Odds
     const pool: { pos: string; m: number; line: StarterLine | null }[] = [...side.starters, ...side.bench]
       .filter((l): l is StarterLine => l !== null && !hasStarted(l) && l.projected > 0)
       .map((line) => ({ pos: side.pos(line.playerId), m: line.projected, line }))
-    for (const [pos, m] of Object.entries(side.replacement)) if (m > 0) pool.push({ pos, m, line: null })
+    // One fill-in for every open slot the position can play, so a missing starter is always replaced.
+    for (const [pos, m] of Object.entries(side.replacement)) {
+      const fits = openSlots.filter((slot) => slot === pos || FLEX[slot]?.includes(pos)).length
+      if (m > 0) for (let k = 0; k < fits; k++) pool.push({ pos, m, line: null })
+    }
     const refilled = pickLineup(openSlots, pool)
 
     let fixed = 0

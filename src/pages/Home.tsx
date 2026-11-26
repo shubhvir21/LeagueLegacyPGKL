@@ -78,6 +78,7 @@ export default function Home() {
 
       {upcoming.length > 0 && (
         <Card
+          className="home-upcoming"
           title={<span className="slate-title"><span className="slate-week">Week {nextWeek}</span> Matchups</span>}
           sub={nextWeek === lg.nflWeek ? 'This week · in progress' : 'Up next'}
           right={<Link to={`/season/${current.year}`}>Schedule →</Link>}
@@ -88,6 +89,7 @@ export default function Home() {
 
       {lastGames.length > 0 && (
         <Card
+          className="home-results"
           title={<span className="slate-title"><span className="slate-week">Week {lastWeek}</span> Results</span>}
           right={<Link to={`/season/${current.year}`}>Season page →</Link>}
         >
@@ -95,7 +97,7 @@ export default function Home() {
         </Card>
       )}
 
-      <div className="two-col">
+      <div className="two-col home-tables">
         <Card title={`${current.year} Standings`} right={<Link to={`/season/${current.year}`}>Full season →</Link>}>
           <div className="table-wrap"><table className="fit-table"><tbody>{current.teamSeasons.map((t) => (
             <tr key={t.memberId}>

@@ -53,6 +53,11 @@ describe('buildPartialWeek', () => {
     expect(picked.find((x) => x.m === 8)!.nfl).toBe(-1)
   })
 
+  it('fills every empty slot a position can play, not just one', () => {
+    const w = buildPartialWeek(12, [side('a', ['WR', 'WR', 'FLEX'], [null, null, null], [], () => 'GB', { WR: 8 })], DEFAULT_MODEL)
+    expect(w.teams.a!.starters.map((x) => x.m)).toEqual([8, 8, 8])
+  })
+
   it('prefers a rostered player over the waiver-wire level when he is better', () => {
     const w = buildPartialWeek(12, [side('a', ['WR'], [line('w1', 0, 14, 'scheduled')], [], () => 'GB', { WR: 8 })], DEFAULT_MODEL)
     expect(w.teams.a!.starters.map((x) => x.m)).toEqual([14])

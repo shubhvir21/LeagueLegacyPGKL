@@ -17,3 +17,4 @@
 - Decision: published/frozen snapshots stay as they were; only today's table re-runs with partial results. Rewinding to an earlier week does not use them.
 - Checked old against new on week 12 (probabilities still sum to 6, 1, 1; teams with nothing played land within a point or two of the old roster plan). Found that using lineups as currently set understated teams with empty or weak unplayed slots. Fixed: a player's slot locks at kickoff; every open slot is refilled with the best unplayed rostered player or the waiver-wire level at that position. 15 tests.
 - Dropped the 'someone has scored' gate: the coming week is projected from the Vegas feed from Tuesday on (Sleeper only for players without props and for waiver levels).
+- Merged main (scenarios, waiver fill-in for every slot). The refill now adds one waiver fill-in per open slot a position can play, matching main. 16 tests.
