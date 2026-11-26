@@ -1,10 +1,11 @@
 // Live matchup projections: Sleeper's official points so far + the live-odds Worker's expected remaining points.
-// The Worker (see liveproj) turns sportsbook player props into time-aware projections; this file only reads it.
+// The worker (see liveproj) turns sportsbook player props into time-aware projections; this file only reads it.
 import { posSd, type OddsModel } from './model'
 import { CURRENT_LEAGUE_ID, type SleeperMatchup, type SleeperRoster } from './sleeper'
 
 const SLEEPER = 'https://api.sleeper.app/v1'
-export const LIVE_API_URL = (import.meta.env.VITE_LIVE_API_URL as string | undefined) ?? 'https://liveproj.trentcharlton21.workers.dev'
+/** The file the worker publishes every five minutes. Static, so readers never touch the worker or its database. */
+export const LIVE_FEED_URL = (import.meta.env.VITE_LIVE_FEED_URL as string | undefined) ?? 'https://feed.ffsweats.com/live/all.json'
 
 export type GameStatus = 'scheduled' | 'live' | 'final'
 export interface LiveRow {
@@ -41,7 +42,7 @@ async function getJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export const fetchLiveFeed = () => getJson<LiveFeed>(`${LIVE_API_URL}/api/live`)
+export const fetchLiveFeed = () => getJson<LiveFeed>(LIVE_FEED_URL)
 export const fetchWeek = async () => (await getJson<{ week: number }>(`${SLEEPER}/state/nfl`)).week
 export const fetchMatchups = (week: number) => getJson<SleeperMatchup[]>(`${SLEEPER}/league/${CURRENT_LEAGUE_ID}/matchups/${week}`)
 

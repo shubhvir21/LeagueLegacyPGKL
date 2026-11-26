@@ -20,8 +20,8 @@ npm run sync   # refresh the committed snapshot in public/data/league.json
   history (src/lib/model.ts) and backtests past seasons to choose the roster-vs-scoring blend.
 - **Live Matchups** (`/live`, src/lib/live.ts) shows this week's head-to-heads with time-aware projections:
   Sleeper's official points so far plus expected remaining points from sportsbook player props, scaled by time
-  left and game pace. The numbers come from a separate Cloudflare Worker + D1 (`liveproj`); set
-  `VITE_LIVE_API_URL` to point at your own deployment. Players without props (K/DEF) fall back to Sleeper's
+  left and game pace. A separate Cloudflare Worker + D1 (`liveproj`) publishes the numbers as a static file; set
+  `VITE_LIVE_FEED_URL` to point at your own feed. Players without props (K/DEF) fall back to Sleeper's
   static projection, and the page says so when the odds feed is unreachable or stale.
 - Stat definitions live in `src/lib/stats.ts` and in the ⓘ tooltips.
 
