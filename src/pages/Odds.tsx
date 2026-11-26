@@ -19,7 +19,7 @@ const T = {
   roster: 'Best possible lineup next week from the roster. Each player = Sleeper projection (bias-corrected per position) blended with his actual points this season; byes are zeroed, Out/Doubtful/IR players sit out next week, and later weeks follow Sleeper’s projection (which builds in return dates), and an empty slot is filled by the best waiver-wire option.',
   scoring: 'Actual points per week, recent weeks weighted more (6-week half-life), shrunk toward the league’s all-time average early in the year.',
   swing: 'Playoff odds if this team wins vs. loses its head-to-head game next week. The gap is how much the game matters.',
-  swing3: 'Playoff odds next week if this team goes 2–0 (wins its matchup and the median game), splits 1–1, or goes 0–2.',
+  swing3: 'This league plays two games a week: your head-to-head matchup and the median game (beat the league’s median score). Playoff odds if this team wins both (2–0), wins one and loses one (1–1), or loses both (0–2).',
   model: 'Every simulation draws each team’s true scoring level (with uncertainty), plays the rest of the regular season including the median game, seeds by wins then points for, and plays the bracket.',
 }
 
@@ -99,7 +99,10 @@ export function OddsSection() {
     { key: 't', label: 'Title', render: (t) => <b className="pos">{p(t.title)}</b>, sort: (t) => t.title, align: 'right' },
     { key: 'l', label: 'Toilet Bowl', tip: 'Odds of losing the toilet bowl (finishing last)', render: (t) => <span className="neg">{p(t.last)}</span>, sort: (t) => t.last, align: 'right' },
     ...(run.nextWeek ? [{
-      key: 'sw', label: hasSplit ? `W${run.nextWeek} Win / Split / Loss` : `W${run.nextWeek} Win / Loss`, tip: hasSplit ? T.swing3 : T.swing, align: 'right' as const,
+      key: 'sw',
+      label: hasSplit
+        ? <span>{`W${run.nextWeek} playoff odds if`}<br /><span className="pos">win both</span> / split / <span className="neg">lose both</span></span>
+        : `W${run.nextWeek} Win / Loss`, tip: hasSplit ? T.swing3 : T.swing, align: 'right' as const,
       sort: (t: TeamOdds) => (t.ifWin ?? 0) - (t.ifLoss ?? 0),
       render: (t: TeamOdds) => t.ifWin == null && t.ifLoss == null ? '—' : (
         <span style={{ whiteSpace: 'nowrap' }}>
@@ -326,13 +329,13 @@ export function ScenariosSection() {
 
         {t.ownGames.length > 0 && (
           <div className="scen-block">
-            <h3>{run.median ? 'Their games · win = 2–0, split = 1–1, loss = 0–2' : 'Their games'}</h3>
+            <h3>{run.median ? 'Their games · each week is two games: the matchup and the median' : 'Their games'}</h3>
             <ul className="scen-list">{t.ownGames.map((x) => (
               <li key={x.week}>
                 <span className="scen-wk">W{x.week}</span>
                 <span className="scen-who">vs <MemberLink id={x.b} /></span>
                 <span className="scen-odds">{run.median
-                  ? <><span className="pos">Win {p(x.ifA)}</span><span>Split {x.ifSplit == null ? '—' : p(x.ifSplit)}</span><span className="neg">Loss {p(x.ifB)}</span></>
+                  ? <><span className="pos">Win both {p(x.ifA)}</span><span>Split {x.ifSplit == null ? '—' : p(x.ifSplit)}</span><span className="neg">Lose both {p(x.ifB)}</span></>
                   : <><span className="pos">Win {p(x.ifA)}</span><span className="neg">Lose {p(x.ifB)}</span></>}</span>
               </li>
             ))}</ul>
