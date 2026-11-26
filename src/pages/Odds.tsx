@@ -11,6 +11,7 @@ import { PALETTE } from './History'
 
 const METRICS = { Playoffs: 'playoff', Bye: 'bye', Title: 'title' } as const
 type Metric = keyof typeof METRICS
+const pctOr = (x: number | null | undefined) => (x == null ? '—' : p(x))
 const p = (x: number) => (x >= 0.9995 ? '100%' : x > 0 && x < 0.001 ? '<0.1%' : `${(x * 100).toFixed(1)}%`)
 const heat = (x: number) => ({ background: `rgba(124, 140, 255, ${Math.min(0.85, x * 1.6)})`, color: x > 0.3 ? '#fff' : undefined })
 
@@ -101,15 +102,20 @@ export function OddsSection() {
     ...(run.nextWeek ? [{
       key: 'sw',
       label: hasSplit
-        ? <span>{`W${run.nextWeek} playoff odds if`}<br /><span className="pos">win both</span> / matchup only / median only / <span className="neg">lose both</span></span>
+        ? <span>{`W${run.nextWeek} playoff odds if`}<span className="sw-legend"><br /><span className="pos">win both</span> / matchup only / median only / <span className="neg">lose both</span></span></span>
         : `W${run.nextWeek} Win / Loss`, tip: hasSplit ? T.swing3 : T.swing, align: 'right' as const,
       sort: (t: TeamOdds) => (t.ifWin ?? 0) - (t.ifLoss ?? 0),
       render: (t: TeamOdds) => t.ifWin == null && t.ifLoss == null ? '—' : (
-        <span style={{ whiteSpace: 'nowrap' }}>
-          <span className="pos">{t.ifWin == null ? '—' : p(t.ifWin)}</span>
-          {hasSplit && <> / <span>{t.ifMatchupOnly == null ? '—' : p(t.ifMatchupOnly)}</span> / <span>{t.ifMedianOnly == null ? '—' : p(t.ifMedianOnly)}</span></>}
-          {' / '}<span className="neg">{t.ifLoss == null ? '—' : p(t.ifLoss)}</span>
-        </span>
+        hasSplit ? (
+          <span className="sw4">
+            <span className="pos"><b>{pctOr(t.ifWin)}</b><i>Win both</i></span>
+            <span><b>{pctOr(t.ifMatchupOnly)}</b><i>Matchup only</i></span>
+            <span><b>{pctOr(t.ifMedianOnly)}</b><i>Median only</i></span>
+            <span className="neg"><b>{pctOr(t.ifLoss)}</b><i>Lose both</i></span>
+          </span>
+        ) : (
+          <span style={{ whiteSpace: 'nowrap' }}><span className="pos">{pctOr(t.ifWin)}</span> / <span className="neg">{pctOr(t.ifLoss)}</span></span>
+        )
       ),
     }] : []),
   ]
