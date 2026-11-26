@@ -3,7 +3,8 @@
 // somebody has scored, so a quiet week leaves the published odds alone.
 import { useEffect, useRef, useState } from 'react'
 import { useLeague } from './data'
-import { buildTeamLines, fetchLiveFeed, fetchMatchups, fetchSleeperProjections, fetchWeek, indexBySleeperId, indexGamesByTeam, normalizeTeam, pairMatchups } from './live'
+import { buildBenchLines, buildStarterLine, EMPTY_SLOT, fetchLiveFeed, fetchMatchups, fetchSleeperProjections, fetchRosters, fetchWeek, indexBySleeperId, indexGamesByTeam, normalizeTeam, pairMatchups } from './live'
+import { lineupSlots } from './lineup'
 import { DEFAULT_MODEL } from './model'
 import type { PartialWeek } from './odds'
 import { buildPartialWeek } from './partial'
@@ -24,10 +25,12 @@ export function usePartialWeek(enabled: boolean): PartialWeek | null {
     const season = lg.seasons[0]
     const info = playersOf(lg).info
     const model = lg.raw.model ?? DEFAULT_MODEL
+    const latest = lg.raw.seasons.at(-1)
+    const slots = lineupSlots(latest?.league.roster_positions ?? [])
     const load = async () => {
       const week = await fetchWeek()
-      const [matchups, projections, rawFeed, espn] = await Promise.all([
-        fetchMatchups(week), fetchSleeperProjections(week), fetchLiveFeed(), fetchEspnSnapshot().catch(() => null),
+      const [matchups, rosters, projections, rawFeed, espn] = await Promise.all([
+        fetchMatchups(week), fetchRosters(), fetchSleeperProjections(week), fetchLiveFeed(), fetchEspnSnapshot().catch(() => null),
       ])
       const started = matchups.some((m) => m.starters_points.some((p) => p !== 0))
       if (!alive || !season || !started) return
@@ -42,7 +45,11 @@ export function usePartialWeek(enabled: boolean): PartialWeek | null {
       const sides = pairMatchups(matchups).flatMap(([a, b]) => [a, ...(b ? [b] : [])]).flatMap((m) => {
         const memberId = season.teamSeasons.find((t) => t.rosterId === m.roster_id)?.memberId
         return memberId ? [{
-          memberId, lines: buildTeamLines(m, ctx), pos: (id: string) => info[id]?.pos ?? 'WR',
+          memberId, slots,
+          starters: m.starters.map((id, i) => (id === EMPTY_SLOT ? null : buildStarterLine(id, m.starters_points[i] ?? 0, ctx))),
+          bench: buildBenchLines(m, rosters.find((r) => r.roster_id === m.roster_id), ctx),
+          replacement: Object.fromEntries(Object.entries(latest?.projections?.repl?.[week] ?? {}).map(([pos, v]) => [pos, v * (model.pos[pos]?.bias ?? 1)])),
+          pos: (id: string) => info[id]?.pos ?? 'WR',
           nflOf: (id: string) => { const t = live.get(id)?.row.team ?? info[id]?.team; return t ? normalizeTeam(t) : null },
         }] : []
       })

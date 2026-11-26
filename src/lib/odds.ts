@@ -48,7 +48,7 @@ interface WeekPlan { R: number; starters: Starter[] }
 type Plan = Record<string, Record<number, WeekPlan>> // member -> week -> lineup
 
 /** Starting lineup chosen by expected points (managers start their best team). */
-function pickLineup<T extends { pos: string; m: number }>(slots: string[], players: T[]): T[] {
+export function pickLineup<T extends { pos: string; m: number }>(slots: string[], players: T[]): T[] {
   const pool = [...players].sort((a, b) => b.m - a.m)
   const used = new Set<number>()
   const out: T[] = []
