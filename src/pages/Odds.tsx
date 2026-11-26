@@ -19,7 +19,7 @@ const T = {
   roster: 'Best possible lineup next week from the roster. Each player = Sleeper projection (bias-corrected per position) blended with his actual points this season; byes are zeroed, Out/Doubtful/IR players sit out next week, and later weeks follow Sleeper’s projection (which builds in return dates), and an empty slot is filled by the best waiver-wire option.',
   scoring: 'Actual points per week, recent weeks weighted more (6-week half-life), shrunk toward the league’s all-time average early in the year.',
   swing: 'Playoff odds if this team wins vs. loses its head-to-head game next week. The gap is how much the game matters.',
-  swing3: 'This league plays two games a week: your head-to-head matchup and the median game (beat the league’s median score). Playoff odds if this team wins both (2–0), wins one and loses one (1–1), or loses both (0–2).',
+  swing3: 'This league plays two different games a week: your head-to-head matchup (beat one team) and the median game (score above the league’s median, whoever you play). Playoff odds if this team wins both, wins only its matchup, beats only the median, or loses both.',
   model: 'Every simulation draws each team’s true scoring level (with uncertainty), plays the rest of the regular season including the median game, seeds by wins then points for, and plays the bracket.',
 }
 
@@ -101,13 +101,13 @@ export function OddsSection() {
     ...(run.nextWeek ? [{
       key: 'sw',
       label: hasSplit
-        ? <span>{`W${run.nextWeek} playoff odds if`}<br /><span className="pos">win both</span> / split / <span className="neg">lose both</span></span>
+        ? <span>{`W${run.nextWeek} playoff odds if`}<br /><span className="pos">win both</span> / matchup only / median only / <span className="neg">lose both</span></span>
         : `W${run.nextWeek} Win / Loss`, tip: hasSplit ? T.swing3 : T.swing, align: 'right' as const,
       sort: (t: TeamOdds) => (t.ifWin ?? 0) - (t.ifLoss ?? 0),
       render: (t: TeamOdds) => t.ifWin == null && t.ifLoss == null ? '—' : (
         <span style={{ whiteSpace: 'nowrap' }}>
           <span className="pos">{t.ifWin == null ? '—' : p(t.ifWin)}</span>
-          {hasSplit && <> / <span>{t.ifSplit == null ? '—' : p(t.ifSplit)}</span></>}
+          {hasSplit && <> / <span>{t.ifMatchupOnly == null ? '—' : p(t.ifMatchupOnly)}</span> / <span>{t.ifMedianOnly == null ? '—' : p(t.ifMedianOnly)}</span></>}
           {' / '}<span className="neg">{t.ifLoss == null ? '—' : p(t.ifLoss)}</span>
         </span>
       ),
@@ -306,7 +306,8 @@ export function ScenariosSection() {
             <h3>Week {nx.week}</h3>
             <div className="stat-grid scen-stats">
               {nx.both != null && <Stat label={nx.median ? 'Win both' : 'Win'} value={<span className="pos">{p(nx.both)}</span>} />}
-              {nx.split != null && <Stat label="Split" value={p(nx.split)} />}
+              {nx.matchupOnly != null && <Stat label="Win matchup only" value={p(nx.matchupOnly)} />}
+              {nx.medianOnly != null && <Stat label="Beat median only" value={p(nx.medianOnly)} />}
               {nx.none != null && <Stat label={nx.median ? 'Lose both' : 'Lose'} value={<span className="neg">{p(nx.none)}</span>} />}
             </div>
           </div>
@@ -329,13 +330,13 @@ export function ScenariosSection() {
 
         {t.ownGames.length > 0 && (
           <div className="scen-block">
-            <h3>{run.median ? 'Their games · each week is two games: the matchup and the median' : 'Their games'}</h3>
+            <h3>{run.median ? 'Their games · each week is two different games: the matchup and the median' : 'Their games'}</h3>
             <ul className="scen-list">{t.ownGames.map((x) => (
               <li key={x.week}>
                 <span className="scen-wk">W{x.week}</span>
                 <span className="scen-who">vs <MemberLink id={x.b} /></span>
                 <span className="scen-odds">{run.median
-                  ? <><span className="pos">Win both {p(x.ifA)}</span><span>Split {x.ifSplit == null ? '—' : p(x.ifSplit)}</span><span className="neg">Lose both {p(x.ifB)}</span></>
+                  ? <><span className="pos">Win both {p(x.ifA)}</span><span>Matchup only {x.ifMatchupOnly == null ? '—' : p(x.ifMatchupOnly)}</span><span>Median only {x.ifMedianOnly == null ? '—' : p(x.ifMedianOnly)}</span><span className="neg">Lose both {p(x.ifB)}</span></>
                   : <><span className="pos">Win {p(x.ifA)}</span><span className="neg">Lose {p(x.ifB)}</span></>}</span>
               </li>
             ))}</ul>

@@ -124,3 +124,35 @@ describe('simulate with a week in progress', () => {
     expect(r.a!.rating).toBeLessThan(150)
   })
 })
+
+describe('next-week outcomes in a median league', () => {
+  // Week 2 is pinned: a 100 vs b 120, c 50 vs d 60; the median line is 80.
+  // a loses the matchup but beats the median, b wins both, c loses both, d wins the matchup but misses the median.
+  const ctx: Ctx = {
+    season: { year: 2026, playoffTeams: 2, playoffStart: 4 } as Season,
+    ids: ['a', 'b', 'c', 'd'], scores: { a: [90], b: [90], c: [90], d: [90] },
+    pairings: { 1: [['a', 'b'], ['c', 'd']], 2: [['a', 'b'], ['c', 'd']], 3: [['a', 'b'], ['c', 'd']] },
+    lastReg: 3, median: true, priorMean: 90, priorSd: 20,
+  }
+  const pinned: PartialWeek = { week: 2, teams: { a: { fixed: 100, starters: [] }, b: { fixed: 120, starters: [] }, c: { fixed: 50, starters: [] }, d: { fixed: 60, starters: [] } } }
+  const t = Object.fromEntries(simulate(ctx, 1, 600, 3, { partial: pinned }).teams.map((x) => [x.memberId, x]))
+
+  it('puts a team that won both in win-both only', () => {
+    expect(t.b!.ifWin).not.toBeNull()
+    expect([t.b!.ifMatchupOnly, t.b!.ifMedianOnly, t.b!.ifLoss]).toEqual([null, null, null])
+  })
+  it('separates beating the median from winning the matchup', () => {
+    expect(t.a!.ifMedianOnly).not.toBeNull() // lost the matchup, beat the median
+    expect([t.a!.ifWin, t.a!.ifMatchupOnly, t.a!.ifLoss]).toEqual([null, null, null])
+    expect(t.d!.ifMatchupOnly).not.toBeNull() // won the matchup, missed the median
+    expect([t.d!.ifWin, t.d!.ifMedianOnly, t.d!.ifLoss]).toEqual([null, null, null])
+  })
+  it('puts a team that lost both in lose-both only', () => {
+    expect(t.c!.ifLoss).not.toBeNull()
+    expect([t.c!.ifWin, t.c!.ifMatchupOnly, t.c!.ifMedianOnly]).toEqual([null, null, null])
+  })
+  it('still reports the combined split', () => {
+    expect(t.a!.ifSplit).not.toBeNull()
+    expect(t.d!.ifSplit).not.toBeNull()
+  })
+})
